@@ -1,0 +1,19 @@
+%import common.WS_INLINE -> _WSI
+%import common.NEWLINE -> _NL
+
+start           : entry+
+entry           : _ACRONYM protein_id description [commentary] [_WSI] ref_id _NL
+
+content    : protein_id description ref_id
+commentary      : "(" _seperated{content, ";"} ")"
+
+description     : [_WSI] (TEXT ["\t"])+
+protein_id      : "#" _seperated{NUM_ID, _LIST_SEP} "#"
+ref_id          : "<" _seperated{NUM_ID, _LIST_SEP} ">"
+
+_ACRONYM        : "PLACEHOLDER"
+_LIST_SEP       : "," | "\t"
+NUM_ID          : /[0-9]+/
+TEXT            : /[\w .,]+/
+
+_seperated{x, sep}: x (sep x)*  // Define a sequence of 'x sep x sep x ...'
