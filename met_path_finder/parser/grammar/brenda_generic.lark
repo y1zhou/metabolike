@@ -1,24 +1,22 @@
 %import common.NEWLINE -> _NL
 
 start      : entry+
-entry      : _ACRONYM [protein_id] DESCRIPTION [commentary _WS] [ref_id] _NL
+entry      : _ACRONYM [protein_id] DESCRIPTION+ [commentary _WS] [ref_id] _NL
 
 commentary : "(" _seperated{content, _COMMENTARY_SEP} ")"
-content    : protein_id DESCRIPTION ref_id
+content    : protein_id DESCRIPTION+ ref_id
 
-DESCRIPTION: TOKEN+ [_WS]
+DESCRIPTION: TOKEN+
+    | [_WS] "(" TOKEN+ ")" ["-" | ", " | _WS]  // e.g. (S)-xxx or (1 g/kg ip), parentheses but not commentary
+    | [_WS] "[" /[^\]]+/  "]" // Often chemical names wrapped in [...]
 protein_id : "#" _seperated{NUM_ID, _LIST_SEP} "#"
 ref_id     : "<" _seperated{NUM_ID, _LIST_SEP} ">"
 
-TOKEN      : [_WS] CHAR+
-    | [_WS] ARROW
-    | [_WS] COMPARE_NUM
-    | [_WS] "(" (CHAR+ [_WS])* ")" [("-" | ", ") CHAR+]  // e.g. (S)-xxx or (1 g/kg ip), parentheses but not commentary
-    | [_WS] "[" /[^\]]+/  "]"  // Often chemical names wrapped in [...]
-
+TOKEN      : [_WS] (CHAR+ | ARROW | COMPARE_NUM) [_WS]
 CHAR       : /\w/
     | /[^\x00-\x7F]/  // Unicode characters
     | "?" | "." | "," | "+" | ":" | "/" | "*" | "-" | "%" | "'"
+    | "(H)"  // NADP(H), NAD(H)
 
 ARROW      : "<->" | "<-->" | "<-" | "->" | "-->"
 COMPARE_NUM: /p\s?<\s?0\.05/i  // p-values
@@ -30,5 +28,5 @@ _WS        : ("\t" | " ")+
 NUM_ID     : /\d+/
 FLOAT_NUM  : /\d+(\.\d+)?/
 
-_seperated{x, sep}: x (sep x)*  // Define a sequence of 'x sep x sep x ...'
+_seperated{x, sep}: x (sep x)*  // A sequence of 'x sep x sep x ...'
 _ACRONYM   : "<acronym>\t"

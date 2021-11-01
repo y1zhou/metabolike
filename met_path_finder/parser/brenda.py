@@ -265,10 +265,23 @@ if __name__ == "__main__":
     for _, (_, field, text) in br.db.iterrows():
         if field not in [
             "REACTION",
+            # field-specific information
             "NATURAL_SUBSTRATE_PRODUCT",
             "SUBSTRATE_PRODUCT",
             "TURNOVER_NUMBER",
             "KM_VALUE",
             "KI_VALUE",
+            "REFERENCE",
+            "IC50_VALUE",
+            # no description, just commentary
+            "CLONED",
+            "CRYSTALLIZATION",
+            "PURIFICATION",
+            "GENERAL_STABILITY",
+            "STORAGE_STABILITY",
+            # Special case
+            "TRANSFERRED_DELETED",
         ]:
+            print(f"Working on {field}")
             res = br._description_to_tree(text, FIELD_SET[field])
+            print(f"Finished {field}")
