@@ -89,7 +89,7 @@ class Brenda:
     """
 
     def __init__(self):
-        self.db = None
+        pass
 
     def parse(self, filepath: Union[str, Path]):
         filepath = Path(filepath).expanduser().resolve()
@@ -248,7 +248,7 @@ class Brenda:
 
         # Replace placeholder with actual acronym
         grammar = fr"""
-            %import .grammar.brenda_generic (start, _ACRONYM)
+            %import .grammar.brenda_{mode} (start, _ACRONYM)
             %override _ACRONYM: "{acronym}\t"
         """
 
@@ -262,7 +262,13 @@ class Brenda:
 if __name__ == "__main__":
     br = Brenda()
     br.parse("/mnt/data0/yi/dissertation/met_path_finder/tests/data/brenda_test.txt")
-    text = br.db.loc[0, "description"]
-
-    res = br._description_to_tree(text, FIELD_SET["PROTEIN"])
-    print(res.pretty())
+    for _, (_, field, text) in br.db.iterrows():
+        if field not in [
+            "REACTION",
+            "NATURAL_SUBSTRATE_PRODUCT",
+            "SUBSTRATE_PRODUCT",
+            "TURNOVER_NUMBER",
+            "KM_VALUE",
+            "KI_VALUE",
+        ]:
+            res = br._description_to_tree(text, FIELD_SET[field])

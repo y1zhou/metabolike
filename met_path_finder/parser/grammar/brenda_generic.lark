@@ -1,19 +1,34 @@
-%import common.WS_INLINE -> _WSI
 %import common.NEWLINE -> _NL
 
-start           : entry+
-entry           : _ACRONYM protein_id description [commentary] [_WSI] ref_id _NL
+start      : entry+
+entry      : _ACRONYM [protein_id] DESCRIPTION [commentary _WS] [ref_id] _NL
 
-content    : protein_id description ref_id
-commentary      : "(" _seperated{content, ";"} ")"
+commentary : "(" _seperated{content, _COMMENTARY_SEP} ")"
+content    : protein_id DESCRIPTION ref_id
 
-description     : [_WSI] (TEXT ["\t"])+
-protein_id      : "#" _seperated{NUM_ID, _LIST_SEP} "#"
-ref_id          : "<" _seperated{NUM_ID, _LIST_SEP} ">"
+DESCRIPTION: TOKEN+ [_WS]
+protein_id : "#" _seperated{NUM_ID, _LIST_SEP} "#"
+ref_id     : "<" _seperated{NUM_ID, _LIST_SEP} ">"
 
-_ACRONYM        : "PLACEHOLDER"
-_LIST_SEP       : "," | "\t"
-NUM_ID          : /[0-9]+/
-TEXT            : /[\w .,]+/
+TOKEN      : [_WS] CHAR+
+    | [_WS] ARROW
+    | [_WS] COMPARE_NUM
+    | [_WS] "(" (CHAR+ [_WS])* ")" [("-" | ", ") CHAR+]  // e.g. (S)-xxx or (1 g/kg ip), parentheses but not commentary
+    | [_WS] "[" /[^\]]+/  "]"  // Often chemical names wrapped in [...]
+
+CHAR       : /\w/
+    | /[^\x00-\x7F]/  // Unicode characters
+    | "?" | "." | "," | "+" | ":" | "/" | "*" | "-" | "%" | "'"
+
+ARROW      : "<->" | "<-->" | "<-" | "->" | "-->"
+COMPARE_NUM: /p\s?<\s?0\.05/i  // p-values
+    | /[<>]/ FLOAT_NUM "%"  // percentages
+
+_COMMENTARY_SEP : /;\s*/
+_LIST_SEP  : "," | "\t"
+_WS        : ("\t" | " ")+
+NUM_ID     : /\d+/
+FLOAT_NUM  : /\d+(\.\d+)?/
 
 _seperated{x, sep}: x (sep x)*  // Define a sequence of 'x sep x sep x ...'
+_ACRONYM   : "<acronym>\t"
