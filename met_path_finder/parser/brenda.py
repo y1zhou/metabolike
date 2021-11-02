@@ -78,13 +78,16 @@ FIELDS = {
     "TURNOVER_NUMBER": "TN",  # substrate in {...}
 }
 
-FIELD_WITH_SPECIFIC_INFO = {
+FIELD_WITH_REACTIONS = {
+    "REACTION",
     "NATURAL_SUBSTRATE_PRODUCT",
     "SUBSTRATE_PRODUCT",
+}
+
+FIELD_WITH_SPECIFIC_INFO = {
     "TURNOVER_NUMBER",
     "KM_VALUE",
     "KI_VALUE",
-    "REFERENCE",
     "IC50_VALUE",
 }
 
@@ -338,64 +341,51 @@ class GenericTreeTransformer(BaseTransformer):
         res = {x.type: x.value for x in children}
         return res
 
-        return Token("description", res)
+
+class ReactionTreeTransformer(GenericTreeTransformer):
+    """
+    Commentary in `(...)` are on substrates, and in `|...|` on products.
+    """
+
+    def reaction(self, children) -> Token:
+        """Parse the reaction in the description node.
+
+        There should be three parts:
+            - The left-hand-side of the reaction, which is a list of chemical
+                names, separated by ` + `.
+            - The separator ` = `.
+            - The right-hand-side of the reaction, which is a list of chemical
+                names, separated by ` + `.
+        """
+        reaction = " ".join([x.value.strip() for x in children])
+        reaction = self._fix_string(reaction)
+        lhs, rhs = reaction.split(" = ")
+        lhs = lhs.split(" + ")
+        rhs = rhs.split(" + ")
+        res = {"lhs": lhs, "rhs": rhs}
+        return Token("reaction", res)
 
     def commentary(self, children) -> Token:
-        # protein_id, ref_id, description are the only possible cases
-        res = {}
-        descriptions = []
-        for child in children:
-            if child.type == "protein_id":
-                res["protein_id"] = child.value
-            elif child.type == "ref_id":
-                res["ref_id"] = child.value
-            else:
-                descriptions.append(child.value)
+        return Token("commentary_substrate", children)
 
-        res["description"] = " ".join(descriptions)
-        res["description"] = self._fix_string(res["description"])
-        return Token("commentary", res)
+    def more_commentary(self, children) -> Token:
+        return Token("commentary_product", children)
 
-    def entry(self, children: List[Token]) -> Dict[str, Union[str, List[int]]]:
-        descriptions = []
-        res = {}
-        for child in children:
-            if child.type == "protein_id":
-                res["protein_id"] = child.value
-            elif child.type == "ref_id":
-                res["ref_id"] = child.value
-            elif child.type == "description":
-                # Concatenate description nodes
-                descriptions.append(child.value)
-            else:
-                res["commentary"] = child.value
+    def reversibility(self, children) -> Token:
+        """
+        `r` for reversible, `ir` for irreversible, `?` for unknown.
+        """
+        x = children[0].value
+        x = x.replace("{", "")
+        x = x.replace("}", "")
+        if not x:
+            x = "?"
+        return Token("reversibility", x)
 
-        res["description"] = " ".join(descriptions)
-        res["description"] = self._fix_string(res["description"])
-        return res
-
-    @staticmethod
-    def _fix_string(s: str):
-        s = s.replace("( ", "(")
-        s = s.replace(" )", ")")
-        s = s.replace("[ ", "[")
-        s = s.replace(" ]", "]")
-        return s
+    # def entry(self, children):
+    #     return children
 
 
 if __name__ == "__main__":
     br = Brenda()
-    br.parse("/mnt/data0/yi/dissertation/met_path_finder/tests/data/brenda_test.txt")
-    for _, (ec_num, field, text) in br.db.iterrows():
-        if field == "REACTION":
-            res = br._description_to_tree(text, FIELDS[field], "reaction")
-        elif field == "TRANSFERRED_DELETED":
-            pass
-        elif field in FIELD_WITH_SPECIFIC_INFO:
-            res = br._description_to_tree(text, FIELDS[field], "specific_info")
-        elif field in FIELD_COMMENTARY_ONLY:
-            res = br._description_to_tree(text, FIELDS[field], "commentary")
-        else:
-            res = br._description_to_tree(
-                text, FIELDS[field], transformer=GenericTreeTransformer()
-            )
+    br.parse("tests/data/brenda_test.txt")
