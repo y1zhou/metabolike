@@ -3,8 +3,8 @@
 start      : entry+
 entry      : _ACRONYM [protein_id] description+ [commentary _WS] [ref_id] _NL
 
-commentary : "(" _seperated{_content, _COMMENTARY_SEP} ")"
-_content    : protein_id description+ ref_id
+commentary : "(" _seperated{content, _COMMENTARY_SEP} ")"
+content    : protein_id description+ ref_id
 
 !description: TOKEN+
     | [_WS] "(" TOKEN+ ")" ["-" | ", " | _WS]  // e.g. (S)-xxx or (1 g/kg ip), parentheses but not commentary

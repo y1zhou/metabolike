@@ -24,9 +24,8 @@ given in the original paper only the organism is given.
 
 ///	indicates the end of an EC-number specific part.
 """
-from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 from lark import Lark, Token, Tree
@@ -293,9 +292,7 @@ class Brenda:
         return tree
 
 
-class GenericTreeTransformer(Transformer):
-    """Transform extracted values from bottom-up."""
-
+class BaseTransformer(Transformer):
     def NUM_ID(self, num):
         return num.update(value=int(num))
 
@@ -310,8 +307,37 @@ class GenericTreeTransformer(Transformer):
         children = [x.value for x in children]
         return Token("ref_id", children)
 
+    @staticmethod
+    def _fix_string(s: str):
+        s = s.replace("( ", "(")
+        s = s.replace(" )", ")")
+        s = s.replace("[ ", "[")
+        s = s.replace(" ]", "]")
+        return s
+
+
+class GenericTreeTransformer(BaseTransformer):
+    """Transform extracted values from bottom-up.
+
+    Formats the tree into a dictionary, as described in :meth:`entry`.
+    """
+
     def description(self, children) -> Token:
         res = " ".join([x.value for x in children])
+        res = self._fix_string(res)
+        return Token("description", res)
+
+    def content(self, children) -> Dict[str, Union[str, List[int]]]:
+        res = {x.type: x.value for x in children}
+        return res
+
+    def commentary(self, children) -> List[Dict[str, Union[str, List[int]]]]:
+        return Token("commentary", children)
+
+    def entry(self, children: List[Token]) -> Dict[str, Any]:
+        res = {x.type: x.value for x in children}
+        return res
+
         return Token("description", res)
 
     def commentary(self, children) -> Token:
