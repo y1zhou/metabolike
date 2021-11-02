@@ -24,6 +24,7 @@ given in the original paper only the organism is given.
 
 ///	indicates the end of an EC-number specific part.
 """
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -135,23 +136,22 @@ _separated{x, sep}: x (sep x)*  // A sequence of 'x sep x sep x ...'
 class Brenda:
     """Class for working with Brenda.
 
-    Args:
-        filepath: Path to the Brenda file.
-
     Attributes:
-        db: TODO
+        df: cleaned BRENDA text file as a pandas DataFrame.
     """
 
     def __init__(self):
-        pass
+        self.df: pd.DataFrame
 
     def parse(self, filepath: Union[str, Path]):
         # Read text file into pandas DataFrame, where the last column contains
         # the text that is to be parsed into trees.
         filepath = Path(filepath).expanduser().resolve()
-        self.db = self.read_brenda(filepath)
+        self.df = self.read_brenda(filepath)
 
         # TODO: parse the text into a tree
+        for _, (ec_num, field, description) in self.df.iterrows():
+            res = self._text_to_tree(description, field)
 
         # TODO: feed the tree into a Neo4j database
 
@@ -375,10 +375,9 @@ class BaseTransformer(Transformer):
 
     @staticmethod
     def _fix_string(s: str):
-        s = s.replace("( ", "(")
-        s = s.replace(" )", ")")
-        s = s.replace("[ ", "[")
-        s = s.replace(" ]", "]")
+        s = re.sub(r"([\[(]) ", r"\1", s)
+        s = re.sub(r" ([\])])", r"\1", s)
+        s = s.replace("\t", " ")
         return s
 
 
@@ -389,7 +388,7 @@ class GenericTreeTransformer(BaseTransformer):
     """
 
     def description(self, children) -> Token:
-        res = " ".join([x.value for x in children])
+        res = " ".join([x.value.strip() for x in children])
         res = self._fix_string(res)
         return Token("description", res)
 
