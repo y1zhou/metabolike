@@ -24,14 +24,16 @@ given in the original paper only the organism is given.
 
 ///	indicates the end of an EC-number specific part.
 """
-import re
+from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
-from lark import Lark, Tree
+from lark import Lark, Token, Tree
+from lark.visitors import Transformer
+from met_path_finder import db
 
-FIELD_SET = {
+FIELDS = {
     "ACTIVATING_COMPOUND": "AC",
     "APPLICATION": "AP",
     "CLONED": "CL",
@@ -77,6 +79,24 @@ FIELD_SET = {
     "TURNOVER_NUMBER": "TN",  # substrate in {...}
 }
 
+FIELD_WITH_SPECIFIC_INFO = {
+    "NATURAL_SUBSTRATE_PRODUCT",
+    "SUBSTRATE_PRODUCT",
+    "TURNOVER_NUMBER",
+    "KM_VALUE",
+    "KI_VALUE",
+    "REFERENCE",
+    "IC50_VALUE",
+}
+
+FIELD_COMMENTARY_ONLY = {
+    "CLONED",
+    "CRYSTALLIZATION",
+    "PURIFICATION",
+    "GENERAL_STABILITY",
+    "STORAGE_STABILITY",
+}
+
 
 class Brenda:
     """Class for working with Brenda.
@@ -92,9 +112,14 @@ class Brenda:
         pass
 
     def parse(self, filepath: Union[str, Path]):
+        # Read text file into pandas DataFrame, where the last column contains
+        # the text that is to be parsed into trees.
         filepath = Path(filepath).expanduser().resolve()
         self.db = self.read_brenda(filepath)
-        # TODO
+
+        # TODO: parse the text into a tree
+
+        # TODO: feed the tree into a Neo4j database
 
     def read_brenda(self, filepath: Path) -> pd.DataFrame:
         """Read brenda file and convert to DataFrame.
@@ -181,7 +206,7 @@ class Brenda:
 
             # When we are at the end of a field, we insert the previous entry,
             # update field and clear ec_info
-            elif line in FIELD_SET:
+            elif line in FIELDS:
                 ids.append(current_id)
                 fields.append(current_field)
                 descriptions.append(ec_info)
@@ -243,45 +268,108 @@ class Brenda:
         return pd.concat([df_standard, df_nonstd], axis=0, ignore_index=True)
 
     @staticmethod
-    def _description_to_tree(text: str, acronym: str) -> Tree:
-        mode = "generic"
+    def _description_to_tree(
+        text: str,
+        acronym: str,
+        transformer: Optional[Transformer],
+        mode: str = "generic",
+    ) -> Tree:
+        valid_modes = {"generic", "specific_info", "reaction", "commentary"}
+        if mode not in valid_modes:
+            raise ValueError(f"Invalid mode: {mode}; should be one of {valid_modes}")
 
         # Replace placeholder with actual acronym
         grammar = fr"""
             %import .grammar.brenda_{mode} (start, _ACRONYM)
+            %import .grammar.brenda_{mode} (protein_id, ref_id, description, commentary, entry)
+            %import .grammar.brenda_{mode} (NUM_ID, TOKEN)
             %override _ACRONYM: "{acronym}\t"
         """
 
         # Parse the text into an annotated tree
-        parser = Lark(grammar, start="start", parser="lalr", debug=True)
+        parser = Lark(grammar, start="start", parser="lalr", transformer=transformer)
         tree = parser.parse(text)
 
         return tree
 
 
+class GenericTreeTransformer(Transformer):
+    """Transform extracted values from bottom-up."""
+
+    def NUM_ID(self, num):
+        return num.update(value=int(num))
+
+    def TOKEN(self, tok):
+        return tok.update(value=tok.strip())
+
+    def protein_id(self, children) -> Token:
+        children = [x.value for x in children]
+        return Token("protein_id", children)
+
+    def ref_id(self, children) -> Token:
+        children = [x.value for x in children]
+        return Token("ref_id", children)
+
+    def description(self, children) -> Token:
+        res = " ".join([x.value for x in children])
+        return Token("description", res)
+
+    def commentary(self, children) -> Token:
+        # protein_id, ref_id, description are the only possible cases
+        res = {}
+        descriptions = []
+        for child in children:
+            if child.type == "protein_id":
+                res["protein_id"] = child.value
+            elif child.type == "ref_id":
+                res["ref_id"] = child.value
+            else:
+                descriptions.append(child.value)
+
+        res["description"] = " ".join(descriptions)
+        res["description"] = self._fix_string(res["description"])
+        return Token("commentary", res)
+
+    def entry(self, children: List[Token]) -> Dict[str, Union[str, List[int]]]:
+        descriptions = []
+        res = {}
+        for child in children:
+            if child.type == "protein_id":
+                res["protein_id"] = child.value
+            elif child.type == "ref_id":
+                res["ref_id"] = child.value
+            elif child.type == "description":
+                # Concatenate description nodes
+                descriptions.append(child.value)
+            else:
+                res["commentary"] = child.value
+
+        res["description"] = " ".join(descriptions)
+        res["description"] = self._fix_string(res["description"])
+        return res
+
+    @staticmethod
+    def _fix_string(s: str):
+        s = s.replace("( ", "(")
+        s = s.replace(" )", ")")
+        s = s.replace("[ ", "[")
+        s = s.replace(" ]", "]")
+        return s
+
+
 if __name__ == "__main__":
     br = Brenda()
     br.parse("/mnt/data0/yi/dissertation/met_path_finder/tests/data/brenda_test.txt")
-    for _, (_, field, text) in br.db.iterrows():
-        if field not in [
-            "REACTION",
-            # field-specific information
-            "NATURAL_SUBSTRATE_PRODUCT",
-            "SUBSTRATE_PRODUCT",
-            "TURNOVER_NUMBER",
-            "KM_VALUE",
-            "KI_VALUE",
-            "REFERENCE",
-            "IC50_VALUE",
-            # no description, just commentary
-            "CLONED",
-            "CRYSTALLIZATION",
-            "PURIFICATION",
-            "GENERAL_STABILITY",
-            "STORAGE_STABILITY",
-            # Special case
-            "TRANSFERRED_DELETED",
-        ]:
-            print(f"Working on {field}")
-            res = br._description_to_tree(text, FIELD_SET[field])
-            print(f"Finished {field}")
+    for _, (ec_num, field, text) in br.db.iterrows():
+        if field == "REACTION":
+            res = br._description_to_tree(text, FIELDS[field], "reaction")
+        elif field == "TRANSFERRED_DELETED":
+            pass
+        elif field in FIELD_WITH_SPECIFIC_INFO:
+            res = br._description_to_tree(text, FIELDS[field], "specific_info")
+        elif field in FIELD_COMMENTARY_ONLY:
+            res = br._description_to_tree(text, FIELDS[field], "commentary")
+        else:
+            res = br._description_to_tree(
+                text, FIELDS[field], transformer=GenericTreeTransformer()
+            )
