@@ -99,6 +99,38 @@ FIELD_COMMENTARY_ONLY = {
     "STORAGE_STABILITY",
 }
 
+BASE_GRAMMAR = r"""
+%import common.NEWLINE -> _NL
+
+commentary : "(" _separated{content, _COMMENTARY_SEP} ")"
+content    : protein_id description ref_id
+
+!description: TOKENS+
+TOKENS: TOKEN+
+    | [_WS] "(" TOKEN+ ")" ["-" | ", " | _WS]  // e.g. (S)-xxx or (1 g/kg ip), parentheses but not commentary
+    | [_WS] "[" /[^\]]+/  "]" // Often chemical names wrapped in [...]
+protein_id : "#" _separated{NUM_ID, _LIST_SEP} "#"
+ref_id     : "<" _separated{NUM_ID, _LIST_SEP} ">"
+
+TOKEN      : [_WS] (CHAR+ | ARROW | COMPARE_NUM) [_WS]
+CHAR       : /\w/
+    | /[^\x00-\x7F]/  // Unicode characters
+    | "?" | "." | "," | "+" | ":" | "/" | "*" | "-" | "%" | "'"
+    | "(H)"  // NADP(H), NAD(H)
+
+ARROW      : "<->" | "<-->" | "<-" | "->" | "-->"
+COMPARE_NUM: /p\s?<\s?0\.05/i  // p-values
+    | /[<>]/ FLOAT_NUM "%"  // percentages
+
+_COMMENTARY_SEP : /;\s*/
+_LIST_SEP  : "," | "\t"
+_WS        : ("\t" | " ")+
+NUM_ID     : /\d+/
+FLOAT_NUM  : /\d+(\.\d+)?/
+
+_separated{x, sep}: x (sep x)*  // A sequence of 'x sep x sep x ...'
+"""
+
 
 class Brenda:
     """Class for working with Brenda.
@@ -270,29 +302,60 @@ class Brenda:
         return pd.concat([df_standard, df_nonstd], axis=0, ignore_index=True)
 
     @staticmethod
-    def _description_to_tree(
-        text: str,
-        acronym: str,
-        transformer: Optional[Transformer],
-        mode: str = "generic",
-    ) -> Tree:
-        valid_modes = {"generic", "specific_info", "reaction", "commentary"}
-        if mode not in valid_modes:
-            raise ValueError(f"Invalid mode: {mode}; should be one of {valid_modes}")
+    def _get_parser_from_field(field: str) -> Lark:
+        if field == "TRANSFERRED_DELETED":
+            grammar = ""
+            t: Transformer
 
-        # Replace placeholder with actual acronym
-        grammar = fr"""
-            %import .grammar.brenda_{mode} (start, _ACRONYM)
-            %import .grammar.brenda_{mode} (protein_id, ref_id, description, commentary, entry)
-            %import .grammar.brenda_{mode} (NUM_ID, TOKEN)
-            %override _ACRONYM: "{acronym}\t"
-        """
+        elif field == "REFERENCE":
+            grammar = ""
+            t: Transformer
 
-        # Parse the text into an annotated tree
-        parser = Lark(grammar, start="start", parser="lalr", transformer=transformer)
+        elif field in FIELD_WITH_REACTIONS:
+            grammar = fr"""
+                {BASE_GRAMMAR}
+                %extend CHAR: "="  // Appear in reactions
+
+                start: entry+
+                entry: _ACRONYM [protein_id] reaction [commentary] [[_WS] more_commentary] [[_WS] reversibility] [[_WS] ref_id] _NL
+
+                reaction: TOKENS+
+                more_commentary:  "|" _separated{{content, _COMMENTARY_SEP}} "|"
+                !reversibility:  "{{}}" | "{{r}}" | "{{ir}}"
+                _ACRONYM: "{FIELDS[field]}\t"
+            """
+            t = ReactionTreeTransformer()
+
+        elif field in FIELD_WITH_SPECIFIC_INFO:
+            grammar = ""
+            t: Transformer
+
+        elif field in FIELD_COMMENTARY_ONLY:
+            grammar = ""
+            t: Transformer
+
+        else:
+            # All other cases can be parsed with the generic grammar.
+            # Replace placeholder with actual acronym, and import tokens to be
+            # transformed in BaseTransformer.
+            grammar = fr"""
+                {BASE_GRAMMAR}
+                start      : entry+
+                entry      : _ACRONYM [protein_id] description [commentary _WS] [ref_id] _NL
+                _ACRONYM: "{FIELDS[field]}\t"
+            """
+            t = GenericTreeTransformer()
+
+        return Lark(grammar, parser="lalr", transformer=t)
+
+    def _text_to_tree(self, text: str, field: str) -> List[Dict]:
+        # Get the parser for the specified mode
+        parser = self._get_parser_from_field(field)
+
+        # Parse the text into an annotated tree, then transform into dict
         tree = parser.parse(text)
 
-        return tree
+        return tree.children
 
 
 class BaseTransformer(Transformer):
