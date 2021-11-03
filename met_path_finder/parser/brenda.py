@@ -106,28 +106,30 @@ BASE_GRAMMAR = r"""
 commentary : "(" _separated{content, _COMMENTARY_SEP} ")"
 content    : protein_id description ref_id
 
-!description: TOKENS+
+!description : TOKENS+
+protein_id   : "#" _separated{NUM_ID, _LIST_SEP} "#"
+ref_id       : "<" _separated{NUM_ID, _LIST_SEP} ">"
+
 TOKENS: TOKEN+
-    | [_WS] "(" TOKEN+ ")" ["-" | ", " | _WS]  // e.g. (S)-xxx or (1 g/kg ip), parentheses but not commentary
-    | [_WS] "[" /[^\]]+/  "]" // Often chemical names wrapped in [...]
-protein_id : "#" _separated{NUM_ID, _LIST_SEP} "#"
-ref_id     : "<" _separated{NUM_ID, _LIST_SEP} ">"
+      | [_WS] "(" TOKEN+ ")" ["-" | ", " | _WS]  // e.g. (1 g/kg ip), parentheses but not commentary
 
-TOKEN      : [_WS] (CHAR+ | ARROW | COMPARE_NUM) [_WS]
-CHAR       : /\w/
-    | /[^\x00-\x7F]/  // Unicode characters
-    | "?" | "." | "," | "+" | ":" | "/" | "*" | "-" | "%" | "'"
-    | "(H)"  // NADP(H), NAD(H)
+TOKEN : [_WS] (CHAR+ | ARROW | COMPARE_NUM | INLINE_CHEMICAL) [_WS]
+CHAR  : /\w/
+      | /[^\x00-\x7F]/  // Unicode characters
+      | "?" | "." | "," | "+" | ":" | "/" | "*" | "-" | "%" | "'" | "&"
+      | "(H)"  // NADP(H), NAD(H)
+      | "[" | "]"
 
-ARROW      : "<->" | "<-->" | "<-" | "->" | "-->"
-COMPARE_NUM: /p\s?<\s?0\.05/i  // p-values
-    | /[<>]/ FLOAT_NUM "%"  // percentages
+ARROW          : "<->" | "<-->" | "<-" | "->" | "-->"
+COMPARE_NUM    : /p\s?<\s?0\.05/i  // p-values
+               | /[<>]/ FLOAT_NUM "%"  // percentages
+INLINE_CHEMICAL: /\(+(?!#)([\w\-(),%]+\))/
 
 _COMMENTARY_SEP : /;\s*/
-_LIST_SEP  : "," | "\t"
-_WS        : ("\t" | " ")+
-NUM_ID     : /\d+/
-FLOAT_NUM  : /\d+(\.\d+)?/
+_LIST_SEP       : "," | "\t"
+_WS             : ("\t" | " ")+
+NUM_ID          : /\d+/
+FLOAT_NUM       : /\d+(\.\d+)?/
 
 _separated{x, sep}: x (sep x)*  // A sequence of 'x sep x sep x ...'
 """
@@ -172,6 +174,11 @@ class Brenda:
         lines = self._read_brenda_file(filepath)
         df = self._separate_entries(lines)
         df = self._clean_ec_number(df)
+
+        # Fix a spefical case that breaks the parser
+        df["description"] = df["description"].str.replace(
+            "2-pentanol;", "2-pentanol,", regex=False
+        )
 
         return df
 
