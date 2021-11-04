@@ -89,3 +89,34 @@ def test_text_to_tree_references(brenda_data: Brenda):
     assert len(tree) == 285
     assert set(tree[0].keys()) - {"ref_id", "citation", "pubmed", "paper_stat"} == set()
     assert tree[0]["pubmed"] == "6794566"
+
+
+def test_text_to_tree_specific_info(brenda_data: Brenda):
+    """Test the specific info grammar."""
+    df = brenda_data.df
+    text = (
+        df.query("ID == '1.1.1.1' & field == 'TURNOVER_NUMBER'")
+        .filter(["description"])
+        .values[0, 0]
+    )
+
+    tree = brenda_data._text_to_tree(text, "TURNOVER_NUMBER")
+    assert isinstance(tree, list)
+    assert len(tree) == 495
+    assert "substrate" in tree[0]
+    assert tree[0]["description"] == "0.73"
+
+
+def test_text_to_tree_commentary_only(brenda_data: Brenda):
+    """Test the specific info grammar."""
+    df = brenda_data.df
+    text = (
+        df.query("ID == '1.1.1.1' & field == 'CLONED'")
+        .filter(["description"])
+        .values[0, 0]
+    )
+
+    tree = brenda_data._text_to_tree(text, "CLONED")
+    assert isinstance(tree, list)
+    assert len(tree) == 85
+    assert all(len(x["protein_id"]) == 1 for x in tree)
