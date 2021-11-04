@@ -451,8 +451,12 @@ class ReactionTreeTransformer(GenericTreeTransformer):
             x = "?"
         return Token("reversibility", x)
 
-    # def entry(self, children):
-    #     return children
+    def entry(self, children: List[Token]) -> Dict[str, Any]:
+        res = {x.type: x.value for x in children}
+        if "reversibility" in res:
+            res["reaction"]["reversibility"] = res["reversibility"]
+            del res["reversibility"]
+        return res
 
 
 if __name__ == "__main__":

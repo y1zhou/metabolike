@@ -38,7 +38,7 @@ def test_text_to_tree_generic(brenda_data: Brenda):
     tree = brenda_data._text_to_tree(text, "PROTEIN")
     assert isinstance(tree, list)
     assert len(tree) == 164
-    assert set(tree[0].keys()) - set(["protein_id", "description", "ref_id"]) == set()
+    assert set(tree[0].keys()) - {"protein_id", "description", "ref_id"} == set()
     assert isinstance(tree[0]["protein_id"], list)
     assert isinstance(tree[0]["protein_id"][0], int)
 
@@ -54,3 +54,8 @@ def test_text_to_tree_reaction(brenda_data: Brenda):
 
     tree = brenda_data._text_to_tree(text, "SUBSTRATE_PRODUCT")
     assert isinstance(tree, list)
+    assert len(tree) == 773
+    assert set(tree[0].keys()) - {"protein_id", "reaction", "ref_id"} == set()
+    assert isinstance(tree[0]["protein_id"], list)
+    assert isinstance(tree[0]["protein_id"][0], int)
+    assert tree[0]["reaction"]["reversibility"] == "r"
