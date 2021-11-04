@@ -59,3 +59,17 @@ def test_text_to_tree_reaction(brenda_data: Brenda):
     assert isinstance(tree[0]["protein_id"], list)
     assert isinstance(tree[0]["protein_id"][0], int)
     assert tree[0]["reaction"]["reversibility"] == "r"
+
+
+def test_text_to_tree_transferred(brenda_data: Brenda):
+    """Test the transferred grammar."""
+    df = brenda_data.df
+    text = (
+        df.query("ID == '6.3.5.8' & field == 'TRANSFERRED_DELETED'")
+        .filter(["description"])
+        .values[0, 0]
+    )
+    tree = brenda_data._text_to_tree(text, "TRANSFERRED_DELETED")
+    assert isinstance(tree, list)
+    assert len(tree) == 1
+    assert "description" in tree[0]

@@ -3,9 +3,6 @@
 A lot of the code is translated from brendaDb:
 https://bioconductor.org/packages/release/bioc/html/brendaDb.html
 
-This implmentation focuses on extracting information from the text file, and
-feeding the data into a Neo4j database.
-
 The file is organised in an EC-number specific format. The
 information on each EC-number is given in a very short and compact
 way in a part of the file. The contents of each line are described
@@ -14,9 +11,13 @@ start after a TAB. Empty spaces at the beginning of a line
 indicate a continuation line.
 
 The contents are organised in ~40 information fields as given
-below. Protein information is included in '#'...#', literature
-citations are in '<...>', commentaries in '(...)' and field-
-special information in '{...}'.
+below. Protein information is included in `#...#`, literature
+citations are in `<...>`, commentaries in `(...)` and field-
+special information in `{...}`.
+
+It's not officially documented, but some fields also have commentaries
+wrapped in `|...|`. These are usually for reaction-related fields, so
+`(...)` would be for substrates and `|...|` for products.
 
 Protein information is given as the combination organism/Uniprot
 accession number where available. When this information is not
@@ -29,7 +30,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
-from lark import Lark, Token, Tree
+from lark import Lark, Token
 from lark.visitors import Transformer
 from met_path_finder import db
 
@@ -137,6 +138,11 @@ _separated{x, sep}: x (sep x)*  // A sequence of 'x sep x sep x ...'
 
 class Brenda:
     """Class for working with Brenda.
+
+    This implmentation focuses on extracting information from the text file,
+    and feeding the data into a Neo4j database. The parser is implemented
+    using Lark. A series of :class:`Transformer` classes are used to clean
+    the data and convert it into the format required by Neo4j.
 
     Attributes:
         df: cleaned BRENDA text file as a pandas DataFrame.
@@ -309,10 +315,9 @@ class Brenda:
         return pd.concat([df_standard, df_nonstd], axis=0, ignore_index=True)
 
     @staticmethod
-    def _get_parser_from_field(field: str) -> Lark:
+    def _get_parser_from_field(field: str) -> Optional[Lark]:
         if field == "TRANSFERRED_DELETED":
-            grammar = ""
-            t: Transformer
+            return None
 
         elif field == "REFERENCE":
             grammar = ""
@@ -358,10 +363,12 @@ class Brenda:
     def _text_to_tree(self, text: str, field: str) -> List[Dict]:
         # Get the parser for the specified mode
         parser = self._get_parser_from_field(field)
+        if parser is None:
+            # Simply return the text for TRANSFERRED_DELETED fields
+            return [{"description": text}]
 
         # Parse the text into an annotated tree, then transform into dict
         tree = parser.parse(text)
-
         return tree.children
 
 
