@@ -320,8 +320,16 @@ class Brenda:
             return None
 
         elif field == "REFERENCE":
-            grammar = ""
-            t: Transformer
+            grammar = fr"""
+                {BASE_GRAMMAR}
+                start      : entry+
+                entry      : _ACRONYM ref_id citation [_WS] pubmed [_WS paper_stat] _NL
+                citation   : /[^{{]+/
+                pubmed     : /\{{Pubmed:\d*\}}/
+                paper_stat : "(" _separated{{TOKEN, ","}} ")"
+                _ACRONYM: "{FIELDS[field]}\t"
+            """
+            t = RefTreeTransformer()
 
         elif field in FIELD_WITH_REACTIONS:
             grammar = fr"""
@@ -464,6 +472,28 @@ class ReactionTreeTransformer(GenericTreeTransformer):
             res["reaction"]["reversibility"] = res["reversibility"]
             del res["reversibility"]
         return res
+
+
+class RefTreeTransformer(BaseTransformer):
+    def ref_id(self, children) -> Token:
+        return Token("ref_id", children[0].value)
+
+    def citation(self, children) -> Token:
+        res = " ".join([x.value.strip() for x in children])
+        res = self._fix_string(res)
+        return Token("citation", res)
+
+    def pubmed(self, children) -> Token:
+        res = children[0].value
+        res = re.sub(r"\{Pubmed:(\d*)\}", r"\1", res)
+        return Token("pubmed", res)
+
+    def paper_stat(self, children) -> Token:
+        res = children[0].split(",")
+        return Token("paper_stat", res)
+
+    def entry(self, children: List[Token]) -> Dict[str, Any]:
+        return {x.type: x.value for x in children}
 
 
 if __name__ == "__main__":

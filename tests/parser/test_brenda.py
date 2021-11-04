@@ -62,7 +62,7 @@ def test_text_to_tree_reaction(brenda_data: Brenda):
 
 
 def test_text_to_tree_transferred(brenda_data: Brenda):
-    """Test the transferred grammar."""
+    """Test the transferred/deleted grammar."""
     df = brenda_data.df
     text = (
         df.query("ID == '6.3.5.8' & field == 'TRANSFERRED_DELETED'")
@@ -73,3 +73,19 @@ def test_text_to_tree_transferred(brenda_data: Brenda):
     assert isinstance(tree, list)
     assert len(tree) == 1
     assert "description" in tree[0]
+
+
+def test_text_to_tree_references(brenda_data: Brenda):
+    """Test the references grammar."""
+    df = brenda_data.df
+    text = (
+        df.query("ID == '1.1.1.1' & field == 'REFERENCE'")
+        .filter(["description"])
+        .values[0, 0]
+    )
+
+    tree = brenda_data._text_to_tree(text, "REFERENCE")
+    assert isinstance(tree, list)
+    assert len(tree) == 285
+    assert set(tree[0].keys()) - {"ref_id", "citation", "pubmed", "paper_stat"} == set()
+    assert tree[0]["pubmed"] == "6794566"
