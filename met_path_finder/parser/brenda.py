@@ -332,7 +332,7 @@ class Brenda:
                 start      : entry+
                 entry      : _ACRONYM ref_id citation [_WS] pubmed [_WS paper_stat] _NL
                 citation   : /[^{{]+/
-                pubmed     : /\{{Pubmed:\d*\}}/
+                pubmed     : /\{{Pubmed:\d*\}}+/
                 paper_stat : "(" _separated{{TOKEN, ","}} ")"
                 _ACRONYM: "{FIELDS[field]}\t"
             """
@@ -370,7 +370,7 @@ class Brenda:
                 start      : entry+
                 entry      : _ACRONYM protein_id _WS [description] ref_id _NL
                 %override description: /\(.*\)/ _WS
-                _ACRONYM: "CL\t"
+                _ACRONYM: "{FIELDS[field]}\t"
             """
             t = CommentaryOnlyTreeTransformer()
 
