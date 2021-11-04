@@ -35,7 +35,7 @@ def test_text_to_tree_generic(brenda_data: Brenda):
         .values[0, 0]
     )
 
-    tree = brenda_data._text_to_tree(text, "PROTEIN")
+    tree = brenda_data._text_to_tree(text, brenda_data.parsers["PROTEIN"])
     assert isinstance(tree, list)
     assert len(tree) == 164
     assert set(tree[0].keys()) - {"protein_id", "description", "ref_id"} == set()
@@ -52,7 +52,7 @@ def test_text_to_tree_reaction(brenda_data: Brenda):
         .values[0, 0]
     )
 
-    tree = brenda_data._text_to_tree(text, "SUBSTRATE_PRODUCT")
+    tree = brenda_data._text_to_tree(text, brenda_data.parsers["SUBSTRATE_PRODUCT"])
     assert isinstance(tree, list)
     assert len(tree) == 773
     assert set(tree[0].keys()) - {"protein_id", "reaction", "ref_id"} == set()
@@ -69,7 +69,7 @@ def test_text_to_tree_transferred(brenda_data: Brenda):
         .filter(["description"])
         .values[0, 0]
     )
-    tree = brenda_data._text_to_tree(text, "TRANSFERRED_DELETED")
+    tree = brenda_data._text_to_tree(text, brenda_data.parsers["TRANSFERRED_DELETED"])
     assert isinstance(tree, list)
     assert len(tree) == 1
     assert "description" in tree[0]
@@ -84,7 +84,7 @@ def test_text_to_tree_references(brenda_data: Brenda):
         .values[0, 0]
     )
 
-    tree = brenda_data._text_to_tree(text, "REFERENCE")
+    tree = brenda_data._text_to_tree(text, brenda_data.parsers["REFERENCE"])
     assert isinstance(tree, list)
     assert len(tree) == 285
     assert set(tree[0].keys()) - {"ref_id", "citation", "pubmed", "paper_stat"} == set()
@@ -100,7 +100,7 @@ def test_text_to_tree_specific_info(brenda_data: Brenda):
         .values[0, 0]
     )
 
-    tree = brenda_data._text_to_tree(text, "TURNOVER_NUMBER")
+    tree = brenda_data._text_to_tree(text, brenda_data.parsers["TURNOVER_NUMBER"])
     assert isinstance(tree, list)
     assert len(tree) == 495
     assert "substrate" in tree[0]
@@ -116,7 +116,7 @@ def test_text_to_tree_commentary_only(brenda_data: Brenda):
         .values[0, 0]
     )
 
-    tree = brenda_data._text_to_tree(text, "CLONED")
+    tree = brenda_data._text_to_tree(text, brenda_data.parsers["CLONED"])
     assert isinstance(tree, list)
     assert len(tree) == 85
     assert all(len(x["protein_id"]) == 1 for x in tree)

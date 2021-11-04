@@ -117,19 +117,17 @@ protein_id   : "#" _separated{NUM_ID, _LIST_SEP} "#"
 ref_id       : "<" _separated{NUM_ID, _LIST_SEP} ">"
 
 TOKENS: TOKEN+
-      | [_WS] "(" TOKEN+ ")" ["-" | ", " | _WS]  // e.g. (1 g/kg ip), parentheses but not commentary
-
 TOKEN : [_WS] (CHAR+ | ARROW | COMPARE_NUM | INLINE_CHEMICAL) [_WS]
 CHAR  : /\w/
       | /[^\x00-\x7F]/  // Unicode characters
       | "?" | "." | "," | "+" | ":" | "/" | "*" | "-" | "%" | "'" | "&"
-      | "(H)"  // NADP(H), NAD(H)
       | "[" | "]"
+      | "="  // Appears in REACTION and very rarely in PROTEIN
 
 ARROW          : "<->" | "<-->" | "<-" | "->" | "-->"
 COMPARE_NUM    : /p\s?<\s?0\.05/i  // p-values
                | /[<>]/ FLOAT_NUM "%"  // percentages
-INLINE_CHEMICAL: /\(+(?!#)([\w\-(),%]+\))/
+INLINE_CHEMICAL: /\(+(?!#)/ (CHAR | _WS | "(" | ")")+ ")"
 
 _COMMENTARY_SEP : /;\s*/
 _LIST_SEP       : "," | "\t"
@@ -156,7 +154,11 @@ class Brenda:
     def __init__(self):
         self.df: pd.DataFrame
 
-    def parse(self, filepath: Union[str, Path]):
+        # Get parsers for each unique field
+        self.parsers: Dict[str, Optional[Lark]] = {"TRANSFERRED_DELETED": None}
+        for field in FIELDS.keys():
+            self.parsers[field] = self._get_parser_from_field(field)
+
         # Read text file into pandas DataFrame, where the last column contains
         # the text that is to be parsed into trees.
         filepath = Path(filepath).expanduser().resolve()
@@ -386,9 +388,7 @@ class Brenda:
 
         return Lark(grammar, parser="lalr", transformer=t)
 
-    def _text_to_tree(self, text: str, field: str) -> List[Dict]:
-        # Get the parser for the specified mode
-        parser = self._get_parser_from_field(field)
+    def _text_to_tree(self, text: str, parser: Optional[Lark]) -> List[Dict]:
         if parser is None:
             # Simply return the text for TRANSFERRED_DELETED fields
             return [{"description": text}]
