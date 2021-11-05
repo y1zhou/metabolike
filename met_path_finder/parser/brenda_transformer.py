@@ -68,6 +68,8 @@ class ReactionTreeTransformer(GenericTreeTransformer):
         """
         reaction = " ".join([x.value.strip() for x in children])
         reaction = self._fix_string(reaction)
+        if " = " not in reaction:
+            return Token("reaction_description", reaction)
         lhs, rhs = reaction.split(" = ")
         lhs = lhs.split(" + ")
         rhs = rhs.split(" + ")

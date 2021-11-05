@@ -1,7 +1,10 @@
-"""Functions from the brendaDb R package.
+"""Reading and parsing the BRENDA text file.
 
-A lot of the code is translated from brendaDb:
-https://bioconductor.org/packages/release/bioc/html/brendaDb.html
+> A lot of the code is translated from the brendaDb R package:
+> https://bioconductor.org/packages/release/bioc/html/brendaDb.html
+
+Link to get the text file:
+https://www.brenda-enzymes.org/download_brenda_without_registration.php
 
 The file is organised in an EC-number specific format. The
 information on each EC-number is given in a very short and compact
@@ -98,11 +101,14 @@ FIELD_WITH_SPECIFIC_INFO = {
     "IC50_VALUE",
 }
 
+# The following fields don't have descriptions; there is only
+# a blob of text wrapped in `(...)`.
 FIELD_COMMENTARY_ONLY = {
     "CLONED",
     "CRYSTALLIZATION",
     "PURIFICATION",
     "GENERAL_STABILITY",
+    "RENATURED",
     "STORAGE_STABILITY",
 }
 
@@ -117,19 +123,22 @@ protein_id   : "#" _separated{NUM_ID, _LIST_SEP} "#"
 ref_id       : "<" _separated{NUM_ID, _LIST_SEP} ">"
 
 TOKENS: TOKEN+
-TOKEN : [_WS] (CHAR+ | ARROW | COMPARE_NUM | INLINE_CHEMICAL) [_WS]
+TOKEN : [_WS] (CHAR+ | INLINE_CHEMICAL) [_WS]
 CHAR  : /\w/
       | /[^\x00-\x7F]/  // Unicode characters
-      | "?" | "." | "," | "+" | ":" | "/" | "*" | "-" | "%" | "'" | "&"
-      | "[" | "]"
+      | ARROW | COMPARE_NUM
+      | "?" | "." | "," | "+" | ":" | "-" | "/" | "!"  // Common punctuation
+      | "*" | "%" | "'" | "\"" | "&" | ";" | "~" | ">"  // Rare symbols
+      | "[" | "]"  // Wraps chemical names
       | "="  // Appears in REACTION and very rarely in PROTEIN
 
 ARROW          : "<->" | "<-->" | "<-" | "->" | "-->"
+               | "\t>" | "<\t>" | "_>"  // Arrows that are broken by newlines
 COMPARE_NUM    : /p\s?<\s?0\.05/i  // p-values
                | /[<>]/ FLOAT_NUM "%"  // percentages
-INLINE_CHEMICAL: /\(+(?!#)/ (CHAR | _WS | "(" | ")")+ ")"
+INLINE_CHEMICAL: /\(+(?!#)/ (CHAR | _WS | COMPARE_NUM | ARROW | "(" | ")")+ ")"
 
-_COMMENTARY_SEP : /;\s*/
+_COMMENTARY_SEP : /;\s*(?=#)/
 _LIST_SEP       : "," | "\t"
 _WS             : ("\t" | " ")+
 NUM_ID          : /\d+/
@@ -149,6 +158,7 @@ class Brenda:
 
     Attributes:
         df: cleaned BRENDA text file as a pandas DataFrame.
+        parsers: list of Lark parsers for each field.
     """
 
     def __init__(self):
@@ -188,9 +198,21 @@ class Brenda:
         df = self._separate_entries(lines)
         df = self._clean_ec_number(df)
 
-        # Fix a spefical case that breaks the parser
-        df["description"] = df["description"].str.replace(
-            "2-pentanol;", "2-pentanol,", regex=False
+        # Fix spefical cases that break the parser
+        df = df[df.description != "SN\n"]  # empty systamatic name
+        df.description = df.description.str.replace(
+            "<Swissprot>", "", regex=False
+        )  # SYNONYMS has this in ref_id
+        df.description = df.description.str.replace(
+            r"[\x00-\x08\x0b-\x1f\x7f-\x9f]", " ", regex=True
+        )  # Remove all control characters other than \t and \n
+
+        # Remove redundant `|` in description
+        mask = df.description.str.contains("\|[^#]") & (
+            ~df.field.isin(FIELD_WITH_REACTIONS)
+        )
+        df.loc[mask, "description"] = df.loc[mask, "description"].str.replace(
+            "|", "", regex=False
         )
 
         return df
@@ -341,14 +363,16 @@ class Brenda:
         elif field in FIELD_WITH_REACTIONS:
             grammar = fr"""
                 {BASE_GRAMMAR}
-                %extend CHAR: "="  // Appear in reactions
-
                 start: entry+
                 entry: _ACRONYM [protein_id] reaction [commentary] [[_WS] more_commentary] [[_WS] reversibility] [[_WS] ref_id] _NL
 
+                %extend TOKEN: /\{{(?!(r|ir|\?)?\}})/
+                             | "}}"  // chemicals
+                             | ")"  // sometimes there's missing (
+
                 reaction: TOKENS+
                 more_commentary:  "|" _separated{{content, _COMMENTARY_SEP}} "|"
-                !reversibility:  "{{}}" | "{{r}}" | "{{ir}}"
+                !reversibility:  "{{}}" | "{{r}}" | "{{ir}}" | "{{?}}"
                 _ACRONYM: "{FIELDS[field]}\t"
             """
             t = ReactionTreeTransformer()
@@ -359,7 +383,7 @@ class Brenda:
                 start      : entry+
                 entry      : _ACRONYM protein_id description substrate [_WS commentary] [_WS] ref_id _NL
 
-                substrate: [_WS] "{{" TOKENS+ "}}"
+                substrate: [_WS] "{{" (TOKENS | "{{" | "}}")+ "}}"
                 _ACRONYM: "{FIELDS[field]}\t"
             """
             t = SpecificInfoTreeTransformer()
@@ -380,8 +404,9 @@ class Brenda:
             # transformed in BaseTransformer.
             grammar = fr"""
                 {BASE_GRAMMAR}
+                %extend CHAR: "{{" | "}}" // Appears in ENGINEERING and INHIBITORS
                 start      : entry+
-                entry      : _ACRONYM [protein_id] description [commentary _WS] [ref_id] _NL
+                entry      : _ACRONYM [protein_id] description [commentary] [_WS] [ref_id] _NL
                 _ACRONYM: "{FIELDS[field]}\t"
             """
             t = GenericTreeTransformer()
