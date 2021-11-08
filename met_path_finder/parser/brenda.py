@@ -130,23 +130,27 @@ CHAR  : /\w/
       | /[^\x00-\x7F]/  // Unicode characters
       | ARROW | COMPARE_NUM
       | "?" | "." | "," | "+" | ":" | "-" | "/" | "!"  // Common punctuation
-      | "*" | "%" | "'" | "\"" | "&" | ";" | "~" | ">"  // Rare symbols
+      | "*" | "%" | "'" | "\"" | "&" | ";" | "~"  // Rare symbols
       | "[" | "]"  // Wraps chemical names
       | "="  // Appears in REACTION and very rarely in PROTEIN
 
-ARROW          : "<->" | "<-->" | "<-" | "->" | "-->"
-               | "\t>" | "<\t>" | "_>"  // Arrows that are broken by newlines
+ARROW          : "<->" | "<-->" | "<-" | "->" | "-->" | ">" | "<\t>"
+               | /<(?=[A-Za-z])/  // Comparison of checmicals in commentary
 COMPARE_NUM    : /p\s?<\s?0\.05/i  // p-values
-               | /[<>]/ FLOAT_NUM "%"  // percentages
+               //| /[<>]/ FLOAT_NUM "%"  // percentages
+               //| /<(?!\d+([,\t]\d+)*>)/  // e.g. <15 nm
+
 INLINE_CHEMICAL: /\(+(?!#)/ (CHAR | _WS | COMPARE_NUM | ARROW | "(" | ")")+ ")"
 
 _COMMENTARY_SEP : /;\s*(?=#)/
 _LIST_SEP       : "," | "\t"
 _WS             : ("\t" | " ")+
 NUM_ID          : /\d+/
-FLOAT_NUM       : /\d+(\.\d+)?/
+FLOAT_NUM       : NUM_ID "." NUM_ID
 
 _separated{x, sep}: x (sep x)*  // A sequence of 'x sep x sep x ...'
+
+start: entry+
 """
 
 
@@ -230,21 +234,34 @@ class Brenda:
         df = self._clean_ec_number(df)
 
         # Fix spefical cases that break the parser
+        regexes = [
+            ("<Swissprot>", "", False),  # SYNONYMS has this in ref_id
+            (
+                r"[\x00-\x08\x0b-\x1f\x7f-\x9f]",
+                " ",
+                True,
+            ),  # Remove all control characters other than \t and \n
+            (r"(?<=\w)#(?=\w)", "", True),  # Remove # in text that's not protein ID
+            # Missing opening/closing parenthees
+            (r"\sE\)-farnesyl", " (E)-farnesyl", True),
+            ("(4a-", "4a-", False),  # (4a-hydroxytetrahydrobiopterin
+            ("SN\t2E,6E)", "SN\t(2E,6E)", False),
+            # Replace < with "less than" for non-ref ID cases
+            (r"<(\d+[^,\t\d>])", r"less than \1", True),
+        ]
+        for x in regexes:
+            df.description = df.description.str.replace(x[0], x[1], regex=x[2])
+
         df = df[df.description != "SN\n"]  # empty systamatic name
-        df.description = df.description.str.replace(
-            "<Swissprot>", "", regex=False
-        )  # SYNONYMS has this in ref_id
-        df.description = df.description.str.replace(
-            r"[\x00-\x08\x0b-\x1f\x7f-\x9f]", " ", regex=True
-        )  # Remove all control characters other than \t and \n
 
         # Remove redundant `|` in description
-        mask = df.description.str.contains("\|[^#]") & (
+        mask = df.description.str.contains(r"\|[^#]") & (
             ~df.field.isin(FIELD_WITH_REACTIONS)
         )
         df.loc[mask, "description"] = df.loc[mask, "description"].str.replace(
             "|", "", regex=False
         )
+        df.reset_index(drop=True, inplace=True)
 
         return df
 
@@ -382,9 +399,8 @@ class Brenda:
         elif field == "REFERENCE":
             grammar = fr"""
                 {BASE_GRAMMAR}
-                start      : entry+
                 entry      : _ACRONYM ref_id citation [_WS] pubmed [_WS paper_stat] _NL
-                citation   : /[^{{]+/
+                citation   : /.+(?={{Pubmed:)/
                 pubmed     : /\{{Pubmed:\d*\}}+/
                 paper_stat : "(" _separated{{TOKEN, ","}} ")"
                 _ACRONYM: "{FIELDS[field]}\t"
@@ -394,14 +410,10 @@ class Brenda:
         elif field in FIELD_WITH_REACTIONS:
             grammar = fr"""
                 {BASE_GRAMMAR}
-                start: entry+
                 entry: _ACRONYM [protein_id] reaction [commentary] [[_WS] more_commentary] [[_WS] reversibility] [[_WS] ref_id] _NL
 
-                %extend TOKEN: /\{{(?!(r|ir|\?)?\}})/
-                             | "}}"  // chemicals
-                             | ")"  // sometimes there's missing (
-
                 reaction: TOKENS+
+                %extend CHAR: /\{{(?=[^\}}]{{3}})/ | "}}"  // inline curly brackets around chemicals
                 more_commentary:  "|" _separated{{content, _COMMENTARY_SEP}} "|"
                 !reversibility:  "{{}}" | "{{r}}" | "{{ir}}" | "{{?}}"
                 _ACRONYM: "{FIELDS[field]}\t"
@@ -411,10 +423,9 @@ class Brenda:
         elif field in FIELD_WITH_SPECIFIC_INFO:
             grammar = fr"""
                 {BASE_GRAMMAR}
-                start      : entry+
                 entry      : _ACRONYM protein_id description substrate [_WS commentary] [_WS] ref_id _NL
 
-                substrate: [_WS] "{{" (TOKENS | "{{" | "}}")+ "}}"
+                substrate: [_WS] "{{" (TOKENS | "{{" | "}}" | "(" | ")")+ "}}"
                 _ACRONYM: "{FIELDS[field]}\t"
             """
             t = SpecificInfoTreeTransformer()
@@ -422,7 +433,6 @@ class Brenda:
         elif field in FIELD_COMMENTARY_ONLY:
             grammar = fr"""
                 {BASE_GRAMMAR}
-                start      : entry+
                 entry      : _ACRONYM protein_id _WS [description] ref_id _NL
                 %override description: /\(.*\)/ _WS
                 _ACRONYM: "{FIELDS[field]}\t"
@@ -436,7 +446,7 @@ class Brenda:
             grammar = fr"""
                 {BASE_GRAMMAR}
                 %extend CHAR: "{{" | "}}" // Appears in ENGINEERING and INHIBITORS
-                start      : entry+
+
                 entry      : _ACRONYM [protein_id] description [commentary] [_WS] [ref_id] _NL
                 _ACRONYM: "{FIELDS[field]}\t"
             """
