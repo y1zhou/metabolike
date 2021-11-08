@@ -29,9 +29,11 @@ given in the original paper only the organism is given.
 ///	indicates the end of an EC-number specific part.
 """
 
+import multiprocessing as mp
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+import dask.dataframe as dd
 import pandas as pd
 from lark import Lark
 from met_path_finder import db
@@ -169,14 +171,43 @@ class Brenda:
         for field in FIELDS.keys():
             self.parsers[field] = self._get_parser_from_field(field)
 
+    def parse(self, filepath: Union[str, Path], n_jobs: int = 1):
+        """Parse the BRENDA text file into a dict."""
         # Read text file into pandas DataFrame, where the last column contains
         # the text that is to be parsed into trees.
         filepath = Path(filepath).expanduser().resolve()
         self.df = self.read_brenda(filepath)
 
-        # TODO: parse the text into a tree
-        for _, (ec_num, field, description) in self.df.iterrows():
-            res = self._text_to_tree(description, field)
+        # Parse each description into a Lark tree. To speed up parsing,
+        # partition the dataframe into `n_jobs` chunks, and use dask
+        # to parallelize the parsing.
+        if n_jobs < 0:
+            raise ValueError("n_jobs must be >= 0")
+
+        if n_jobs == 0:
+            n_jobs = mp.cpu_count()
+
+        if n_jobs == 1:
+            self.parsed = self.df.apply(
+                lambda row: self._text_to_tree(
+                    row.description, self.parsers[row.field]
+                ),
+                axis=1,
+            )
+        else:
+            ddf: dd.DataFrame = dd.from_pandas(self.df, npartitions=n_jobs)
+
+            res = ddf.map_partitions(
+                lambda part: part.apply(
+                    lambda row: self._text_to_tree(
+                        row.description, self.parsers[row.field]
+                    ),
+                    axis=1,
+                ),
+                meta=pd.Series(dtype="object", name=None),
+            )
+
+            self.parsed = res.compute()
 
         # TODO: feed the tree into a Neo4j database
 
@@ -419,10 +450,14 @@ class Brenda:
             return [{"description": text}]
 
         # Parse the text into an annotated tree, then transform into dict
-        tree = parser.parse(text)
-        return tree.children
+        try:
+            tree = parser.parse(text)
+            return tree.children
+        except Exception as e:
+            raise Exception(text, e.with_traceback(e.__traceback__))
 
 
 if __name__ == "__main__":
     br = Brenda()
-    br.parse("tests/data/brenda_test.txt")
+    br.parse("tests/data/brenda_test.txt", n_jobs=10)
+    print(br.df)
