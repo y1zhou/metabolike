@@ -117,7 +117,7 @@ FIELD_COMMENTARY_ONLY = {
 BASE_GRAMMAR = r"""
 %import common.NEWLINE -> _NL
 
-commentary : "(" _separated{content, _COMMENTARY_SEP} ")"
+commentary : /\((?=#)/ _separated{content, _COMMENTARY_SEP} /(?<=>)\)/
 content    : protein_id description ref_id
 
 !description : TOKENS+
@@ -130,17 +130,16 @@ CHAR  : /\w/
       | /[^\x00-\x7F]/  // Unicode characters
       | ARROW | COMPARE_NUM
       | "?" | "." | "," | "+" | ":" | "-" | "/" | "!"  // Common punctuation
-      | "*" | "%" | "'" | "\"" | "&" | ";" | "~"  // Rare symbols
+      | "*" | "%" | "'" | "\"" | "&" | ";" | "~" | "`" | "\\"  // Rare symbols
       | "[" | "]"  // Wraps chemical names
       | "="  // Appears in REACTION and very rarely in PROTEIN
 
-ARROW          : "<->" | "<-->" | "<-" | "->" | "-->" | ">" | "<\t>"
+ARROW          : "<->" | "<-->" | "<-" | "->" | "-->" | "<<" | ">" | /<\t?>/ | /\s<\s/
                | /<(?=[A-Za-z])/  // Comparison of checmicals in commentary
 COMPARE_NUM    : /p\s?<\s?0\.05/i  // p-values
-               //| /[<>]/ FLOAT_NUM "%"  // percentages
-               //| /<(?!\d+([,\t]\d+)*>)/  // e.g. <15 nm
 
-INLINE_CHEMICAL: /\(+(?!#)/ (CHAR | _WS | COMPARE_NUM | ARROW | "(" | ")")+ ")"
+//INLINE_CHEMICAL: /\(+(?!#)/ (CHAR | _WS | COMPARE_NUM | ARROW | "(" | ")")+ ")"
+INLINE_CHEMICAL: /\((?!#\d)/ | /(?<!\d>)\)/
 
 _COMMENTARY_SEP : /;\s*(?=#)/
 _LIST_SEP       : "," | "\t"
@@ -175,12 +174,12 @@ class Brenda:
         for field in FIELDS.keys():
             self.parsers[field] = self._get_parser_from_field(field)
 
-    def parse(self, filepath: Union[str, Path], n_jobs: int = 1):
+    def parse(self, filepath: Union[str, Path], n_jobs: int = 1, **kwargs):
         """Parse the BRENDA text file into a dict."""
         # Read text file into pandas DataFrame, where the last column contains
         # the text that is to be parsed into trees.
         filepath = Path(filepath).expanduser().resolve()
-        self.df = self.read_brenda(filepath)
+        self.df = self.read_brenda(filepath, **kwargs)
 
         # Parse each description into a Lark tree. To speed up parsing,
         # partition the dataframe into `n_jobs` chunks, and use dask
@@ -215,7 +214,7 @@ class Brenda:
 
         # TODO: feed the tree into a Neo4j database
 
-    def read_brenda(self, filepath: Path) -> pd.DataFrame:
+    def read_brenda(self, filepath: Path, cache: bool = False) -> pd.DataFrame:
         """Read brenda file and convert to DataFrame.
 
         Args:
@@ -229,6 +228,11 @@ class Brenda:
 
             See :func:`clean_brenda` for details on how the data is cleaned.
         """
+        cache_file = filepath.with_suffix(".parquet")
+        if cache_file.exists() and cache:
+            df = pd.read_parquet(cache_file)
+            return df
+
         lines = self._read_brenda_file(filepath)
         df = self._separate_entries(lines)
         df = self._clean_ec_number(df)
@@ -236,18 +240,41 @@ class Brenda:
         # Fix spefical cases that break the parser
         regexes = [
             ("<Swissprot>", "", False),  # SYNONYMS has this in ref_id
+            ("&#8242;", "'", False),  # &#8242; is a single quote
+            ("Rmyt2<", "Rmyt2", False),  # Extra < in string
             (
                 r"[\x00-\x08\x0b-\x1f\x7f-\x9f]",
                 " ",
                 True,
             ),  # Remove all control characters other than \t and \n
-            (r"(?<=\w)#(?=\w)", "", True),  # Remove # in text that's not protein ID
+            # Remove # in text that's not protein ID
+            (r"(?<=\w)#(?=\w)", "", True),
+            (r"\s#([A-Z])", r" \1", True),
+            (r"#(\d+[,\t]?[^\d,\t#])", r"number \1", True),
+            (r"([^\s\d\|\(])#", r"\1", True),
+            (
+                r"(stereoselectivity) :(.*<5,6,7>) (<3,6>;)",
+                r"\1 \3 \2; ",
+                True,
+            ),  # nested commentary in 1.1.1.270
+            (
+                r">(4#.+<20>) (<29>)",
+                r"\2; #\1",
+                True,
+            ),  # nested commentary in 2.7.9.1 REACTION
             # Missing opening/closing parenthees
             (r"\sE\)-farnesyl", " (E)-farnesyl", True),
             ("(4a-", "4a-", False),  # (4a-hydroxytetrahydrobiopterin
             ("SN\t2E,6E)", "SN\t(2E,6E)", False),
+            (" dU)230 ", " (dU)230 ", False),  # 4.2.99.18 SP
+            (
+                "carboxyethylsulfanylthiocarbonylamino\t",
+                "carboxyethylsulfanylthiocarbonylamino)",
+                False,
+            ),  # 1.8.1.7 INHIBITORS
             # Replace < with "less than" for non-ref ID cases
-            (r"<(\d+[^,\t\d>])", r"less than \1", True),
+            (r"<(\d+[^,\d>])", r"less than \1", True),
+            (r"<(\d+,\s\d+)", r"less than \1", True),
         ]
         for x in regexes:
             df.description = df.description.str.replace(x[0], x[1], regex=x[2])
@@ -261,7 +288,17 @@ class Brenda:
         df.loc[mask, "description"] = df.loc[mask, "description"].str.replace(
             "|", "", regex=False
         )
+
+        # Irregular commentary in 2.2.1.3 REACTION
+        mask = (df.ID == "2.2.1.3") & (df.field == "REACTION")
+        df.loc[mask, "description"] = df.loc[mask, "description"].str.replace(
+            r"\(#.*$", "", regex=True
+        )
+
         df.reset_index(drop=True, inplace=True)
+
+        if cache:
+            df.to_parquet(str(cache_file), index=False)
 
         return df
 
@@ -402,7 +439,8 @@ class Brenda:
                 entry      : _ACRONYM ref_id citation [_WS] pubmed [_WS paper_stat] _NL
                 citation   : /.+(?={{Pubmed:)/
                 pubmed     : /\{{Pubmed:\d*\}}+/
-                paper_stat : "(" _separated{{TOKEN, ","}} ")"
+                paper_stat : "(" _separated{{STATS, ","}} ")"
+                STATS      : /[\w\/.\-\s]+/
                 _ACRONYM: "{FIELDS[field]}\t"
             """
             t = RefTreeTransformer()
@@ -413,7 +451,7 @@ class Brenda:
                 entry: _ACRONYM [protein_id] reaction [commentary] [[_WS] more_commentary] [[_WS] reversibility] [[_WS] ref_id] _NL
 
                 reaction: TOKENS+
-                %extend CHAR: /\{{(?=[^\}}]{{3}})/ | "}}"  // inline curly brackets around chemicals
+                %extend CHAR: /\{{(?!(r|ir|\?)?\}})/ | "}}"  // inline curly brackets around chemicals
                 more_commentary:  "|" _separated{{content, _COMMENTARY_SEP}} "|"
                 !reversibility:  "{{}}" | "{{r}}" | "{{ir}}" | "{{?}}"
                 _ACRONYM: "{FIELDS[field]}\t"
@@ -469,5 +507,5 @@ class Brenda:
 
 if __name__ == "__main__":
     br = Brenda()
-    br.parse("tests/data/brenda_test.txt", n_jobs=10)
+    br.parse("tests/data/brenda_test.txt", n_jobs=10, cache=True)
     print(br.df)
