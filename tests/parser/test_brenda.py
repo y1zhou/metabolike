@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import pandas.testing as pdt
 import pytest
-from met_path_finder.parser.brenda import Brenda
+from metabolike.parser.brenda import Brenda
 
 
 @pytest.fixture

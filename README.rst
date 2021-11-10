@@ -1,4 +1,4 @@
-Metabolic Pathway Finder
+Metabolic reprogramming Knowledgebase
 ========================
 
 A Python package that aggregates the data from BRENDA_, BioCyc_ and Reactome_ into one unified `graph database`_.

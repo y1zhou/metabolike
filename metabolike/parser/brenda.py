@@ -36,8 +36,8 @@ from typing import Dict, List, Optional, Union
 import dask.dataframe as dd
 import pandas as pd
 from lark import Lark
-from met_path_finder import db
-from met_path_finder.parser.brenda_transformer import *
+from metabolike import db
+from metabolike.parser.brenda_transformer import *
 
 FIELDS = {
     "ACTIVATING_COMPOUND": "AC",
