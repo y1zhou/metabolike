@@ -134,7 +134,7 @@ CHAR  : /\w/
       | "[" | "]"  // Wraps chemical names
       | "="  // Appears in REACTION and very rarely in PROTEIN
 
-ARROW          : "<->" | "<-->" | "<-" | "->" | "-->" | "<<" | ">" | /<\t?>/ | /\s<\s/
+ARROW          : "<->" | "<-->" | "<-" | "->" | "-->" | "<<" | ">" | /<\t?>/ | /\s?<\s/
                | /<(?=[A-Za-z])/  // Comparison of checmicals in commentary
 COMPARE_NUM    : /p\s?<\s?0\.05/i  // p-values
 
@@ -210,7 +210,7 @@ class Brenda:
                 meta=pd.Series(dtype="object", name=None),
             )
 
-            self.parsed = res.compute()
+            self.parsed = res.compute(scheduler="processes")
 
         # TODO: feed the tree into a Neo4j database
 
@@ -252,6 +252,7 @@ class Brenda:
             (r"\s#([A-Z])", r" \1", True),
             (r"#(\d+[,\t]?[^\d,\t#])", r"number \1", True),
             (r"([^\s\d\|\(])#", r"\1", True),
+            (r"#2#\s#> <38>;", "", True),  # 3.4.21.69
             (
                 r"(stereoselectivity) :(.*<5,6,7>) (<3,6>;)",
                 r"\1 \3 \2; ",
@@ -262,6 +263,8 @@ class Brenda:
                 r"\2; #\1",
                 True,
             ),  # nested commentary in 2.7.9.1 REACTION
+            ("<6> <17>", "<6,17>", False),  # nested commentary in 3.4.21.79 NSP
+            ("#2# <4>;", "<4>;", False),  # nested commentary in 5.1.3.3 REACTION
             # Missing opening/closing parenthees
             (r"\sE\)-farnesyl", " (E)-farnesyl", True),
             ("(4a-", "4a-", False),  # (4a-hydroxytetrahydrobiopterin
@@ -271,10 +274,16 @@ class Brenda:
                 "carboxyethylsulfanylthiocarbonylamino\t",
                 "carboxyethylsulfanylthiocarbonylamino)",
                 False,
-            ),  # 1.8.1.7 INHIBITORS
+            ),  # 1.8.1.7 INHIBITORS,
+            ("1->4>)", "1->4)", False),  # 4.2.2.8 SUBSTRATE_PRODUCT
             # Replace < with "less than" for non-ref ID cases
             (r"<(\d+[^,\d>])", r"less than \1", True),
             (r"<(\d+,\s\d+)", r"less than \1", True),
+            (
+                "#1,2,4-8,12-14#",
+                "",
+                False,
+            ),  # Ranges in protein ID for 4.2.1.49
         ]
         for x in regexes:
             df.description = df.description.str.replace(x[0], x[1], regex=x[2])
@@ -452,6 +461,8 @@ class Brenda:
 
                 reaction: TOKENS+
                 %extend CHAR: /\{{(?!(r|ir|\?)?\}})/ | "}}"  // inline curly brackets around chemicals
+                %override content: protein_id description [[_WS] reversibility [_WS]] ref_id  // reversibility in commentary
+
                 more_commentary:  "|" _separated{{content, _COMMENTARY_SEP}} "|"
                 !reversibility:  "{{}}" | "{{r}}" | "{{ir}}" | "{{?}}"
                 _ACRONYM: "{FIELDS[field]}\t"
@@ -463,6 +474,7 @@ class Brenda:
                 {BASE_GRAMMAR}
                 entry      : _ACRONYM protein_id description substrate [_WS commentary] [_WS] ref_id _NL
 
+                %extend CHAR: /(?<=[^\s])[\{{\}}](?=[^\s])/
                 substrate: [_WS] "{{" (TOKENS | "{{" | "}}" | "(" | ")")+ "}}"
                 _ACRONYM: "{FIELDS[field]}\t"
             """

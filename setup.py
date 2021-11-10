@@ -1,8 +1,10 @@
 from setuptools import find_packages, setup
 
+from metabolike import __version__
+
 setup(
     name="metabolike",
-    verion="0.0.1",
+    verion=__version__,
     author="Yi Zhou",
     url="https://github.com/y1zhou/metabolike",
     packages=find_packages(),

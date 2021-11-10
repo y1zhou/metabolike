@@ -17,13 +17,16 @@ sys.path.insert(0, os.path.abspath(".."))
 
 
 # -- Project information -----------------------------------------------------
+from metabolike import __version__
 
 project = "metabolike"
 copyright = "2021, Yi Zhou"
 author = "Yi Zhou"
 
+# The short X.Y version.
+version = __version__
 # The full version, including alpha/beta/rc tags
-release = "0.0.1"
+release = __version__
 
 
 # -- General configuration ---------------------------------------------------
