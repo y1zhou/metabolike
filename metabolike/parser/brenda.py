@@ -168,6 +168,11 @@ class Brenda:
 
     def __init__(self):
         self.df: pd.DataFrame
+        # Get parsers for each unique field
+        self.parsers: Dict[str, Optional[Lark]] = {"TRANSFERRED_DELETED": None}
+        for field in FIELDS.keys():
+            self.parsers[field] = self._get_parser_from_field(field)
+
 
     def parse(self, filepath: Union[str, Path], n_jobs: int = 1, **kwargs):
         """Parse the BRENDA text file into a dict."""
@@ -186,12 +191,8 @@ class Brenda:
             n_jobs = mp.cpu_count()
 
         if n_jobs == 1:
-            # Get parsers for each unique field
-            parsers: Dict[str, Optional[Lark]] = {"TRANSFERRED_DELETED": None}
-            for field in FIELDS.keys():
-                parsers[field] = self._get_parser_from_field(field)
-            self.parsed = self.df.apply(
-                lambda row: self._text_to_tree(row.description, parsers[row.field]),
+            self.df["parsed"] = self.df.apply(
+                lambda row: self._text_to_tree(row.description, self.parsers[row.field]),
                 axis=1,
             )
         else:
@@ -214,7 +215,7 @@ class Brenda:
                 meta=pd.Series(dtype="object", name=None),
             )
 
-            self.parsed = res.compute()
+            self.df["parsed"] = res.compute()
 
         # TODO: feed the tree into a Neo4j database
 
