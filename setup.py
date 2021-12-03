@@ -10,5 +10,5 @@ setup(
     packages=find_packages(),
     keywords=["bioinformatics", "metabolic-pathway", "graph"],
     python_requires=">=3.6",
-    install_requires=["lark>=1.0.0", "pandas", "numpy", "pyspark"],
+    install_requires=["lark>=0.11.3,<1.0.0", "pandas", "numpy", "pyspark"],
 )
