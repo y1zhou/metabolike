@@ -132,7 +132,7 @@ CHAR  : /\w/
       | "="  // Appears in REACTION and very rarely in PROTEIN
 
 ARROW          : "<->" | "<-->" | "<-" | "->" | "-->" | "<<" | ">" | /<\t?>/ | /\s?<\s/
-               | /<(?=[A-Za-z])/  // Comparison of checmicals in commentary
+               | /<(?=[A-Za-z])/  // Comparison of chemicals in commentary
 COMPARE_NUM    : /p\s?<\s?0\.05/i  // p-values
 
 //INLINE_CHEMICAL: /\(+(?!#)/ (CHAR | _WS | COMPARE_NUM | ARROW | "(" | ")")+ ")"
@@ -321,6 +321,42 @@ def read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
         df.to_parquet(str(cache_file), index=False)
 
     return df
+
+
+def parse_brenda(filepath: Union[str, Path], **kwargs) -> pd.DataFrame:
+
+    """Parse the BRENDA text file into a dict.
+
+    This implmentation focuses on extracting information from the text file,
+    and feeding the data into a Neo4j database. The parser is implemented
+    using Lark. A series of :class:`Transformer` classes are used to clean
+    the data and convert it into the format required by Neo4j.
+
+    Args:
+        filepath: The path to the BRENDA text file.
+        **kwargs: Additional keyword arguments to pass to :func:`read_brenda`.
+
+    Returns:
+        A `pd.DataFrame` with the `description` column from :func:`read_brenda`
+        transformed into lists of dicts.
+    """
+    # Read text file into pandas DataFrame, where the last column contains
+    # the text that is to be parsed into trees.
+    filepath = Path(filepath).expanduser().resolve()
+    df = read_brenda(filepath, **kwargs)
+
+    # Get parsers for each unique field
+    parsers: Dict[str, Optional[Lark]] = {"TRANSFERRED_DELETED": None}
+    for field in FIELDS.keys():
+        parsers[field] = get_parser_from_field(field)
+
+    df["description"] = df.apply(
+        lambda row: text_to_tree(row.description, parsers[row.field]),
+        axis=1,
+    )
+    return df
+
+    # TODO: feed the tree into a Neo4j database
 
 
 def _read_brenda_file(filepath: Path) -> List[str]:
