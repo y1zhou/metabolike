@@ -131,6 +131,7 @@ class Metacyc:
         """
         with self.neo4j_driver.session(database=self.db_name) as session:
             # Compartments
+            logger.info("Creating Compartment nodes")
             for c in self.model.getListOfCompartments():
                 c: libsbml.Compartment
                 session.write_transaction(
@@ -140,16 +141,18 @@ class Metacyc:
                         ON CREATE
                         SET c.displayName = $name;
                         """,
+                        mcId=c.getId(),
+                        name=c.getName(),
                     ),
-                    mcId=c.getId(),
-                    name=c.getName(),
                 )
 
             # Compounds, i.e. metabolites, species
+            logger.info("Creating Compound nodes")
             for s in self.model.getListOfSpecies():
                 s: libsbml.Species
                 # Basic properties
                 mcid: str = s.getId()
+                logger.debug(f"Creating Compound node {mcid}")
                 session.write_transaction(
                     lambda tx: tx.run(
                         """
