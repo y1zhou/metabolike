@@ -7,7 +7,34 @@ from metabolike import db
 
 logger = logging.getLogger(__name__)
 
-NODE_LABELS = ["Pathway", "Compartment", "Reaction", "Compound", "GeneProduct"]
+# MIRIAM qualifiers (https://co.mbine.org/standards/qualifiers)
+# libsbml.BiolQualifierType_toString
+BIO_QUALIFIERS = {
+    0: "is",
+    1: "hasPart",
+    2: "isPartOf",
+    3: "isVersionOf",
+    4: "hasVersion",
+    5: "isHomologTo",
+    6: "isDescribedBy",
+    7: "isEncodedBy",
+    8: "encodes",
+    9: "occursIn",
+    10: "hasProperty",
+    11: "isPropertyOf",
+    12: "hasTaxon",
+    13: "unknown",
+}
+
+
+NODE_LABELS = [
+    "Pathway",
+    "Compartment",
+    "Reaction",
+    "Compound",
+    "GeneProduct",
+    "RDF",
+]
 
 
 class Metacyc:
@@ -122,6 +149,7 @@ class Metacyc:
             for s in self.model.getListOfSpecies():
                 s: libsbml.Species
                 # Basic properties
+                mcid: str = s.getId()
                 session.write_transaction(
                     lambda tx: tx.run(
                         """
@@ -135,7 +163,7 @@ class Metacyc:
                                 c.hasOnlySubstanceUnits = $hasOnlySubstanceUnits,
                                 c.constant = $constant;
                         """,
-                        mcId=s.getId(),
+                        mcId=mcid,
                         name=s.getName(),
                         compartment=s.getCompartment(),
                         charge=s.getCharge(),
@@ -145,3 +173,8 @@ class Metacyc:
                         constant=s.getConstant(),
                     )
                 )
+
+                # RDF in Annotation are in the form of triples:
+                # the model component to annotate (subject), the relationship
+                # between the model component and the annotation (predicate),
+                # and a term describing the component (object).
