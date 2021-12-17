@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Dict, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import libsbml
 from metabolike import db
@@ -177,37 +177,52 @@ class Metacyc:
                     )
                 )
 
-                # RDF in Annotation are in the form of triples:
-                # the model component to annotate (subject), the relationship
-                # between the model component and the annotation (predicate),
-                # and a term describing the component (object).
+                # Add RDF annotations
                 logger.debug(f"Adding RDF nodes for Compound {mcid}")
-                cvterms = s.getCVTerms()
+                cvterms: List[libsbml.CVTerm] = s.getCVTerms()
                 for cvterm in cvterms:
-                    # Get the biological qualifier type of the terms
-                    cvterm: libsbml.CVTerm
-                    bio_qual = BIO_QUALIFIERS[cvterm.getBiologicalQualifierType()]
-                    # Get the content of each RDF term
-                    uris = [
-                        self.split_uri(cvterm.getResourceURI(i))
-                        for i in range(cvterm.getNumResources())
-                    ]
-                    uris = {x[0]: x[1] for x in uris}
-                    # Generate the Cypher statements for each RDF term
-                    uri_cypher = self.generate_cypher_for_uri(uris)
+                    self.add_rdf_node("Compound", mcid, cvterm, session)
 
-                    session.write_transaction(
-                        lambda tx: tx.run(
-                            f"""
-                            MATCH (c:Compound {{mcId: $mcId}})
-                            MERGE (n:RDF)<-[:{bio_qual}]-(c)
-                            ON CREATE
-                                SET {uri_cypher};
-                            """,
-                            mcId=mcid,
-                            **uris,
-                        )
-                    )
+    def add_rdf_node(
+        self, node_label: str, mcid: str, cvterm: libsbml.CVTerm, session: db.Session
+    ):
+        """Create RDF node and link it to the given SBML node.
+
+        RDF in Annotation are in the form of triples:
+        the model component to annotate (subject), the relationship between
+        the model component and the annotation (predicate), and a term
+        describing the component (object).
+
+        Args:
+            node_label: The label of the SBML node to annotate. Should be one
+                of the labels defined in `NODE_LABELS`.
+            mcid: The MetaCyc ID of the SBML node to annotate.
+            cvterm: The CVTerm that contains information to add to the RDF node.
+            session: The Neo4j session to use.
+        """
+        # Get the biological qualifier type of the terms
+        bio_qual = BIO_QUALIFIERS[cvterm.getBiologicalQualifierType()]
+        # Get the content of each RDF term
+        uris = [
+            self.split_uri(cvterm.getResourceURI(i))
+            for i in range(cvterm.getNumResources())
+        ]
+        uris = {x[0]: x[1] for x in uris}
+        # Generate the Cypher statements for each RDF term
+        uri_cypher = self.generate_cypher_for_uri(uris)
+
+        session.write_transaction(
+            lambda tx: tx.run(
+                f"""
+                MATCH (c:{node_label} {{mcId: $mcId}})
+                MERGE (n:RDF)<-[:{bio_qual}]-(c)
+                ON CREATE
+                    SET {uri_cypher};
+                """,
+                mcId=mcid,
+                **uris,
+            )
+        )
 
     @staticmethod
     def split_uri(uri: str) -> Tuple[str, str]:
