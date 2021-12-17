@@ -55,7 +55,7 @@ class Metacyc:
         # Read SBML file
         self.doc = self.read_sbml()
         self.model: libsbml.Model = self.doc.getModel()
-        self.db_name: str = self.model.getId().lower()
+        self.db_name: str = self.model.getMetaId().lower()
 
         # Setup Neo4j database
         self.setup_graph_db(force=force)
@@ -141,7 +141,7 @@ class Metacyc:
                         ON CREATE
                         SET c.displayName = $name;
                         """,
-                        mcId=c.getId(),
+                        mcId=c.getMetaId(),
                         name=c.getName(),
                     ),
                 )
@@ -151,7 +151,7 @@ class Metacyc:
             for s in self.model.getListOfSpecies():
                 s: libsbml.Species
                 # Basic properties
-                mcid: str = s.getId()
+                mcid: str = s.getMetaId()
                 logger.debug(f"Creating Compound node {mcid}")
                 session.write_transaction(
                     lambda tx: tx.run(
