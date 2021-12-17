@@ -183,6 +183,31 @@ class Metacyc:
                 for cvterm in cvterms:
                     self.add_rdf_node("Compound", mcid, cvterm, session)
 
+            # Gene products
+            logger.info("Creating GeneProduct nodes")
+            fbc: libsbml.FbcModelPlugin = self.model.getPlugin("fbc")
+            for gp in fbc.getListOfGeneProducts():
+                gp: libsbml.GeneProduct
+                mcid = gp.getMetaId()
+                logger.debug(f"Creating GeneProduct node {mcid}")
+                session.write_transaction(
+                    lambda tx: tx.run(
+                        """
+                        MERGE (gp:GeneProduct {mcId: $mcId})
+                        ON CREATE
+                            SET gp.displayName = $name,
+                                gp.label = $label;
+                        """,
+                        mcId=mcid,
+                        name=gp.getName(),
+                        label=gp.getLabel(),
+                    ),
+                )
+                logger.debug(f"Adding RDF nodes for GeneProduct {mcid}")
+                cvterms: List[libsbml.CVTerm] = gp.getCVTerms()
+                for cvterm in cvterms:
+                    self.add_rdf_node("GeneProduct", mcid, cvterm, session)
+
     def add_rdf_node(
         self, node_label: str, mcid: str, cvterm: libsbml.CVTerm, session: db.Session
     ):
