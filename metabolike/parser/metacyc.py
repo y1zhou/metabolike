@@ -208,6 +208,36 @@ class Metacyc:
                 for cvterm in cvterms:
                     self.add_rdf_node("GeneProduct", mcid, cvterm, session)
 
+            # Reactions
+            logger.info("Creating Reaction nodes")
+            for r in self.model.getListOfReactions():
+                r: libsbml.Reaction
+                mcid = r.getMetaId()
+
+                # Basic properties
+                logger.debug(f"Creating Reaction node {mcid}")
+                session.write_transaction(
+                    lambda tx: tx.run(
+                        """
+                        MERGE (r:Reaction {mcId: $mcId})
+                        ON CREATE
+                            SET r.displayName = $name,
+                                r.reversible = $reversible,
+                                r.fast = $fast;
+                        """,
+                        mcId=mcid,
+                        name=r.getName(),
+                        reversible=r.getReversible(),
+                        fast=r.getFast(),
+                    ),
+                )
+
+                # Add RDF nodes
+                logger.debug(f"Adding RDF nodes for Reaction {mcid}")
+                cvterms: List[libsbml.CVTerm] = r.getCVTerms()
+                for cvterm in cvterms:
+                    self.add_rdf_node("Reaction", mcid, cvterm, session)
+
     def add_rdf_node(
         self, node_label: str, mcid: str, cvterm: libsbml.CVTerm, session: db.Session
     ):
