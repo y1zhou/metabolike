@@ -238,6 +238,15 @@ class Metacyc:
                 for cvterm in cvterms:
                     self.add_rdf_node("Reaction", mcid, cvterm, session)
 
+                # Add reactants and products
+                logger.debug(f"Adding reactants for Reaction {mcid}")
+                reactants = r.getListOfReactants()
+                self.link_reaction_to_compound(mcid, reactants, "Reactant", session)
+
+                logger.debug(f"Adding products for Reaction {mcid}")
+                products = r.getListOfProducts()
+                self.link_reaction_to_compound(mcid, products, "Product", session)
+
     def add_rdf_node(
         self, node_label: str, mcid: str, cvterm: libsbml.CVTerm, session: db.Session
     ):
@@ -303,3 +312,42 @@ class Metacyc:
             cypher.append(f"n.{label} = ${label}")
 
         return ",".join(cypher)
+
+    @staticmethod
+    def link_reaction_to_compound(
+        reaction_id: str,
+        compounds: List[libsbml.SpeciesReference],
+        compound_type: str,
+        session: db.Session,
+    ):
+        """Link reactants or products to a reaction.
+
+        Args:
+            reaction_id: The MetaCyc ID of the reaction.
+            compounds: The list of compounds to link to the reaction.
+            compound_type: The type of compound to link to the reaction. Should
+                be one of "Reactant" or "Product".
+            session: The Neo4j session to use.
+        """
+        if compound_type not in ["Reactant", "Product"]:
+            raise ValueError(f"Invalid compound type: {compound_type}")
+        for cpd in compounds:
+            logger.debug(
+                f"Adding {compound_type} {cpd.getSpecies()} to Reaction {reaction_id}"
+            )
+            session.write_transaction(
+                lambda tx: tx.run(
+                    f"""
+                    MATCH (r:Reaction {{mcId: $reaction}}),
+                            (c:Compound {{mcId: $compound}})
+                    MERGE (r)-[l:has{compound_type}]->(c)
+                    ON CREATE
+                        SET l.stoichiometry = $stoichiometry,
+                            l.constant = $constant;
+                    """,
+                    reaction=reaction_id,
+                    compound=cpd.getSpecies(),
+                    stoichiometry=cpd.getStoichiometry(),
+                    constant=cpd.getConstant(),
+                )
+            )
