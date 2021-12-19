@@ -248,7 +248,9 @@ class Metacyc:
                 gpa: libsbml.GeneProductAssociation = r.getPlugin(
                     "fbc"
                 ).getGeneProductAssociation()
-                self.add_gene_product_association_node(gpa, session, mcid)
+                if gpa is not None:
+                    node = gpa.getAssociation()
+                self.add_gene_product_association_node(node, session, mcid)
 
     def add_rdf_node(
         self, node_label: str, mcid: str, cvterm: libsbml.CVTerm, session: db.Session
@@ -357,7 +359,7 @@ class Metacyc:
 
     def add_gene_product_association_node(
         self,
-        gpa: libsbml.GeneProductAssociation,
+        node: Union[libsbml.GeneProductRef, libsbml.FbcAnd, libsbml.FbcOr],
         session: db.Session,
         source_id: str,
         source_label: str = "Reaction",
@@ -371,7 +373,7 @@ class Metacyc:
         and `FbcOr` nodes, respectively.
 
         Args:
-            gpa: The GeneProductAssociation to add.
+            node: The GeneProductAssociation child node to add.
             session: The Neo4j session to use.
             source_id: The MetaCyc ID of the source node. This should be the
                 MetaCyc ID of the `Reaction` node
@@ -381,7 +383,6 @@ class Metacyc:
             node_index: The index of the current node. This is used to construct
                 the `mcId` of the `Complex` and `EntitySet` nodes.
         """
-        node = gpa.getAssociation()
         # If there's no nested association, add the node directly
         if isinstance(node, libsbml.GeneProductRef):
             session.write_transaction(
@@ -403,9 +404,8 @@ class Metacyc:
             session.write_transaction(
                 lambda tx: tx.run(
                     f"""
-                    MATCH (n:{source_label} {{mcId: $node_id}}),
-                          (complex:Complex {{mcId: $complex_id}})
-                    MERGE (complex)<-[l:{edge_type}]-(n)
+                    MATCH (n:{source_label} {{mcId: $node_id}})
+                    MERGE (:Complex {{mcId: $complex_id}})<-[l:{edge_type}]-(n)
                     """,
                     node_id=source_id,
                     complex_id=complex_id,
@@ -425,9 +425,8 @@ class Metacyc:
             session.write_transaction(
                 lambda tx: tx.run(
                     f"""
-                    MATCH (n:{source_label} {{mcId: $node_id}}),
-                          (eset:EntitySet {{mcId: $eset_id}})
-                    MERGE (eset)<-[l:{edge_type}]-(n)
+                    MATCH (n:{source_label} {{mcId: $node_id}})
+                    MERGE (:EntitySet {{mcId: $eset_id}})<-[l:{edge_type}]-(n)
                     """,
                     node_id=source_id,
                     eset_id=eset_id,
