@@ -34,6 +34,8 @@ NODE_LABELS = [
     "Compound",
     "GeneProduct",
     "RDF",
+    "Complex",
+    "EntitySet",
 ]
 
 
@@ -80,17 +82,7 @@ class Metacyc:
     def setup_graph_db(self, **kwargs):
         """
         Create Neo4j database and set proper constraints. `Reaction` nodes are
-        central in the schema:
-
-        ```
-                     Pathway
-                        │
-        Compartment───Reaction───Compound
-            │           │          │
-            └───────────┼──────────┘
-                        │
-                    GeneProduct
-        ```
+        central in the schema (see README.rst).
         """
         # Create database
         try:
@@ -247,6 +239,17 @@ class Metacyc:
                 products = r.getListOfProducts()
                 self.link_reaction_to_compound(mcid, products, "Product", session)
 
+                # Add associated gene products
+                # This could be complicated where the child nodes could be:
+                # 1. GeneProductRef
+                # 2. fbc:or -> GeneProductRef
+                # 3. fbc:and -> GeneProductRef
+                # 4. Arbitrarily nested fbc:or / fbc:and within cases 2 and 3
+                gpa: libsbml.GeneProductAssociation = r.getPlugin(
+                    "fbc"
+                ).getGeneProductAssociation()
+                self.add_gene_product_association_node(gpa, session, mcid)
+
     def add_rdf_node(
         self, node_label: str, mcid: str, cvterm: libsbml.CVTerm, session: db.Session
     ):
@@ -351,3 +354,94 @@ class Metacyc:
                     constant=cpd.getConstant(),
                 )
             )
+
+    def add_gene_product_association_node(
+        self,
+        gpa: libsbml.GeneProductAssociation,
+        session: db.Session,
+        source_id: str,
+        source_label: str = "Reaction",
+        edge_type: str = "hasGeneProduct",
+        node_index: int = 0,
+    ):
+        """
+        Add gene products to a reaction. When the added node is FbcAnd or FbcOr,
+        recursively add the children. This means a custom `mcId` is constructed
+        for the `Complex` and `EntitySet` nodes corresponding to the `FbcAnd`
+        and `FbcOr` nodes, respectively.
+
+        Args:
+            gpa: The GeneProductAssociation to add.
+            session: The Neo4j session to use.
+            source_id: The MetaCyc ID of the source node. This should be the
+                MetaCyc ID of the `Reaction` node
+            source_label: The label of the source node.
+            edge_type: The type of edge to add. Should be one of `hasGeneProduct`,
+                `hasComponent`, or `hasMember`.
+            node_index: The index of the current node. This is used to construct
+                the `mcId` of the `Complex` and `EntitySet` nodes.
+        """
+        node = gpa.getAssociation()
+        # If there's no nested association, add the node directly
+        if isinstance(node, libsbml.GeneProductRef):
+            session.write_transaction(
+                lambda tx: tx.run(
+                    f"""
+                    MATCH (n:{source_label} {{mcId: $node_id}}),
+                          (gp:GeneProduct {{mcId: $gp_id}})
+                    MERGE (gp)<-[l:{edge_type}]-(n)
+                    """,
+                    node_id=source_id,
+                    gp_id=node.getGeneProduct(),
+                )
+            )
+
+        # For nested associations, first add a `Complex` or `EntitySet` node,
+        # then recursively add the children
+        elif isinstance(node, libsbml.FbcAnd):
+            complex_id = f"{source_id}_complex{node_index}"
+            session.write_transaction(
+                lambda tx: tx.run(
+                    f"""
+                    MATCH (n:{source_label} {{mcId: $node_id}}),
+                          (complex:Complex {{mcId: $complex_id}})
+                    MERGE (complex)<-[l:{edge_type}]-(n)
+                    """,
+                    node_id=source_id,
+                    complex_id=complex_id,
+                )
+            )
+            for i in range(node.getNumAssociations()):
+                self.add_gene_product_association_node(
+                    node.getAssociation(i),
+                    session,
+                    complex_id,
+                    "Complex",
+                    "hasComponent",
+                    i,
+                )
+        elif isinstance(node, libsbml.FbcOr):
+            eset_id = f"{source_id}_entityset{node_index}"
+            session.write_transaction(
+                lambda tx: tx.run(
+                    f"""
+                    MATCH (n:{source_label} {{mcId: $node_id}}),
+                          (eset:EntitySet {{mcId: $eset_id}})
+                    MERGE (eset)<-[l:{edge_type}]-(n)
+                    """,
+                    node_id=source_id,
+                    eset_id=eset_id,
+                )
+            )
+            for i in range(node.getNumAssociations()):
+                self.add_gene_product_association_node(
+                    node.getAssociation(i),
+                    session,
+                    eset_id,
+                    "EntitySet",
+                    "hasMember",
+                    i,
+                )
+        else:
+            logging.error(f"Unhandled GeneProductAssociation type {type(node)}")
+            raise ValueError

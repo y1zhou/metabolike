@@ -20,6 +20,14 @@ metabolike.parser.brenda\_transformer module
    :undoc-members:
    :show-inheritance:
 
+metabolike.parser.metacyc module
+--------------------------------
+
+.. automodule:: metabolike.parser.metacyc
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 
