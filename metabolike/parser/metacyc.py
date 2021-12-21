@@ -1,4 +1,5 @@
 import logging
+from itertools import groupby
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
@@ -26,7 +27,6 @@ BIO_QUALIFIERS = {
     13: "unknown",
 }
 
-
 NODE_LABELS = [
     "Pathway",
     "Compartment",
@@ -49,9 +49,25 @@ class Metacyc:
     - SBML FAQ: https://synonym.caltech.edu/documents/faq
     """
 
-    def __init__(self, filepath: Union[str, Path], neo4j_driver: db.Neo4jDriver):
+    def __init__(
+        self, filepath: Union[str, Path], neo4j_driver: db.Neo4jDriver, **kwargs
+    ):
+        """
+        Args:
+            filepath: The path to the MetaCyc SBML file to convert.
+            neo4j_driver: A Neo4jDriver instance.
+            pw_filepath (optional): The path to the pathway.dat file. If given,
+                the file will be parsed and pathway links will be added to the
+                Reaction nodes.
+        """
+        # File paths
+        self.filepath = self._validate_path(filepath)
+        pw_filepath = kwargs.get("pw_filepath")
+        if pw_filepath:
+            self.pw_filepath = self._validate_path(pw_filepath)
+
+        # Neo4j driver
         self.neo4j_driver = neo4j_driver
-        self.filepath = Path(filepath).expanduser().resolve()
 
     def setup(self, force: bool = False):
         # Read SBML file
@@ -59,8 +75,25 @@ class Metacyc:
         self.model: libsbml.Model = self.doc.getModel()
         self.db_name: str = self.model.getMetaId().lower()
 
-        # Setup Neo4j database
+        # Setup Neo4j database and populate it with data
         self.setup_graph_db(force=force)
+        self.sbml_to_graph()
+
+        # Read pathways file if given
+        if self.pw_filepath:
+            # `rb` to bypass the 0xa9 character
+            with open(self.pw_filepath, "rb") as f:
+                lines = [l.decode("utf-8", "ignore").strip() for l in f]
+                # Also remove comments on the top of the file
+                lines = [l for l in lines if not l.startswith("#")]
+
+            # Split entries based on `//`
+            doc = [list(g) for k, g in groupby(lines, key=lambda x: x != "//") if k]
+            doc = [x for x in doc if len(x) > 1]  # Remove empty entries
+            pathways = {}
+            for pw in doc:
+                pw_id, pw_data = self.read_pathways(pw)
+                pathways[pw_id] = pw_data
 
     def read_sbml(self) -> libsbml.SBMLDocument:
         reader = libsbml.SBMLReader()
@@ -78,6 +111,42 @@ class Metacyc:
             )
 
         return metacyc
+
+    @staticmethod
+    def read_pathways(lines: List[str]) -> Tuple[str, Dict[str, Union[str, List[str]]]]:
+        """
+        Parse one entry from an attribute-value file.
+
+        Args:
+            lines: A list of lines from an entry of the file.
+        """
+        pw_id, pathway = "", {}
+        for line in lines:
+            # / marks the continuation of the previous line
+            if line.startswith("/"):
+                # TODO
+                continue
+
+            # ^ marks an annotation-value pair where the annotation is a
+            # label attached to the previous attribute
+            elif line.startswith("^"):
+                # TODO
+                continue
+
+            # Otherwise we have a regular attribute-value pair
+            else:
+                attr, val = line.split(" - ")
+                # Treat `UNIQUE-ID` as a special case as we need to return
+                # the pathway ID separately
+                if attr == "UNIQUE-ID":
+                    pw_id = val
+                    continue
+                # TODO
+
+        if not pw_id:
+            raise ValueError("Pathway ID not found")
+
+        return pw_id, pathway
 
     def setup_graph_db(self, **kwargs):
         """
@@ -445,3 +514,12 @@ class Metacyc:
         else:
             logging.error(f"Unhandled GeneProductAssociation type {type(node)}")
             raise ValueError
+
+    @staticmethod
+    def _validate_path(filepath: Union[str, Path]) -> Path:
+        f = Path(filepath).expanduser().resolve()
+        if not f.is_file():
+            logger.error(f"File does not exist: {f}")
+            raise FileNotFoundError(str(f))
+
+        return f
