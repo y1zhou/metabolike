@@ -1,0 +1,145 @@
+# Copyright © SRI International 1999-2020, Marine Biological Laboratory 1998-2001, DoubleTwist Inc 1998-1999.  All Rights Reserved.
+#
+# Authors:
+#    Ron Caspi
+#    Carol A Fulcher
+#    Anamika Kothari
+#    Markus Krummenacker
+#    Mario Latendresse
+#    Suzanne Paley
+#    Pallavi Subhraveti
+#    Peifen Zhang
+#    Sue Rhee
+#    Hartmut Foerster
+#    Lukas Mueller
+#    Peter D Karp
+#
+# Please see the license agreement regarding the use of and distribution of this file.
+# The format of this file is defined at http://bioinformatics.ai.sri.com/ptools/flatfile-format.html .
+#
+# Filename: /home/kaffir2/brg/aic/pgdbs/tier1/metacyc/25.5/data/pathways.dat
+#
+# Organism: MetaCyc
+# Database: MetaCyc
+# Version: 25.5
+# Date and time generated: July 21, 2021, 14:14:55
+#
+UNIQUE-ID - GLYCOLYSIS
+TYPES - GLYCOLYSIS-VARIANTS
+COMMON-NAME - glycolysis I (from glucose 6-phosphate)
+CITATIONS - 28128209
+CITATIONS - EcoSal:EV-EXP-TAS:3386618200:caspi
+COMMENT - <b>General Background</b>
+/
+/Glycolysis, which was first studied as a pathway for the utilization of glucose, is one of the major pathways of central metabolism, the other two being the |FRAME:PENTOSE-P-PWY| and the |FRAME:TCA "TCA cycle"|. In organisms that possess a glycolysis pathway, it is essential under all conditions of growth, because it produces six of the 13 precursor metabolites that are the starting materials for the biosynthesis of building blocks for macromolecules and other needed small molecules (the six compounds are |FRAME:GLC-6-P|, |FRAME:FRUCTOSE-6P|, |FRAME:DIHYDROXY-ACETONE-PHOSPHATE|, |FRAME:G3P|, |FRAME:PHOSPHO-ENOL-PYRUVATE|, and |FRAME: PYRUVATE|). While not universal, glycolysis is very common.
+/
+/Even though glycolysis is often described starting with glucose, other hexoses (e.g. fructose) can also serve as input (as its name implies - glycose is a general term for simple sugars).
+/
+/Glycolysis has evolved to fulfill two essential functions:
+/
+/i) it oxidizes hexoses to generate |FRAME:ATP|, reductants and |FRAME:PYRUVATE|, and
+/
+/ii) being an amphibolic pathway (pathway that involves both catabolism and anabolism), it can reversibly produce hexoses from various low-molecular weight molecules.
+/
+/Because various degradation pathways feed into glycolysis at many different points, glycolysis or portions of it run in the forward or reverse direction, depending on the carbon source being utilized, in order to satisfy the cell's need for precursor metabolites and energy.
+/This switching of direction is possible because all but two of the enzymatic reactions comprising glycolysis are reversible, and the conversions catalyzed by the two exceptions are rendered functionally reversible by other enzymes (|FRAME:F16B-CPLX "fructose-1,6-bisphosphatase"| and |FRAME:PEPSYNTH-CPLX|) that catalyze different irreversible reactions flowing in the opposite direction.
+/
+/<b>About This Pathway</b>
+/
+/This pathway diagram describes the well characterized glycolysis pathway of the bacterium |FRAME: TAX-562| growing with |FRAME: GLC| as a source of carbon and energy. Glucose is not shown here as a component of glycolysis because
+/when used by |FRAME: TAX-562| , glucose enters the cell via a phosphotransferase system (transport of glucose,
+/|FRAME: CPLX-157|), and the first intracellular species, therefore, is |FRAME: GLC-6-P|.
+/
+/|FRAME:TAX-562| does constitutively produce |FRAME:GLUCOKIN-MONOMER| (the intracellular enzyme that converts glucose to glucose-6-phosphate) but it is not needed for the utilization of either exogenous or endogenous glucose |CITS: [9023215]|. It may be required to supplement levels of glucose 6-phosphate under anabolic stress conditions |CITS: [7786044]|.
+/
+/Other substrates may enter glycolysis at different stages. For example, the sugars and sugar alcohols |FRAME:ALLOSE|, |FRAME:SORBOSE|, |FRAME:MANNITOL|, |FRAME:SORBITOL|, |FRAME:MANNOSE| and |FRAME:SUCROSE|, which are processed into |FRAME: FRUCTOSE-6P|, enter the pathway at that stage (see |FRAME: PWY-5484|). 
+/
+/For reviews, please see: Romeo, T. and J. L. Snoep, |CITS: [EcoSal]| module 3.5.1.; Fraenkel, D. G. |CITS: [colisalII]| p. 189-198.
+CREDITS - O0-3
+CREDITS - ingraham
+DBLINKS - (ECOCYC "GLYCOLYSIS" NIL |paley| 3392397157 NIL NIL)
+DBLINKS - (ARACYC "GLYCOLYSIS" NIL |green| 3381011399 NIL NIL)
+ENZYMES-NOT-USED - ALKAPHOSPHA-CPLX
+ENZYMES-NOT-USED - AT2G36530-MONOMER
+ENZYMES-NOT-USED - MONOMER-9165
+ENZYMES-NOT-USED - AT3G55440-MONOMER
+ENZYMES-NOT-USED - CPLX-5403
+ENZYMES-NOT-USED - MONOMER-9123
+ENZYMES-NOT-USED - MONOMER-12859
+ENZYMES-NOT-USED - MONOMER-12710
+ENZYMES-NOT-USED - CPLX-5521
+ENZYMES-NOT-USED - CPLX-5522
+ENZYMES-NOT-USED - MONOMER-12898
+ENZYMES-NOT-USED - MONOMER-12902
+ENZYMES-NOT-USED - MONOMER-12840
+ENZYMES-NOT-USED - MONOMER-12841
+ENZYMES-NOT-USED - MONOMER-2301
+IN-PATHWAY - GLYCOLYSIS-E-D
+IN-PATHWAY - GLYCOLYSIS-TCA-GLYOX-BYPASS
+INSTANCE-NAME-TEMPLATE - PWY-*
+KEY-NON-REACTIONS - (AND GLUCOKIN-RXN)
+PATHWAY-LINKS - (|D-glucopyranose-6-phosphate| (PWY-6724 . :INCOMING) (TRANS-RXN-157 . :INCOMING))
+PATHWAY-LINKS - (PYRUVATE PYRUVDEHYD-PWY TCA-GLYOX-BYPASS |Amino-Acid-Biosynthesis|)
+PATHWAY-LINKS - (G3P SERSYN-PWY)
+PATHWAY-LINKS - (PHOSPHO-ENOL-PYRUVATE FERMENTATION-PWY)
+PATHWAY-LINKS - (FRUCTOSE-6P SORBDEG-PWY SUCUTIL-PWY P302-PWY PWY-3861 MANNCAT-PWY PWY0-44)
+PREDECESSORS - ("2PGADEHYDRAT-RXN" "RXN-15513")
+PREDECESSORS - ("RXN-15513" "PHOSGLYPHOS-RXN")
+PREDECESSORS - ("F16BDEPHOS-RXN" "6PFRUCTPHOS-RXN")
+PREDECESSORS - ("6PFRUCTPHOS-RXN" "F16BDEPHOS-RXN")
+PREDECESSORS - ("PEPDEPHOS-RXN" "PEPSYNTH-RXN")
+PREDECESSORS - ("PEPSYNTH-RXN" "PEPDEPHOS-RXN")
+PREDECESSORS - ("PEPDEPHOS-RXN" "2PGADEHYDRAT-RXN")
+PREDECESSORS - ("2PGADEHYDRAT-RXN" "3PGAREARR-RXN")
+PREDECESSORS - ("3PGAREARR-RXN" "PHOSGLYPHOS-RXN")
+PREDECESSORS - ("PHOSGLYPHOS-RXN" "GAPOXNPHOSPHN-RXN")
+PREDECESSORS - ("GAPOXNPHOSPHN-RXN" "TRIOSEPISOMERIZATION-RXN" "F16ALDOLASE-RXN")
+PREDECESSORS - ("TRIOSEPISOMERIZATION-RXN" "F16ALDOLASE-RXN")
+PREDECESSORS - ("F16ALDOLASE-RXN" "6PFRUCTPHOS-RXN")
+PREDECESSORS - ("6PFRUCTPHOS-RXN" "PGLUCISOM-RXN")
+PREDECESSORS - ("PGLUCISOM-RXN")
+PRIMARY-PRODUCTS - PYRUVATE
+PRIMARY-REACTANTS - D-glucopyranose-6-phosphate
+REACTION-LAYOUT - (RXN-15513 (:LEFT-PRIMARIES 2-PG) (:DIRECTION :R2L) (:RIGHT-PRIMARIES G3P))
+REACTION-LAYOUT - (F16BDEPHOS-RXN (:LEFT-PRIMARIES FRUCTOSE-16-DIPHOSPHATE) (:DIRECTION :L2R) (:RIGHT-PRIMARIES FRUCTOSE-6P))
+REACTION-LAYOUT - (PEPSYNTH-RXN (:LEFT-PRIMARIES PYRUVATE) (:DIRECTION :L2R) (:RIGHT-PRIMARIES PHOSPHO-ENOL-PYRUVATE))
+REACTION-LAYOUT - (PGLUCISOM-RXN (:LEFT-PRIMARIES D-glucopyranose-6-phosphate) (:DIRECTION :L2R) (:RIGHT-PRIMARIES FRUCTOSE-6P))
+REACTION-LAYOUT - (6PFRUCTPHOS-RXN (:LEFT-PRIMARIES FRUCTOSE-6P) (:DIRECTION :L2R) (:RIGHT-PRIMARIES FRUCTOSE-16-DIPHOSPHATE))
+REACTION-LAYOUT - (F16ALDOLASE-RXN (:LEFT-PRIMARIES FRUCTOSE-16-DIPHOSPHATE) (:DIRECTION :L2R) (:RIGHT-PRIMARIES GAP DIHYDROXY-ACETONE-PHOSPHATE))
+REACTION-LAYOUT - (TRIOSEPISOMERIZATION-RXN (:LEFT-PRIMARIES GAP) (:DIRECTION :R2L) (:RIGHT-PRIMARIES DIHYDROXY-ACETONE-PHOSPHATE))
+REACTION-LAYOUT - (GAPOXNPHOSPHN-RXN (:LEFT-PRIMARIES GAP) (:DIRECTION :L2R) (:RIGHT-PRIMARIES DPG))
+REACTION-LAYOUT - (PHOSGLYPHOS-RXN (:LEFT-PRIMARIES G3P) (:DIRECTION :R2L) (:RIGHT-PRIMARIES DPG))
+REACTION-LAYOUT - (3PGAREARR-RXN (:LEFT-PRIMARIES 2-PG) (:DIRECTION :R2L) (:RIGHT-PRIMARIES G3P))
+REACTION-LAYOUT - (2PGADEHYDRAT-RXN (:LEFT-PRIMARIES 2-PG) (:DIRECTION :L2R) (:RIGHT-PRIMARIES PHOSPHO-ENOL-PYRUVATE))
+REACTION-LAYOUT - (PEPDEPHOS-RXN (:LEFT-PRIMARIES PYRUVATE) (:DIRECTION :R2L) (:RIGHT-PRIMARIES PHOSPHO-ENOL-PYRUVATE))
+REACTION-LIST - RXN-15513
+REACTION-LIST - F16BDEPHOS-RXN
+REACTION-LIST - PEPSYNTH-RXN
+REACTION-LIST - PGLUCISOM-RXN
+REACTION-LIST - 6PFRUCTPHOS-RXN
+REACTION-LIST - F16ALDOLASE-RXN
+REACTION-LIST - TRIOSEPISOMERIZATION-RXN
+REACTION-LIST - GAPOXNPHOSPHN-RXN
+REACTION-LIST - PHOSGLYPHOS-RXN
+REACTION-LIST - 3PGAREARR-RXN
+REACTION-LIST - 2PGADEHYDRAT-RXN
+REACTION-LIST - PEPDEPHOS-RXN
+SPECIES - TAX-3708
+SPECIES - TAX-511145
+SPECIES - TAX-272634
+SPECIES - TAX-3988
+SPECIES - TAX-4932
+SPECIES - TAX-3562
+SPECIES - TAX-4577
+SPECIES - ORG-5993
+SUPER-PATHWAYS - GLYCOLYSIS-E-D
+SUPER-PATHWAYS - GLYCOLYSIS-TCA-GLYOX-BYPASS
+SYNONYMS - Embden-Meyerhof pathway
+SYNONYMS - Embden-Meyerhof-Parnas pathway
+SYNONYMS - EMP pathway
+SYNONYMS - glycolysis (plastidic)
+TAXONOMIC-RANGE - TAX-2759
+TAXONOMIC-RANGE - TAX-2
+TAXONOMIC-RANGE - TAX-2157
+//
+
