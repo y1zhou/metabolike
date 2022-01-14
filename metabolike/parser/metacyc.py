@@ -1,7 +1,7 @@
 import logging
 from itertools import groupby
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import libsbml
 from metabolike import db
@@ -42,7 +42,7 @@ NODE_LABELS = [
 class Metacyc:
     """
     Converting MetaCyc files to a Neo4j database.
-    Documentation on the MetaCyc files and ofrmat FAQs can be found at:
+    Documentation on the MetaCyc files and format FAQs can be found at:
 
     - MetaCyc data files download: https://metacyc.org/downloads.shtml
     - MetaCyc file formats: http://bioinformatics.ai.sri.com/ptools/flatfile-format.html
@@ -50,103 +50,58 @@ class Metacyc:
     """
 
     def __init__(
-        self, filepath: Union[str, Path], neo4j_driver: db.Neo4jDriver, **kwargs
+        self,
+        sbml: Union[str, Path],
+        neo4j_driver: db.Neo4jDriver,
+        db_name: Optional[str] = None,
+        reactions: Optional[Union[str, Path]] = None,
+        pathways: Optional[Union[str, Path]] = None,
     ):
         """
         Args:
-            filepath: The path to the MetaCyc SBML file to convert.
+            sbml: The path to the MetaCyc SBML file to convert.
             neo4j_driver: A Neo4jDriver instance.
-            pw_filepath (optional): The path to the pathway.dat file. If given,
+            db_name: The name of the database to create. If None, the ``metaid``
+                attribute of the SBML file is used.
+            reactions: The path to the ``reaction.dat`` file. If given,
+                the file will be parsed and extra annotation on ``Reaction``
+                nodes will be added.
+            pathways: The path to the ``pathway.dat`` file. If given,
                 the file will be parsed and pathway links will be added to the
-                Reaction nodes.
+                ``Reaction`` nodes.
         """
-        # File paths
-        self.filepath = self._validate_path(filepath)
-        pw_filepath = kwargs.get("pw_filepath")
-        if pw_filepath:
-            self.pw_filepath = self._validate_path(pw_filepath)
-
         # Neo4j driver
         self.neo4j_driver = neo4j_driver
 
+        # File paths
+        self.input_files = {
+            "sbml": self._validate_path(sbml),
+            "reactions": self._validate_path(reactions),
+            "pathways": self._validate_path(pathways),
+        }
+
+        # Misc variables
+        if db_name:
+            self.db_name = db_name
+
     def setup(self, force: bool = False):
         # Read SBML file
-        self.doc = self.read_sbml()
-        self.model: libsbml.Model = self.doc.getModel()
-        self.db_name: str = self.model.getMetaId().lower()
+        doc = self._read_sbml()
+        model: libsbml.Model = doc.getModel()
+        if not self.db_name:
+            self.db_name: str = model.getMetaId().lower()
 
         # Setup Neo4j database and populate it with data
         self.setup_graph_db(force=force)
-        self.sbml_to_graph()
+        self.sbml_to_graph(model)
 
         # Read pathways file if given
-        if self.pw_filepath:
-            # `rb` to bypass the 0xa9 character
-            with open(self.pw_filepath, "rb") as f:
-                lines = [l.decode("utf-8", "ignore").strip() for l in f]
-                # Also remove comments on the top of the file
-                lines = [l for l in lines if not l.startswith("#")]
-
-            # Split entries based on `//`
-            doc = [list(g) for k, g in groupby(lines, key=lambda x: x != "//") if k]
-            doc = [x for x in doc if len(x) > 1]  # Remove empty entries
-            pathways = {}
-            for pw in doc:
-                pw_id, pw_data = self.read_pathways(pw)
-                pathways[pw_id] = pw_data
-
-    def read_sbml(self) -> libsbml.SBMLDocument:
-        reader = libsbml.SBMLReader()
-        metacyc = reader.readSBMLFromFile(self.filepath)
-        logger.info("Finished reading SBML file")
-
-        for i in range(metacyc.getNumErrors()):
-            err = metacyc.getError(i)
-            logger.warning(
-                "SBML reader raised %s during parsing at line %d, column %d: %s",
-                err.getSeverityAsString(),
-                err.getLine(),
-                err.getColumn(),
-                err.getMessage().replace("\n", " "),
-            )
-
-        return metacyc
-
-    @staticmethod
-    def read_pathways(lines: List[str]) -> Tuple[str, Dict[str, Union[str, List[str]]]]:
-        """
-        Parse one entry from an attribute-value file.
-
-        Args:
-            lines: A list of lines from an entry of the file.
-        """
-        pw_id, pathway = "", {}
-        for line in lines:
-            # / marks the continuation of the previous line
-            if line.startswith("/"):
-                # TODO
-                continue
-
-            # ^ marks an annotation-value pair where the annotation is a
-            # label attached to the previous attribute
-            elif line.startswith("^"):
-                # TODO
-                continue
-
-            # Otherwise we have a regular attribute-value pair
-            else:
-                attr, val = line.split(" - ")
-                # Treat `UNIQUE-ID` as a special case as we need to return
-                # the pathway ID separately
-                if attr == "UNIQUE-ID":
-                    pw_id = val
-                    continue
-                # TODO
-
-        if not pw_id:
-            raise ValueError("Pathway ID not found")
-
-        return pw_id, pathway
+        if self.input_files["pathways"]:
+            logger.info("Creating pathway links")
+            docs = self._read_dat_file(self.input_files["pathways"])
+            for pw in docs:
+                pw_id = self.pathway_to_graph(pw)
+                logger.debug(f"Pathway {pw_id} added to graph")
 
     def setup_graph_db(self, **kwargs):
         """
@@ -183,7 +138,7 @@ class Metacyc:
                         f"Could not create constraint for {label} nodes: {r}"
                     )
 
-    def sbml_to_graph(self):
+    def sbml_to_graph(self, model: libsbml.Model):
         """
         Populate Neo4j database with SBML data.
 
@@ -193,7 +148,7 @@ class Metacyc:
         with self.neo4j_driver.session(database=self.db_name) as session:
             # Compartments
             logger.info("Creating Compartment nodes")
-            for c in self.model.getListOfCompartments():
+            for c in model.getListOfCompartments():
                 c: libsbml.Compartment
                 session.write_transaction(
                     lambda tx: tx.run(
@@ -209,7 +164,7 @@ class Metacyc:
 
             # Compounds, i.e. metabolites, species
             logger.info("Creating Compound nodes")
-            for s in self.model.getListOfSpecies():
+            for s in model.getListOfSpecies():
                 s: libsbml.Species
                 # Basic properties
                 mcid: str = s.getMetaId()
@@ -242,11 +197,11 @@ class Metacyc:
                 logger.debug(f"Adding RDF nodes for Compound {mcid}")
                 cvterms: List[libsbml.CVTerm] = s.getCVTerms()
                 for cvterm in cvterms:
-                    self.add_rdf_node("Compound", mcid, cvterm, session)
+                    self._add_sbml_rdf_node("Compound", mcid, cvterm, session)
 
             # Gene products
             logger.info("Creating GeneProduct nodes")
-            fbc: libsbml.FbcModelPlugin = self.model.getPlugin("fbc")
+            fbc: libsbml.FbcModelPlugin = model.getPlugin("fbc")
             for gp in fbc.getListOfGeneProducts():
                 gp: libsbml.GeneProduct
                 mcid = gp.getMetaId()
@@ -267,11 +222,11 @@ class Metacyc:
                 logger.debug(f"Adding RDF nodes for GeneProduct {mcid}")
                 cvterms: List[libsbml.CVTerm] = gp.getCVTerms()
                 for cvterm in cvterms:
-                    self.add_rdf_node("GeneProduct", mcid, cvterm, session)
+                    self._add_sbml_rdf_node("GeneProduct", mcid, cvterm, session)
 
             # Reactions
             logger.info("Creating Reaction nodes")
-            for r in self.model.getListOfReactions():
+            for r in model.getListOfReactions():
                 r: libsbml.Reaction
                 mcid = r.getMetaId()
 
@@ -297,16 +252,16 @@ class Metacyc:
                 logger.debug(f"Adding RDF nodes for Reaction {mcid}")
                 cvterms: List[libsbml.CVTerm] = r.getCVTerms()
                 for cvterm in cvterms:
-                    self.add_rdf_node("Reaction", mcid, cvterm, session)
+                    self._add_sbml_rdf_node("Reaction", mcid, cvterm, session)
 
                 # Add reactants and products
                 logger.debug(f"Adding reactants for Reaction {mcid}")
                 reactants = r.getListOfReactants()
-                self.link_reaction_to_compound(mcid, reactants, "Reactant", session)
+                self._link_reaction_to_compound(mcid, reactants, "Reactant", session)
 
                 logger.debug(f"Adding products for Reaction {mcid}")
                 products = r.getListOfProducts()
-                self.link_reaction_to_compound(mcid, products, "Product", session)
+                self._link_reaction_to_compound(mcid, products, "Product", session)
 
                 # Add associated gene products
                 # This could be complicated where the child nodes could be:
@@ -319,9 +274,76 @@ class Metacyc:
                 ).getGeneProductAssociation()
                 if gpa is not None:
                     node = gpa.getAssociation()
-                self.add_gene_product_association_node(node, session, mcid)
+                self._add_sbml_gene_product_association_node(node, session, mcid)
 
-    def add_rdf_node(
+    def pathway_to_graph(self, lines: List[str]) -> str:
+        """
+        Parse one entry from the pathway attribute-value file, and add relevant
+        information to the graph database in one transaction.
+
+        Args:
+            lines: A list of lines from an entry of the file.
+
+        Returns:
+            A string containing the ID of the pathway.
+        """
+        pw_id = ""
+        for line in lines:
+            # / marks the continuation of the previous line
+            if line.startswith("/"):
+                # TODO
+                continue
+
+            # ^ marks an annotation-value pair where the annotation is a
+            # label attached to the previous attribute
+            elif line.startswith("^"):
+                # TODO
+                continue
+
+            # Otherwise we have a regular attribute-value pair
+            else:
+                attr, val = line.split(" - ", maxsplit=1)
+                # Treat `UNIQUE-ID` as a special case as we need to return
+                # the pathway ID separately
+                if attr == "UNIQUE-ID":
+                    pw_id = val
+                    continue
+                # TODO
+
+        if not pw_id:
+            raise ValueError("Pathway ID not found")
+
+        return pw_id
+
+    @staticmethod
+    def _validate_path(filepath: Optional[Union[str, Path]]) -> Optional[Path]:
+        if not filepath:
+            return None
+        f = Path(filepath).expanduser().resolve()
+        if not f.is_file():
+            logger.error(f"File does not exist: {f}")
+            raise FileNotFoundError(str(f))
+
+        return f
+
+    def _read_sbml(self) -> libsbml.SBMLDocument:
+        reader = libsbml.SBMLReader()
+        metacyc = reader.readSBMLFromFile(self.input_files["sbml"])
+        logger.info("Finished reading SBML file")
+
+        for i in range(metacyc.getNumErrors()):
+            err = metacyc.getError(i)
+            logger.warning(
+                "SBML reader raised %s during parsing at line %d, column %d: %s",
+                err.getSeverityAsString(),
+                err.getLine(),
+                err.getColumn(),
+                err.getMessage().replace("\n", " "),
+            )
+
+        return metacyc
+
+    def _add_sbml_rdf_node(
         self, node_label: str, mcid: str, cvterm: libsbml.CVTerm, session: db.Session
     ):
         """Create RDF node and link it to the given SBML node.
@@ -342,12 +364,12 @@ class Metacyc:
         bio_qual = BIO_QUALIFIERS[cvterm.getBiologicalQualifierType()]
         # Get the content of each RDF term
         uris = [
-            self.split_uri(cvterm.getResourceURI(i))
+            self._split_uri(cvterm.getResourceURI(i))
             for i in range(cvterm.getNumResources())
         ]
         uris = {x[0]: x[1] for x in uris}
         # Generate the Cypher statements for each RDF term
-        uri_cypher = self.generate_cypher_for_uri(uris)
+        uri_cypher = self._generate_cypher_for_uri(uris)
 
         session.write_transaction(
             lambda tx: tx.run(
@@ -363,33 +385,7 @@ class Metacyc:
         )
 
     @staticmethod
-    def split_uri(uri: str) -> Tuple[str, str]:
-        """Split a URI into a namespace and an annotation term.
-
-        Args:
-            uri: URI to split.
-
-        Returns:
-            Tuple of namespace and annotation term.
-        """
-        # First three elements are from http://identifiers.org/
-        uri = uri.replace("-", ".")  # Ec-code
-        res = uri.split("/")[3:]
-        resource, identifier = res[0], res[1:]
-        resource = "".join(x.capitalize() for x in resource.split("."))
-        identifier = "".join(identifier)
-        return resource, identifier
-
-    @staticmethod
-    def generate_cypher_for_uri(uris: Dict[str, str]) -> str:
-        cypher = []
-        for label in uris.keys():
-            cypher.append(f"n.{label} = ${label}")
-
-        return ",".join(cypher)
-
-    @staticmethod
-    def link_reaction_to_compound(
+    def _link_reaction_to_compound(
         reaction_id: str,
         compounds: List[libsbml.SpeciesReference],
         compound_type: str,
@@ -427,7 +423,7 @@ class Metacyc:
                 )
             )
 
-    def add_gene_product_association_node(
+    def _add_sbml_gene_product_association_node(
         self,
         node: Union[libsbml.GeneProductRef, libsbml.FbcAnd, libsbml.FbcOr],
         session: db.Session,
@@ -482,7 +478,7 @@ class Metacyc:
                 )
             )
             for i in range(node.getNumAssociations()):
-                self.add_gene_product_association_node(
+                self._add_sbml_gene_product_association_node(
                     node.getAssociation(i),
                     session,
                     complex_id,
@@ -503,7 +499,7 @@ class Metacyc:
                 )
             )
             for i in range(node.getNumAssociations()):
-                self.add_gene_product_association_node(
+                self._add_sbml_gene_product_association_node(
                     node.getAssociation(i),
                     session,
                     eset_id,
@@ -516,10 +512,40 @@ class Metacyc:
             raise ValueError
 
     @staticmethod
-    def _validate_path(filepath: Union[str, Path]) -> Path:
-        f = Path(filepath).expanduser().resolve()
-        if not f.is_file():
-            logger.error(f"File does not exist: {f}")
-            raise FileNotFoundError(str(f))
+    def _split_uri(uri: str) -> Tuple[str, str]:
+        """Split a URI into a namespace and an annotation term.
 
-        return f
+        Args:
+            uri: URI to split.
+
+        Returns:
+            Tuple of namespace and annotation term.
+        """
+        # First three elements are from http://identifiers.org/
+        uri = uri.replace("-", ".")  # Ec-code
+        res = uri.split("/")[3:]
+        resource, identifier = res[0], res[1:]
+        resource = "".join(x.capitalize() for x in resource.split("."))
+        identifier = "".join(identifier)
+        return resource, identifier
+
+    @staticmethod
+    def _generate_cypher_for_uri(uris: Dict[str, str]) -> str:
+        cypher = []
+        for label in uris.keys():
+            cypher.append(f"n.{label} = ${label}")
+
+        return ",".join(cypher)
+
+    @staticmethod
+    def _read_dat_file(filepath: Union[str, Path]) -> List[List[str]]:
+        # `rb` to bypass the 0xa9 character
+        with open(filepath, "rb") as f:
+            lines = [l.decode("utf-8", "ignore").strip() for l in f]
+            # Also remove comments on the top of the file
+            lines = [l for l in lines if not l.startswith("#")]
+
+        # Split entries based on `//`
+        doc = [list(g) for k, g in groupby(lines, key=lambda x: x != "//") if k]
+        doc = [x for x in doc if len(x) > 1]  # Remove empty entries
+        return doc
