@@ -546,6 +546,14 @@ class Metacyc:
             lines = [l for l in lines if not l.startswith("#")]
 
         # Split entries based on `//`
-        doc = [list(g) for k, g in groupby(lines, key=lambda x: x != "//") if k]
-        doc = [x for x in doc if len(x) > 1]  # Remove empty entries
-        return doc
+        docs = [list(g) for k, g in groupby(lines, key=lambda x: x != "//") if k]
+        docs = [x for x in docs if len(x) > 1]  # Remove empty entries
+
+        # Concatenate attributes with multiple lines (mostly COMMENT)
+        for i, doc in enumerate(docs):
+            doc_txt = "\n".join(doc)
+            doc_txt = doc_txt.replace("\n/", " ")
+            docs[i] = doc_txt.split("\n")
+
+        return docs
+
