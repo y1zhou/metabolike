@@ -538,22 +538,30 @@ class Metacyc:
         return ",".join(cypher)
 
     @staticmethod
-    def _read_dat_file(filepath: Union[str, Path]) -> List[List[str]]:
+    def _read_dat_file(filepath: Union[str, Path]) -> Dict[str, List[List[str]]]:
         # `rb` to bypass the 0xa9 character
         with open(filepath, "rb") as f:
             lines = [l.decode("utf-8", "ignore").strip() for l in f]
-            # Also remove comments on the top of the file
-            lines = [l for l in lines if not l.startswith("#")]
+            # Also remove empty lines and comments on the top of the file
+            lines = [l for l in lines if l and (not l.startswith("#"))]
 
         # Split entries based on `//`
-        docs = [list(g) for k, g in groupby(lines, key=lambda x: x != "//") if k]
-        docs = [x for x in docs if len(x) > 1]  # Remove empty entries
+        docs: Dict[str, List[List[str]]] = {}
+        for k, g in groupby(lines, key=lambda x: x != "//"):
+            if not k:
+                continue
 
+            doc = list(g)
         # Concatenate attributes with multiple lines (mostly COMMENT)
-        for i, doc in enumerate(docs):
             doc_txt = "\n".join(doc)
             doc_txt = doc_txt.replace("\n/", " ")
-            docs[i] = doc_txt.split("\n")
+            doc = doc_txt.split("\n")
+
+            # Split key-attribute pairs
+            doc = [l.split(" - ") for l in doc]
+            uniq_id = doc[0][1]
+            doc = doc[1:]
+            docs[uniq_id] = doc
 
         return docs
 
