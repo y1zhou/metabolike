@@ -332,7 +332,8 @@ class Metacyc:
                 session.write_transaction(
                     lambda tx: tx.run(
                         """
-                    MERGE (pw:Pathway {mcId: $pathway, displayName: $pathway})
+                    MERGE (pw:Pathway {mcId: $pathway})
+                      ON CREATE SET pw.displayName = $pathway
                     MERGE (pw)-[:hasReaction]->(r:Reaction {displayName: $reaction})
                     """,
                         reaction=rxn_id,
@@ -386,14 +387,16 @@ class Metacyc:
                 _add_kv_to_dict(props, k, v, as_list=False)
 
             # Relationship with other nodes
-            elif k == "IN-PATHWAY":
+            elif k in {"IN-PATHWAY", "SUPER-PATHWAYS"}:
                 session.write_transaction(
                     lambda tx: tx.run(
                         """
-                    MERGE (spw:Pathway {mcId: $super_pw, displayName: $super_pw})
-                    MERGE (spw)-[:hasSubPathway]->(pw:Pathway {mcId: $pw})
+                    MATCH (pw:Pathway {mcId: $pw_id})
+                    MERGE (spw:Pathway {mcId: $super_pw})
+                      ON CREATE SET spw.displayName = $super_pw
+                    MERGE (spw)-[:hasSubPathway]->(pw)
                     """,
-                        pw=pw_id,
+                        pw_id=pw_id,
                         super_pw=v,
                     )
                 )
