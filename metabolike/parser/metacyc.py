@@ -2,7 +2,7 @@ import logging
 import re
 from itertools import groupby
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import libsbml
 from metabolike import db
@@ -37,7 +37,20 @@ NODE_LABELS = [
     "RDF",
     "Complex",
     "EntitySet",
+    "Citation",
 ]
+
+REACTION_ATTRIBUTES = {
+    # Relationship properties
+    "GIBBS-0": "gibbs0",
+    "STD-REDUCTION-POTENTIAL": "stdReductionPotential",
+    "REACTION-DIRECTION": "reactionDirection",
+    "REACTION-BALANCE-STATUS": "reactionBalanceStatus",
+    "SYSTEMATIC-NAME": "systematicName",
+    "COMMENT": "comment",  # TODO: link to other nodes
+    # Relationship property as a list
+    "SYNONYMS": "synonyms",
+}
 
 
 class Metacyc:
@@ -95,6 +108,19 @@ class Metacyc:
         # Setup Neo4j database and populate it with data
         self.setup_graph_db(force=force)
         self.sbml_to_graph(model)
+
+        # Add additional information of reactions to the graph if given
+        if self.input_files["reactions"]:
+            logger.info("Adding additional reaction information to the graph")
+            rxn_dat = self._read_dat_file(self.input_files["reactions"])
+            with self.neo4j_driver.session(database=self.db_name) as session:
+                all_rxns = session.run(
+                    "MATCH (n:Reaction) RETURN n.displayName;"
+                ).data()
+                all_rxns = [r["n.displayName"] for r in all_rxns]
+                for rxn in all_rxns:
+                    self.reaction_to_graph(rxn, rxn_dat, session)
+                    logger.debug(f"Added extra info for reaction {rxn}")
 
         # Read pathways file if given
         if self.input_files["pathways"]:
@@ -276,6 +302,80 @@ class Metacyc:
                 if gpa is not None:
                     node = gpa.getAssociation()
                 self._add_sbml_gene_product_association_node(node, session, mcid)
+
+    def reaction_to_graph(
+        self, rxn_id: str, rxn_dat: Dict[str, List[List[str]]], session: db.Session
+    ):
+        """
+        Parse one entry from the reaction attribute-value file, and add relevant
+        information to the graph database in one transaction.
+
+        Args:
+            rxn_id: The *full* reaction ID from the graph database.
+            rxn_dat: The reactions.dat file as an attribute-value list.
+            session: The graph database session to use.
+
+        Returns:
+            A string containing the canonical ID of the reaction.
+        """
+        canonical_id = self._find_rxn_canonical_id(rxn_id, rxn_dat.keys())
+        lines = rxn_dat[canonical_id]
+        props: Dict[str, Union[str, List[str]]] = {"canonical_id": canonical_id}
+        for k, v in lines:
+            if k in REACTION_ATTRIBUTES:
+                # SYNONYMS is a special case because it is a list
+                if k == "SYNONYMS":
+                    if k in props:
+                        props[REACTION_ATTRIBUTES[k]].append(v)
+                    else:
+                        props[REACTION_ATTRIBUTES[k]] = [v]
+                else:
+                    props[REACTION_ATTRIBUTES[k]] = v
+            elif k == "IN-PATHWAY":
+                session.write_transaction(
+                    lambda tx: tx.run(
+                        """
+                    MERGE (pw:Pathway {mcId: $pathway})
+                    MERGE (pw)-[:hasReaction]->(r:Reaction {displayName: $reaction})
+                    """,
+                        reaction=rxn_id,
+                        pathway=v,
+                    )
+                )
+            elif k == "CITATIONS":
+                session.write_transaction(
+                    lambda tx: tx.run(
+                        """
+                    MERGE (c:Citation {mcId: $citation})
+                    MERGE (r:Reaction {displayName: $reaction})-[:hasCitation]->(c)
+                    """,
+                        reaction=rxn_id,
+                        citation=v,
+                    )
+                )
+
+        # Clean up props before writing to graph
+        props = self._clean_props(
+            props,
+            num_fields=[
+                REACTION_ATTRIBUTES["GIBBS-0"],
+                REACTION_ATTRIBUTES["STD-REDUCTION-POTENTIAL"],
+            ],
+            enum_fields=[
+                REACTION_ATTRIBUTES["REACTION-BALANCE-STATUS"],
+                REACTION_ATTRIBUTES["REACTION-DIRECTION"],
+            ],
+        )
+        session.write_transaction(
+            lambda tx: tx.run(
+                """
+                    MATCH (r:Reaction {displayName: $reaction})
+                    SET r += $props;
+                    """,
+                reaction=rxn_id,
+                props=props,
+            )
+        )
 
     def pathway_to_graph(self, lines: List[str]) -> str:
         """
@@ -567,7 +667,7 @@ class Metacyc:
         return docs
 
     @staticmethod
-    def _find_rxn_canonical_id(rxn_id: str, all_ids: Set[str]) -> str:
+    def _find_rxn_canonical_id(rxn_id: str, all_ids: Iterable[str]) -> str:
         """Find the canonical ID for a reaction.
 
         Some reactions have longer ID forms in ``metabolic-reactions.xml`` than
@@ -601,3 +701,24 @@ class Metacyc:
         else:
             raise ValueError(f"rxn_id has no canonical form: {rxn_id}")
 
+    @staticmethod
+    def _clean_props(
+        props: Dict[str, Any], num_fields: Iterable[str], enum_fields: Iterable[str]
+    ) -> Dict[str, Any]:
+        """Normalize properties to be used in Cypher.
+
+        Args:
+            props: Properties to normalize.
+
+        """
+        for f in num_fields:
+            if f in props:
+                props[f] = float(props[f])
+
+        enum_pattern = re.compile(r"\W+")
+        for f in enum_fields:
+            if f in props:
+                props[f] = props[f].replace("-", "_").lower()
+                props[f] = enum_pattern.sub("", props[f])
+
+        return props
