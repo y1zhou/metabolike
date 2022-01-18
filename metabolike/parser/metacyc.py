@@ -335,7 +335,7 @@ class Metacyc:
                 session.write_transaction(
                     lambda tx: tx.run(
                         """
-                    MERGE (pw:Pathway {mcId: $pathway})
+                    MERGE (pw:Pathway {mcId: $pathway, displayName: $pathway})
                     MERGE (pw)-[:hasReaction]->(r:Reaction {displayName: $reaction})
                     """,
                         reaction=rxn_id,
@@ -343,16 +343,7 @@ class Metacyc:
                     )
                 )
             elif k == "CITATIONS":
-                session.write_transaction(
-                    lambda tx: tx.run(
-                        """
-                    MERGE (c:Citation {mcId: $citation})
-                    MERGE (r:Reaction {displayName: $reaction})-[:hasCitation]->(c)
-                    """,
-                        reaction=rxn_id,
-                        citation=v,
-                    )
-                )
+                self._link_node_to_citation(session, "Reaction", rxn_id, v)
 
         # Clean up props before writing to graph
         props = self._clean_props(
@@ -700,6 +691,29 @@ class Metacyc:
             return canonical_id
         else:
             raise ValueError(f"rxn_id has no canonical form: {rxn_id}")
+
+    @staticmethod
+    def _link_node_to_citation(
+        session: db.Session, node_type: str, node_display_name: str, citation_id: str
+    ):
+        """Link a node to a citation node.
+
+        Args:
+            session: Neo4j session.
+            node_type: Type of the node (Reaction or Pathway).
+            node_display_name: ``displayName`` of the node.
+            citation_id: ``mcId`` of the ``Citation`` node.
+        """
+        session.write_transaction(
+            lambda tx: tx.run(
+                f"""
+                    MERGE (c:Citation {{mcId: $citation}})
+                    MERGE (:{node_type} {{displayName: $reaction}})-[:hasCitation]->(c)
+                    """,
+                reaction=node_display_name,
+                citation=citation_id,
+            )
+        )
 
     @staticmethod
     def _clean_props(
