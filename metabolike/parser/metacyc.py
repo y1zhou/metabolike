@@ -666,7 +666,7 @@ class Metacyc:
             doc = doc_txt.split("\n")
 
             # Split key-attribute pairs
-            doc = [l.split(" - ") for l in doc]
+            doc = [l.split(" - ", maxsplit=1) for l in doc]
             uniq_id = doc[0][1]
             doc = doc[1:]
             docs[uniq_id] = doc
