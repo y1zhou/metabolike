@@ -128,6 +128,8 @@ class Metacyc:
             with self.neo4j_driver.session(database=self.db_name) as session:
                 all_pws = session.run("MATCH (n:Pathway) RETURN n.mcId;").data()
                 all_pws = [pw["n.mcId"] for pw in all_pws]
+                # TODO: add pathway annotations for superpathways as well.
+                # These pathway nodes are created during self.pathway_to_graph.
                 for pw in all_pws:
                     self.pathway_to_graph(pw, pw_dat, session)
                     logger.debug(f"Added pathway annotation for {pw}")
@@ -333,9 +335,10 @@ class Metacyc:
                 session.write_transaction(
                     lambda tx: tx.run(
                         """
+                    MATCH (r:Reaction {displayName: $reaction})
                     MERGE (pw:Pathway {mcId: $pathway})
                       ON CREATE SET pw.displayName = $pathway
-                    MERGE (pw)-[:hasReaction]->(r:Reaction {displayName: $reaction})
+                    MERGE (pw)-[:hasReaction]->(r)
                     """,
                         reaction=rxn_id,
                         pathway=v,
@@ -379,7 +382,7 @@ class Metacyc:
             session: The graph database session to use.
         """
         lines = pw_dat[pw_id]
-        props: Dict[str, Union[str, List[str]]] = {}
+        props: Dict[str, Union[str, List[str]]] = {"displayName": pw_id}
         for k, v in lines:
             # Pathway node properties
             if k in {"SYNONYMS", "TYPES"}:
@@ -432,7 +435,7 @@ class Metacyc:
         session.write_transaction(
             lambda tx: tx.run(
                 """
-                MATCH (n:Pathway {displayName: $pw})
+                MATCH (n:Pathway {mcId: $pw})
                 SET n += $props;
                 """,
                 pw=pw_id,
@@ -741,9 +744,10 @@ class Metacyc:
         session.write_transaction(
             lambda tx: tx.run(
                 f"""
-                    MERGE (c:Citation {{mcId: $citation}})
-                    MERGE (:{node_type} {{displayName: $dn}})-[:hasCitation]->(c)
-                    """,
+                MATCH (n:{node_type} {{displayName: $dn}})
+                MERGE (c:Citation {{mcId: $citation}})
+                MERGE (n)-[:hasCitation]->(c)
+                """,
                 dn=node_display_name,
                 citation=citation_id,
             )
