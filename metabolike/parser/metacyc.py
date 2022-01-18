@@ -395,8 +395,20 @@ class Metacyc:
                 else:
                     props["synonyms"] = [v]
 
-        if not pw_id:
-            raise ValueError("Pathway ID not found")
+            # Relationship with other nodes
+            elif k == "IN-PATHWAY":
+                session.write_transaction(
+                    lambda tx: tx.run(
+                        """
+                    MERGE (spw:Pathway {mcId: $super_pw, displayName: $super_pw})
+                    MERGE (spw)-[:hasSubPathway]->(pw:Pathway {mcId: $pw})
+                    """,
+                        pw=pw_id,
+                        super_pw=v,
+                    )
+                )
+            elif k == "CITATIONS":
+                self._link_node_to_citation(session, "Pathway", pw_id, v)
 
         # Write Pathway node properties
         session.write_transaction(
@@ -648,7 +660,7 @@ class Metacyc:
                 continue
 
             doc = list(g)
-        # Concatenate attributes with multiple lines (mostly COMMENT)
+            # Concatenate attributes with multiple lines (mostly COMMENT)
             doc_txt = "\n".join(doc)
             doc_txt = doc_txt.replace("\n/", " ")
             doc = doc_txt.split("\n")
