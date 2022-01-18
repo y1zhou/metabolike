@@ -38,6 +38,7 @@ NODE_LABELS = [
     "Complex",
     "EntitySet",
     "Citation",
+    "Taxa",
 ]
 
 REACTION_ATTRIBUTES = {
@@ -323,8 +324,8 @@ class Metacyc:
         lines = rxn_dat[canonical_id]
         props: Dict[str, Union[str, List[str]]] = {"canonical_id": canonical_id}
         for k, v in lines:
-                # SYNONYMS is a special case because it is a list
-                if k == "SYNONYMS":
+            # SYNONYMS is a special case because it is a list
+            if k == "SYNONYMS":
                 _add_kv_to_dict(props, k, v, as_list=True)
             elif k in REACTION_ATTRIBUTES:
                 _add_kv_to_dict(props, k, v, as_list=False)
@@ -402,6 +403,30 @@ class Metacyc:
                 )
             elif k == "CITATIONS":
                 self._link_node_to_citation(session, "Pathway", pw_id, v)
+            elif k == "SPECIES":
+                session.write_transaction(
+                    lambda tx: tx.run(
+                        """
+                    MATCH (pw:Pathway {mcId: $pw})
+                    MERGE (s:Taxa {mcId: $species})
+                    MERGE (pw)-[:hasRelatedSpecies]->(s)
+                    """,
+                        pw=pw_id,
+                        species=v,
+                    )
+                )
+            elif k == "TAXONOMIC-RANGE":
+                session.write_transaction(
+                    lambda tx: tx.run(
+                        """
+                    MATCH (pw:Pathway {mcId: $pw})
+                    MERGE (s:Taxa {mcId: $taxon_range})
+                    MERGE (pw)-[:hasExpectedTaxonRange]->(s)
+                    """,
+                        pw=pw_id,
+                        taxon_range=v,
+                    )
+                )
 
         # Write Pathway node properties
         session.write_transaction(
