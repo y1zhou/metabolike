@@ -430,6 +430,23 @@ class Metacyc:
                         taxon_range=v,
                     )
                 )
+            elif k == "PREDECESSORS":
+                rxns = v[2:-2].split('" "')  # leading (" and trailing ")
+                r1, r2 = rxns[0], rxns[1:]  # could have multiple predecessors
+                session.write_transaction(
+                    lambda tx: tx.run(
+                        """
+                    MATCH (r1:Reaction {canonical_id: $r1}), (r2:Reaction)
+                    WHERE r2.canonical_id IN $r2
+                    UNWIND r2 AS pred
+                    MERGE (pred)-[l:isPrecedingEvent]->(r1)
+                      ON CREATE SET l.hasRelatedPathway = $pw
+                    """,
+                        r1=r1,
+                        r2=r2,
+                        pw=pw_id,
+                    )
+                )
 
         # Write Pathway node properties
         session.write_transaction(
