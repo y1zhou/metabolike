@@ -42,14 +42,12 @@ NODE_LABELS = [
 
 REACTION_ATTRIBUTES = {
     # Relationship properties
-    "GIBBS-0": "gibbs0",
-    "STD-REDUCTION-POTENTIAL": "stdReductionPotential",
-    "REACTION-DIRECTION": "reactionDirection",
-    "REACTION-BALANCE-STATUS": "reactionBalanceStatus",
-    "SYSTEMATIC-NAME": "systematicName",
-    "COMMENT": "comment",  # TODO: link to other nodes
-    # Relationship property as a list
-    "SYNONYMS": "synonyms",
+    "GIBBS-0",
+    "STD-REDUCTION-POTENTIAL",
+    "REACTION-DIRECTION",
+    "REACTION-BALANCE-STATUS",
+    "SYSTEMATIC-NAME",
+    "COMMENT",  # TODO: link to other nodes
 }
 
 
@@ -325,15 +323,11 @@ class Metacyc:
         lines = rxn_dat[canonical_id]
         props: Dict[str, Union[str, List[str]]] = {"canonical_id": canonical_id}
         for k, v in lines:
-            if k in REACTION_ATTRIBUTES:
                 # SYNONYMS is a special case because it is a list
                 if k == "SYNONYMS":
-                    if k in props:
-                        props[REACTION_ATTRIBUTES[k]].append(v)
-                    else:
-                        props[REACTION_ATTRIBUTES[k]] = [v]
-                else:
-                    props[REACTION_ATTRIBUTES[k]] = v
+                _add_kv_to_dict(props, k, v, as_list=True)
+            elif k in REACTION_ATTRIBUTES:
+                _add_kv_to_dict(props, k, v, as_list=False)
             elif k == "IN-PATHWAY":
                 session.write_transaction(
                     lambda tx: tx.run(
@@ -352,12 +346,11 @@ class Metacyc:
         props = self._clean_props(
             props,
             num_fields=[
-                REACTION_ATTRIBUTES["GIBBS-0"],
-                REACTION_ATTRIBUTES["STD-REDUCTION-POTENTIAL"],
+                _snake_to_camel(x) for x in ["GIBBS-0", "STD-REDUCTION-POTENTIAL"]
             ],
             enum_fields=[
-                REACTION_ATTRIBUTES["REACTION-BALANCE-STATUS"],
-                REACTION_ATTRIBUTES["REACTION-DIRECTION"],
+                _snake_to_camel(x)
+                for x in ["REACTION-BALANCE-STATUS", "REACTION-DIRECTION"]
             ],
         )
         session.write_transaction(
@@ -387,13 +380,10 @@ class Metacyc:
         props: Dict[str, Union[str, List[str]]] = {}
         for k, v in lines:
             # Pathway node properties
-            if k == "COMMENT":
-                props["comment"] = v
-            elif k == "SYNONYMS":
-                if k in props:
-                    props["synonyms"].append(v)
-                else:
-                    props["synonyms"] = [v]
+            if k in {"SYNONYMS", "TYPES"}:
+                _add_kv_to_dict(props, k, v, as_list=True)
+            elif k in {"COMMENT", "COMMON-NAME"}:
+                _add_kv_to_dict(props, k, v, as_list=False)
 
             # Relationship with other nodes
             elif k == "IN-PATHWAY":
