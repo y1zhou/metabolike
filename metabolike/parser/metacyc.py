@@ -1,4 +1,5 @@
 import logging
+import re
 from itertools import groupby
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
@@ -564,4 +565,39 @@ class Metacyc:
             docs[uniq_id] = doc
 
         return docs
+
+    @staticmethod
+    def _find_rxn_canonical_id(rxn_id: str, all_ids: Set[str]) -> str:
+        """Find the canonical ID for a reaction.
+
+        Some reactions have longer ID forms in ``metabolic-reactions.xml`` than
+        in ``reactions.dat`` or ``pathways.dat``. For example,
+        ``F16BDEPHOS-RXN`` has two counterparts in ``metabolic-reactions.xml``:
+        ``F16BDEPHOS-RXN[CCO-PERI-BAC]-FRUCTOSE-16-DIPHOSPHATE/WATER//FRUCTOSE-6P/Pi.60.``
+        and
+        ``F16BDEPHOS-RXN[CCO-CYTOSOL]-FRUCTOSE-16-DIPHOSPHATE/WATER//FRUCTOSE-6P/Pi.59.``
+
+        This helper function extracts the leading part from the full ID.
+
+        Args:
+            rxn_id: The MetaCyc ID of the reaction. all_ids: All UNIQUE-IDs in
+            the reactions.dat file.
+
+        Returns:
+            The canonical ID for the reaction.
+        """
+        # See if the rxn_id is in reaction.dat
+        if rxn_id in all_ids:
+            return rxn_id
+
+        # If not, extract the ID from the leading part of rxn_id
+        match_canonical_id = re.match(
+            r"((TRANS-)?(RXN[A-Z\d]*)-\d+)|([A-Z\d.\-\+]+RXN)", rxn_id
+        )
+        if match_canonical_id:
+            canonical_id = match_canonical_id.group(0)
+            assert canonical_id in all_ids
+            return canonical_id
+        else:
+            raise ValueError(f"rxn_id has no canonical form: {rxn_id}")
 
