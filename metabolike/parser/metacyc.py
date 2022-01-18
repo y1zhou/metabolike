@@ -125,10 +125,13 @@ class Metacyc:
         # Read pathways file if given
         if self.input_files["pathways"]:
             logger.info("Creating pathway links")
-            docs = self._read_dat_file(self.input_files["pathways"])
-            for pw in docs:
-                pw_id = self.pathway_to_graph(pw)
-                logger.debug(f"Pathway {pw_id} added to graph")
+            pw_dat = self._read_dat_file(self.input_files["pathways"])
+            with self.neo4j_driver.session(database=self.db_name) as session:
+                all_pws = session.run("MATCH (n:Pathway) RETURN n.mcId;").data()
+                all_pws = [pw["n.mcId"] for pw in all_pws]
+                for pw in all_pws:
+                    self.pathway_to_graph(pw, pw_dat, session)
+                    logger.debug(f"Added pathway annotation for {pw}")
 
     def setup_graph_db(self, **kwargs):
         """
@@ -368,44 +371,44 @@ class Metacyc:
             )
         )
 
-    def pathway_to_graph(self, lines: List[str]) -> str:
+    def pathway_to_graph(
+        self, pw_id: str, pw_dat: Dict[str, List[List[str]]], session: db.Session
+    ):
         """
         Parse one entry from the pathway attribute-value file, and add relevant
         information to the graph database in one transaction.
 
         Args:
-            lines: A list of lines from an entry of the file.
-
-        Returns:
-            A string containing the ID of the pathway.
+            pw_id: The pathway ID from the graph database.
+            pw_dat: The pathways.dat file as an attribute-value list.
+            session: The graph database session to use.
         """
-        pw_id = ""
-        for line in lines:
-            # / marks the continuation of the previous line
-            if line.startswith("/"):
-                # TODO
-                continue
-
-            # ^ marks an annotation-value pair where the annotation is a
-            # label attached to the previous attribute
-            elif line.startswith("^"):
-                # TODO
-                continue
-
-            # Otherwise we have a regular attribute-value pair
-            else:
-                attr, val = line.split(" - ", maxsplit=1)
-                # Treat `UNIQUE-ID` as a special case as we need to return
-                # the pathway ID separately
-                if attr == "UNIQUE-ID":
-                    pw_id = val
-                    continue
-                # TODO
+        lines = pw_dat[pw_id]
+        props: Dict[str, Union[str, List[str]]] = {}
+        for k, v in lines:
+            # Pathway node properties
+            if k == "COMMENT":
+                props["comment"] = v
+            elif k == "SYNONYMS":
+                if k in props:
+                    props["synonyms"].append(v)
+                else:
+                    props["synonyms"] = [v]
 
         if not pw_id:
             raise ValueError("Pathway ID not found")
 
-        return pw_id
+        # Write Pathway node properties
+        session.write_transaction(
+            lambda tx: tx.run(
+                """
+                MATCH (n:Pathway {displayName: $pw})
+                SET n += $props;
+                """,
+                pw=pw_id,
+                props=props,
+            )
+        )
 
     @staticmethod
     def _validate_path(filepath: Optional[Union[str, Path]]) -> Optional[Path]:
@@ -709,9 +712,9 @@ class Metacyc:
             lambda tx: tx.run(
                 f"""
                     MERGE (c:Citation {{mcId: $citation}})
-                    MERGE (:{node_type} {{displayName: $reaction}})-[:hasCitation]->(c)
+                    MERGE (:{node_type} {{displayName: $dn}})-[:hasCitation]->(c)
                     """,
-                reaction=node_display_name,
+                dn=node_display_name,
                 citation=citation_id,
             )
         )
