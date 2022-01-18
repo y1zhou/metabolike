@@ -100,7 +100,7 @@ class Metacyc:
 
     def setup(self, force: bool = False):
         # Read SBML file
-        doc = self._read_sbml()
+        doc = self._read_sbml(self.input_files["sbml"])
         model: libsbml.Model = doc.getModel()
         if not self.db_name:
             self.db_name: str = model.getMetaId().lower()
@@ -418,9 +418,10 @@ class Metacyc:
 
         return f
 
-    def _read_sbml(self) -> libsbml.SBMLDocument:
+    @staticmethod
+    def _read_sbml(sbml_file: Path) -> libsbml.SBMLDocument:
         reader = libsbml.SBMLReader()
-        metacyc = reader.readSBMLFromFile(self.input_files["sbml"])
+        metacyc = reader.readSBMLFromFile(sbml_file)
         logger.info("Finished reading SBML file")
 
         for i in range(metacyc.getNumErrors()):
