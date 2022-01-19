@@ -69,6 +69,7 @@ class Metacyc:
         db_name: Optional[str] = None,
         reactions: Optional[Union[str, Path]] = None,
         pathways: Optional[Union[str, Path]] = None,
+        publications: Optional[Union[str, Path]] = None,
     ):
         """
         Args:
@@ -91,6 +92,7 @@ class Metacyc:
             "sbml": self._validate_path(sbml),
             "reactions": self._validate_path(reactions),
             "pathways": self._validate_path(pathways),
+            "publications": self._validate_path(publications),
         }
 
         # Misc variables
@@ -133,6 +135,18 @@ class Metacyc:
                 for pw in all_pws:
                     self.pathway_to_graph(pw, pw_dat, session)
                     logger.debug(f"Added pathway annotation for {pw}")
+
+        # Read publications file if given
+        if self.input_files["publications"]:
+            logger.info("Annotating publications")
+            pub_dat = self._read_dat_file(self.input_files["publications"])
+            with self.neo4j_driver.session(database=self.db_name) as session:
+                all_cits = session.run("MATCH (n:Citation) RETURN n.mcId;").data()
+                all_cits = [c["n.mcId"] for c in all_cits]
+
+                for cit in all_cits:
+                    self.citation_to_graph(cit, pub_dat, session)
+                    logger.debug(f"Added annotation for citation {cit}")
 
     def setup_graph_db(self, **kwargs):
         """
@@ -507,6 +521,45 @@ class Metacyc:
                 SET n += $props;
                 """,
                 pw=pw_id,
+                props=props,
+            )
+        )
+
+    def citation_to_graph(
+        self, cit_id: str, pub_dat: Dict[str, List[List[str]]], session: db.Session
+    ):
+        pub_dat_id = re.sub(r"[\[\]]", "", cit_id.split(":")[0].upper())
+        pub_dat_id = re.sub(r"-(\d+)$", r"\1", pub_dat_id)
+        if not pub_dat_id:
+            return
+        pub_dat_id = "PUB-" + pub_dat_id
+        # TODO: deal with evidence frames
+
+        lines = pub_dat[pub_dat_id]
+        props: Dict[str, Union[str, List[str]]] = {"citationId": pub_dat_id}
+        for k, v in lines:
+            # Pathway node properties
+            if k == "AUTHORS":
+                _add_kv_to_dict(props, k, v, as_list=True)
+            elif k in {
+                "DOI-ID",
+                "PUBMED-ID",
+                "MEDLINE-ID",
+                "TITLE",
+                "SOURCE",
+                "YEAR",
+                "URL",
+                "REFERENT-FRAME",
+            }:
+                _add_kv_to_dict(props, k, v, as_list=False)
+
+        session.write_transaction(
+            lambda tx: tx.run(
+                """
+                MATCH (c:Citation {mcId: $cit_id})
+                SET c += $props;
+                """,
+                cit_id=cit_id,
                 props=props,
             )
         )
