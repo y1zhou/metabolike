@@ -474,6 +474,31 @@ class Metacyc:
                         compound_id=compound_id,
                     )
                 )
+            elif k == "REACTION-LAYOUT":
+                rxn_id, d = self._parse_reaction_layout(v)
+                if not rxn_id:
+                    continue
+                # Two cypher statements for Reactant and Product compounds
+                for k, v in d.items():
+                    session.write_transaction(
+                        lambda tx: tx.run(
+                            f"""
+                        MATCH (r:Reaction {{canonical_id: $rxn_id}}),
+                              (cpds:Compound)-[:is]->(rdf:RDF)
+                        WHERE rdf.Biocyc IN $compound_ids
+                        UNWIND cpds AS cpd
+                        MATCH (r)-[l:hasLeft|hasRight]->(cpd)
+                        SET l.isPrimary{k}InPathway = CASE
+                          WHEN l.isPrimary{k}InPathway IS NULL THEN [$pw]
+                          WHEN $pw IN l.isPrimary{k}InPathway THEN l.isPrimary{k}InPathway
+                          ELSE l.isPrimary{k}InPathway + [$pw]
+                          END;
+                        """,
+                            rxn_id=rxn_id,
+                            compound_ids=v,
+                            pw=pw_id,
+                        )
+                    )
         # Write Pathway node properties
         session.write_transaction(
             lambda tx: tx.run(
@@ -817,6 +842,55 @@ class Metacyc:
                 props[f] = enum_pattern.sub("", props[f])
 
         return props
+
+    @staticmethod
+    def _parse_reaction_layout(
+        s: str, prefix: Optional[str] = "META:"
+    ) -> Tuple[str, Dict[str, List[str]]]:
+        """Parse the reaction layout from the ``reactions.dat`` file.
+
+        The attribute has the following format: ``(<rxn-id> (:LEFT-PRIMARIES
+        <cpd-id> ...) (:DIRECTION :[L2R|R2L]) (:RIGHT-PRIMARIES <cpd-id> ...))``
+
+        Args:
+            s: The layout string.
+            prefix: The prefix to add to the compound IDs. In the SBML file,
+                    the BioCyc IDs are prefixed with ``META:``.
+
+        Returns:
+            The reaction canonical ID, and a dictionary with the parsed layout
+            containing the following keys: - ``Reactant``: List of primary
+            reactant compounds. - ``Product``: List of primary product
+            compounds.
+        """
+        m = re.compile(
+            r"\(([^\(]+) "  # reaction ID
+            r"\(:LEFT-PRIMARIES ([^\)]+)\) "  # left primary compounds
+            r"\(:DIRECTION :(L2R|R2L)\) "  # reaction direction
+            r"\(:RIGHT-PRIMARIES ([^\)]+)\)\)"
+        )
+        res = m.fullmatch(s)
+        if not res:
+            # Sometimes there's no left/right primaries and only a direction
+            # when the rxn_id is actually a pathway ID
+            return "", {}
+
+        rxn_id, l_prim, direction, r_prim = res.groups()
+        # Use direction to determine which side are the reactants
+        if direction == "L2R":
+            reactants = l_prim.split(" ")
+            products = r_prim.split(" ")
+        else:
+            reactants = r_prim.split(" ")
+            products = l_prim.split(" ")
+
+        d = {
+            "Reactant": reactants,
+            "Product": products,
+        }
+        if prefix:
+            d = {k: [f"{prefix}{e}" for e in v] for k, v in d.items()}
+        return rxn_id, d
 
 
 def _snake_to_camel(s: str, sep: str = "-") -> str:
