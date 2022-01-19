@@ -288,11 +288,11 @@ class Metacyc:
                 # Add reactants and products
                 logger.debug(f"Adding reactants for Reaction {mcid}")
                 reactants = r.getListOfReactants()
-                self._link_reaction_to_compound(mcid, reactants, "Reactant", session)
+                self._link_reaction_to_compound(mcid, reactants, "Left", session)
 
                 logger.debug(f"Adding products for Reaction {mcid}")
                 products = r.getListOfProducts()
-                self._link_reaction_to_compound(mcid, products, "Product", session)
+                self._link_reaction_to_compound(mcid, products, "Right", session)
 
                 # Add associated gene products
                 # This could be complicated where the child nodes could be:
@@ -543,10 +543,10 @@ class Metacyc:
             reaction_id: The MetaCyc ID of the reaction.
             compounds: The list of compounds to link to the reaction.
             compound_type: The type of compound to link to the reaction. Should
-                be one of "Reactant" or "Product".
+                be one of "Left" or "Right".
             session: The Neo4j session to use.
         """
-        if compound_type not in ["Reactant", "Product"]:
+        if compound_type not in ["Left", "Right"]:
             raise ValueError(f"Invalid compound type: {compound_type}")
         for cpd in compounds:
             logger.debug(
