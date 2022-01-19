@@ -447,7 +447,19 @@ class Metacyc:
                         pw=pw_id,
                     )
                 )
-
+            elif k == "RATE-LIMITING-STEP":
+                session.write_transaction(
+                    lambda tx: tx.run(
+                        """
+                    MATCH (pw:Pathway {mcId: $pw}),
+                          (r:Reaction {canonical_id: $rxn})
+                    MERGE (pw)-[l:hasReaction]->(r)
+                      ON MATCH SET l.isRateLimitingStep = true
+                    """,
+                        pw=pw_id,
+                        rxn=v,
+                    )
+                )
         # Write Pathway node properties
         session.write_transaction(
             lambda tx: tx.run(
