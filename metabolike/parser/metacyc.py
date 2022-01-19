@@ -668,9 +668,9 @@ class Metacyc:
             Tuple of namespace and annotation term.
         """
         # First three elements are from http://identifiers.org/
-        uri = uri.replace("-", ".")  # Ec-code
         res = uri.split("/")[3:]
         resource, identifier = res[0], res[1:]
+        resource = resource.replace("-", ".")  # Ec-code
         resource = "".join(x.capitalize() for x in resource.split("."))
         identifier = "".join(identifier)
         return resource, identifier
