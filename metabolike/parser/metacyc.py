@@ -460,6 +460,20 @@ class Metacyc:
                         rxn=v,
                     )
                 )
+            elif k in {"PRIMARY-PRODUCTS", "PRIMARY-REACTANTS"}:
+                relationship = "Product" if k == "PRIMARY-PRODUCTS" else "Reactant"
+                compound_id = f"META:{v}"
+                session.write_transaction(
+                    lambda tx: tx.run(
+                        f"""
+                    MATCH (pw:Pathway {{mcId: $pw}}),
+                          (cpd:Compound)-[:is]->(:RDF {{Biocyc: $compound_id}})
+                    MERGE (pw)-[:hasPrimary{relationship}]->(cpd)
+                    """,
+                        pw=pw_id,
+                        compound_id=compound_id,
+                    )
+                )
         # Write Pathway node properties
         session.write_transaction(
             lambda tx: tx.run(
