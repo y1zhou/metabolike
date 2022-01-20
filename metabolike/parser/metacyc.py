@@ -60,6 +60,7 @@ class Metacyc:
         reactions: Optional[Union[str, Path]] = None,
         pathways: Optional[Union[str, Path]] = None,
         publications: Optional[Union[str, Path]] = None,
+        classes: Optional[Union[str, Path]] = None,
     ):
         """
         Args:
@@ -76,6 +77,9 @@ class Metacyc:
             publications: The path to the ``publication.dat`` file. If given,
                 the file will be parsed and annotations on ``Citation`` nodes
                 will be added.
+            classes: The path to the ``class.dat`` file. If given, the file
+                will be parsed and annotations on ``Compartment``, ``Taxa``,
+                and ``Compound`` nodes will be added.
         """
         # Neo4j driver
         self.neo4j_driver = neo4j_driver
@@ -86,6 +90,7 @@ class Metacyc:
             "reactions": self._validate_path(reactions),
             "pathways": self._validate_path(pathways),
             "publications": self._validate_path(publications),
+            "classes": self._validate_path(classes),
         }
 
         # Misc variables
@@ -144,6 +149,12 @@ class Metacyc:
                 for cit in all_cits:
                     self.citation_to_graph(cit, pub_dat, session)
                     logger.debug(f"Added annotation for citation {cit}")
+
+            # Compartments, Taxon, and comments of Compounds in classes.dat
+            if self.input_files["classes"]:
+                logger.info("Adding common names from classes.dat")
+                class_dat = self._read_dat_file(self.input_files["classes"])
+                self.classes_to_graph(class_dat, session)
 
     def setup_graph_db(self, session: db.Session, **kwargs):
         """
@@ -563,6 +574,61 @@ class Metacyc:
                 props=props,
             )
         )
+
+    def classes_to_graph(
+        self, class_dat: Dict[str, List[List[str]]], session: db.Session
+    ):
+        # Common names for cell components
+        all_cco = [
+            c["n.displayName"]
+            for c in session.run("MATCH (n:Compartment) RETURN DISTINCT n.displayName;")
+        ]
+        for cco in all_cco:
+            if cco in class_dat:
+                props: Dict[str, Union[str, List[str]]] = {}
+                for k, v in class_dat[cco]:
+                    if k == "COMMON-NAME":
+                        _add_kv_to_dict(props, k, v, as_list=False)
+                    elif k == "SYNONYMS":
+                        _add_kv_to_dict(props, k, v, as_list=True)
+
+                session.write_transaction(
+                    lambda tx: tx.run(
+                        """
+                    MATCH (c:Compartment {displayName: $cco})
+                    SET c += $props;
+                    """,
+                        cco=cco,
+                        props=props,
+                    )
+                )
+
+        # Common names and synonyms for organisms. Some also have strain names
+        all_taxon = [
+            n["n.mcId"] for n in session.run("MATCH (n:Taxa) RETURN DISTINCT n.mcId;")
+        ]
+        for taxa in all_taxon:
+            if taxa in class_dat:
+                props: Dict[str, Union[str, List[str]]] = {}
+                for k, v in class_dat[taxa]:
+                    if k in {"COMMON-NAME", "STRAIN-NAME", "COMMENT"}:
+                        _add_kv_to_dict(props, k, v, as_list=False)
+                    elif k == "SYNONYMS":
+                        _add_kv_to_dict(props, k, v, as_list=True)
+                    # TODO: TYPES links the taxon
+
+                session.write_transaction(
+                    lambda tx: tx.run(
+                        """
+                    MATCH (n:Taxa {mcId: $taxa})
+                    SET n += $props;
+                    """,
+                        taxa=taxa,
+                        props=props,
+                    )
+                )
+
+        # TODO: Evidence code in citations are in the `Evidence` attr
 
     @staticmethod
     def _validate_path(filepath: Optional[Union[str, Path]]) -> Optional[Path]:
