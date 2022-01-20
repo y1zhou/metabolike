@@ -1,4 +1,4 @@
-from neo4j import GraphDatabase, Neo4jDriver, Transaction
+from neo4j import GraphDatabase, Neo4jDriver, Session, Transaction
 from neo4j.work.result import Result
 
 

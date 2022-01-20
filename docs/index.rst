@@ -6,6 +6,13 @@
 Welcome to metabolike's documentation!
 ======================================
 
+The MetaCyc (BioCyc) database is imported to a graph database using the provided SBML file.
+
+.. image:: _static/metacyc_schema.svg
+    :alt: Schema of the MetaCyc database
+    :align: center
+
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
