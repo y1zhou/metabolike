@@ -83,6 +83,9 @@ class Metacyc:
             pathways: The path to the ``pathway.dat`` file. If given,
                 the file will be parsed and pathway links will be added to the
                 ``Reaction`` nodes.
+            publications: The path to the ``publication.dat`` file. If given,
+                the file will be parsed and annotations on ``Citation`` nodes
+                will be added.
         """
         # Neo4j driver
         self.neo4j_driver = neo4j_driver
@@ -107,48 +110,52 @@ class Metacyc:
             self.db_name: str = model.getMetaId().lower()
 
         # Setup Neo4j database and populate it with data
-        self.setup_graph_db(force=force)
-        self.sbml_to_graph(model)
+        with self.neo4j_driver.session(database=self.db_name) as session:
+            self.setup_graph_db(session, force=force)
+            self.sbml_to_graph(model, session)
 
-        # Add additional information of reactions to the graph if given
-        if self.input_files["reactions"]:
-            logger.info("Adding additional reaction information to the graph")
-            rxn_dat = self._read_dat_file(self.input_files["reactions"])
-            with self.neo4j_driver.session(database=self.db_name) as session:
-                all_rxns = session.run(
-                    "MATCH (n:Reaction) RETURN n.displayName;"
-                ).data()
-                all_rxns = [r["n.displayName"] for r in all_rxns]
+            # Add additional information of reactions to the graph if given
+            if self.input_files["reactions"]:
+                logger.info("Adding additional reaction information to the graph")
+                rxn_dat = self._read_dat_file(self.input_files["reactions"])
+
+                all_rxns = [
+                    r["n.displayName"]
+                    for r in session.run("MATCH (n:Reaction) RETURN n.displayName;")
+                ]
                 for rxn in all_rxns:
                     self.reaction_to_graph(rxn, rxn_dat, session)
                     logger.debug(f"Added extra info for reaction {rxn}")
 
-        # Read pathways file if given
-        if self.input_files["pathways"]:
-            logger.info("Creating pathway links")
-            pw_dat = self._read_dat_file(self.input_files["pathways"])
-            with self.neo4j_driver.session(database=self.db_name) as session:
-                all_pws = session.run("MATCH (n:Pathway) RETURN n.mcId;").data()
-                all_pws = [pw["n.mcId"] for pw in all_pws]
+            # Read pathways file if given
+            if self.input_files["pathways"]:
+                logger.info("Creating pathway links")
+                pw_dat = self._read_dat_file(self.input_files["pathways"])
+
+                all_pws = [
+                    pw["n.mcId"]
+                    for pw in session.run("MATCH (n:Pathway) RETURN n.mcId;")
+                ]
                 # TODO: add pathway annotations for superpathways as well.
                 # These pathway nodes are created during self.pathway_to_graph.
                 for pw in all_pws:
                     self.pathway_to_graph(pw, pw_dat, session)
                     logger.debug(f"Added pathway annotation for {pw}")
 
-        # Read publications file if given
-        if self.input_files["publications"]:
-            logger.info("Annotating publications")
-            pub_dat = self._read_dat_file(self.input_files["publications"])
-            with self.neo4j_driver.session(database=self.db_name) as session:
-                all_cits = session.run("MATCH (n:Citation) RETURN n.mcId;").data()
-                all_cits = [c["n.mcId"] for c in all_cits]
+            # Read publications file if given
+            if self.input_files["publications"]:
+                logger.info("Annotating publications")
+                pub_dat = self._read_dat_file(self.input_files["publications"])
 
+                all_cits = [
+                    c["n.mcId"]
+                    for c in session.run("MATCH (n:Citation) RETURN n.mcId;")
+                ]
                 for cit in all_cits:
                     self.citation_to_graph(cit, pub_dat, session)
                     logger.debug(f"Added annotation for citation {cit}")
 
-    def setup_graph_db(self, **kwargs):
+    def setup_graph_db(self, session: db.Session, **kwargs):
         """
         Create Neo4j database and set proper constraints. `Reaction` nodes are
         central in the schema (see README.rst).
@@ -161,165 +168,161 @@ class Metacyc:
             raise
 
         # Set constraints
-        with self.neo4j_driver.session(database=self.db_name) as session:
-            logger.debug("Creating constraint for RDF nodes")
+        logger.debug("Creating constraint for RDF nodes")
+        r = session.run(
+            """CREATE CONSTRAINT IF NOT EXISTS
+                ON (r:RDF) ASSERT r.uri IS UNIQUE;"""
+        ).data()
+        if r:
+            logger.warning(f"Could not create constraint for RDF nodes: {r}")
+
+        # Constraints automatically create indexes, so we don't need to
+        # create them manually.
+        for label in NODE_LABELS:
+            logger.debug(f"Creating constraint for {label} nodes")
             r = session.run(
-                """CREATE CONSTRAINT IF NOT EXISTS
-                   ON (r:RDF) ASSERT r.uri IS UNIQUE;"""
+                f"""CREATE CONSTRAINT IF NOT EXISTS
+                    ON (n:{label}) ASSERT n.mcId IS UNIQUE;""",
             ).data()
             if r:
-                logger.warning(f"Could not create constraint for RDF nodes: {r}")
+                logger.warning(f"Could not create constraint for {label} nodes: {r}")
 
-            # Constraints automatically create indexes, so we don't need to
-            # create them manually.
-            for label in NODE_LABELS:
-                logger.debug(f"Creating constraint for {label} nodes")
-                r = session.run(
-                    f"""CREATE CONSTRAINT IF NOT EXISTS
-                        ON (n:{label}) ASSERT n.mcId IS UNIQUE;""",
-                ).data()
-                if r:
-                    logger.warning(
-                        f"Could not create constraint for {label} nodes: {r}"
-                    )
-
-    def sbml_to_graph(self, model: libsbml.Model):
+    def sbml_to_graph(self, model: libsbml.Model, session: db.Session):
         """
         Populate Neo4j database with SBML data.
 
         Nodes are created for each SBML element using `MERGE` statements:
         https://neo4j.com/docs/cypher-manual/current/clauses/merge/#merge-merge-with-on-create
         """
-        with self.neo4j_driver.session(database=self.db_name) as session:
-            # Compartments
-            logger.info("Creating Compartment nodes")
-            for c in model.getListOfCompartments():
-                c: libsbml.Compartment
-                session.write_transaction(
-                    lambda tx: tx.run(
-                        """
-                        MERGE (c:Compartment {mcId: $mcId})
-                        ON CREATE
-                        SET c.displayName = $name;
-                        """,
-                        mcId=c.getMetaId(),
-                        name=c.getName(),
-                    ),
+        # Compartments
+        logger.info("Creating Compartment nodes")
+        for c in model.getListOfCompartments():
+            c: libsbml.Compartment
+            session.write_transaction(
+                lambda tx: tx.run(
+                    """
+                    MERGE (c:Compartment {mcId: $mcId})
+                    ON CREATE
+                    SET c.displayName = $name;
+                    """,
+                    mcId=c.getMetaId(),
+                    name=c.getName(),
+                ),
+            )
+
+        # Compounds, i.e. metabolites, species
+        logger.info("Creating Compound nodes")
+        for s in model.getListOfSpecies():
+            s: libsbml.Species
+            # Basic properties
+            mcid: str = s.getMetaId()
+            logger.debug(f"Creating Compound node {mcid}")
+            session.write_transaction(
+                lambda tx: tx.run(
+                    """
+                    MATCH (cpt:Compartment {mcId: $compartment})
+                    MERGE (c:Compound {mcId: $mcId})-[:hasCompartment]->(cpt)
+                    ON CREATE
+                        SET c.displayName = $name,
+                            c.charge = $charge,
+                            c.chemicalFormula = $formula,
+                            c.boundaryCondition = $boundaryCondition,
+                            c.hasOnlySubstanceUnits = $hasOnlySubstanceUnits,
+                            c.constant = $constant;
+                    """,
+                    mcId=mcid,
+                    name=s.getName(),
+                    compartment=s.getCompartment(),
+                    charge=s.getCharge(),
+                    formula=s.getPlugin("fbc").getChemicalFormula(),
+                    boundaryCondition=s.getBoundaryCondition(),  # unchanged by reactions
+                    hasOnlySubstanceUnits=s.getHasOnlySubstanceUnits(),
+                    constant=s.getConstant(),
                 )
+            )
 
-            # Compounds, i.e. metabolites, species
-            logger.info("Creating Compound nodes")
-            for s in model.getListOfSpecies():
-                s: libsbml.Species
-                # Basic properties
-                mcid: str = s.getMetaId()
-                logger.debug(f"Creating Compound node {mcid}")
-                session.write_transaction(
-                    lambda tx: tx.run(
-                        """
-                        MATCH (cpt:Compartment {mcId: $compartment})
-                        MERGE (c:Compound {mcId: $mcId})-[:hasCompartment]->(cpt)
-                        ON CREATE
-                            SET c.displayName = $name,
-                                c.charge = $charge,
-                                c.chemicalFormula = $formula,
-                                c.boundaryCondition = $boundaryCondition,
-                                c.hasOnlySubstanceUnits = $hasOnlySubstanceUnits,
-                                c.constant = $constant;
-                        """,
-                        mcId=mcid,
-                        name=s.getName(),
-                        compartment=s.getCompartment(),
-                        charge=s.getCharge(),
-                        formula=s.getPlugin("fbc").getChemicalFormula(),
-                        boundaryCondition=s.getBoundaryCondition(),  # unchanged by reactions
-                        hasOnlySubstanceUnits=s.getHasOnlySubstanceUnits(),
-                        constant=s.getConstant(),
-                    )
-                )
+            # Add RDF annotations
+            logger.debug(f"Adding RDF nodes for Compound {mcid}")
+            cvterms: List[libsbml.CVTerm] = s.getCVTerms()
+            for cvterm in cvterms:
+                self._add_sbml_rdf_node("Compound", mcid, cvterm, session)
 
-                # Add RDF annotations
-                logger.debug(f"Adding RDF nodes for Compound {mcid}")
-                cvterms: List[libsbml.CVTerm] = s.getCVTerms()
-                for cvterm in cvterms:
-                    self._add_sbml_rdf_node("Compound", mcid, cvterm, session)
+        # Gene products
+        logger.info("Creating GeneProduct nodes")
+        fbc: libsbml.FbcModelPlugin = model.getPlugin("fbc")
+        for gp in fbc.getListOfGeneProducts():
+            gp: libsbml.GeneProduct
+            mcid = gp.getMetaId()
+            logger.debug(f"Creating GeneProduct node {mcid}")
+            session.write_transaction(
+                lambda tx: tx.run(
+                    """
+                    MERGE (gp:GeneProduct {mcId: $mcId})
+                    ON CREATE
+                        SET gp.displayName = $name,
+                            gp.label = $label;
+                    """,
+                    mcId=mcid,
+                    name=gp.getName(),
+                    label=gp.getLabel(),
+                ),
+            )
+            logger.debug(f"Adding RDF nodes for GeneProduct {mcid}")
+            cvterms: List[libsbml.CVTerm] = gp.getCVTerms()
+            for cvterm in cvterms:
+                self._add_sbml_rdf_node("GeneProduct", mcid, cvterm, session)
 
-            # Gene products
-            logger.info("Creating GeneProduct nodes")
-            fbc: libsbml.FbcModelPlugin = model.getPlugin("fbc")
-            for gp in fbc.getListOfGeneProducts():
-                gp: libsbml.GeneProduct
-                mcid = gp.getMetaId()
-                logger.debug(f"Creating GeneProduct node {mcid}")
-                session.write_transaction(
-                    lambda tx: tx.run(
-                        """
-                        MERGE (gp:GeneProduct {mcId: $mcId})
-                        ON CREATE
-                            SET gp.displayName = $name,
-                                gp.label = $label;
-                        """,
-                        mcId=mcid,
-                        name=gp.getName(),
-                        label=gp.getLabel(),
-                    ),
-                )
-                logger.debug(f"Adding RDF nodes for GeneProduct {mcid}")
-                cvterms: List[libsbml.CVTerm] = gp.getCVTerms()
-                for cvterm in cvterms:
-                    self._add_sbml_rdf_node("GeneProduct", mcid, cvterm, session)
+        # Reactions
+        logger.info("Creating Reaction nodes")
+        for r in model.getListOfReactions():
+            r: libsbml.Reaction
+            mcid = r.getMetaId()
 
-            # Reactions
-            logger.info("Creating Reaction nodes")
-            for r in model.getListOfReactions():
-                r: libsbml.Reaction
-                mcid = r.getMetaId()
+            # Basic properties
+            logger.debug(f"Creating Reaction node {mcid}")
+            session.write_transaction(
+                lambda tx: tx.run(
+                    """
+                    MERGE (r:Reaction {mcId: $mcId})
+                    ON CREATE
+                        SET r.displayName = $name,
+                            r.reversible = $reversible,
+                            r.fast = $fast;
+                    """,
+                    mcId=mcid,
+                    name=r.getName(),
+                    reversible=r.getReversible(),
+                    fast=r.getFast(),
+                ),
+            )
 
-                # Basic properties
-                logger.debug(f"Creating Reaction node {mcid}")
-                session.write_transaction(
-                    lambda tx: tx.run(
-                        """
-                        MERGE (r:Reaction {mcId: $mcId})
-                        ON CREATE
-                            SET r.displayName = $name,
-                                r.reversible = $reversible,
-                                r.fast = $fast;
-                        """,
-                        mcId=mcid,
-                        name=r.getName(),
-                        reversible=r.getReversible(),
-                        fast=r.getFast(),
-                    ),
-                )
+            # Add RDF nodes
+            logger.debug(f"Adding RDF nodes for Reaction {mcid}")
+            cvterms: List[libsbml.CVTerm] = r.getCVTerms()
+            for cvterm in cvterms:
+                self._add_sbml_rdf_node("Reaction", mcid, cvterm, session)
 
-                # Add RDF nodes
-                logger.debug(f"Adding RDF nodes for Reaction {mcid}")
-                cvterms: List[libsbml.CVTerm] = r.getCVTerms()
-                for cvterm in cvterms:
-                    self._add_sbml_rdf_node("Reaction", mcid, cvterm, session)
+            # Add reactants and products
+            logger.debug(f"Adding reactants for Reaction {mcid}")
+            reactants = r.getListOfReactants()
+            self._link_reaction_to_compound(mcid, reactants, "Left", session)
 
-                # Add reactants and products
-                logger.debug(f"Adding reactants for Reaction {mcid}")
-                reactants = r.getListOfReactants()
-                self._link_reaction_to_compound(mcid, reactants, "Left", session)
+            logger.debug(f"Adding products for Reaction {mcid}")
+            products = r.getListOfProducts()
+            self._link_reaction_to_compound(mcid, products, "Right", session)
 
-                logger.debug(f"Adding products for Reaction {mcid}")
-                products = r.getListOfProducts()
-                self._link_reaction_to_compound(mcid, products, "Right", session)
-
-                # Add associated gene products
-                # This could be complicated where the child nodes could be:
-                # 1. GeneProductRef
-                # 2. fbc:or -> GeneProductRef
-                # 3. fbc:and -> GeneProductRef
-                # 4. Arbitrarily nested fbc:or / fbc:and within cases 2 and 3
-                gpa: libsbml.GeneProductAssociation = r.getPlugin(
-                    "fbc"
-                ).getGeneProductAssociation()
-                if gpa is not None:
-                    node = gpa.getAssociation()
-                self._add_sbml_gene_product_association_node(node, session, mcid)
+            # Add associated gene products
+            # This could be complicated where the child nodes could be:
+            # 1. GeneProductRef
+            # 2. fbc:or -> GeneProductRef
+            # 3. fbc:and -> GeneProductRef
+            # 4. Arbitrarily nested fbc:or / fbc:and within cases 2 and 3
+            gpa: libsbml.GeneProductAssociation = r.getPlugin(
+                "fbc"
+            ).getGeneProductAssociation()
+            if gpa is not None:
+                node = gpa.getAssociation()
+            self._add_sbml_gene_product_association_node(node, session, mcid)
 
     def reaction_to_graph(
         self, rxn_id: str, rxn_dat: Dict[str, List[List[str]]], session: db.Session
