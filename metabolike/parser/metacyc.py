@@ -41,16 +41,6 @@ NODE_LABELS = [
     "Taxa",
 ]
 
-REACTION_ATTRIBUTES = {
-    # Relationship properties
-    "GIBBS-0",
-    "STD-REDUCTION-POTENTIAL",
-    "REACTION-DIRECTION",
-    "REACTION-BALANCE-STATUS",
-    "SYSTEMATIC-NAME",
-    "COMMENT",  # TODO: link to other nodes
-}
-
 
 class Metacyc:
     """
@@ -346,7 +336,14 @@ class Metacyc:
             # SYNONYMS is a special case because it is a list
             if k == "SYNONYMS":
                 _add_kv_to_dict(props, k, v, as_list=True)
-            elif k in REACTION_ATTRIBUTES:
+            elif k in {
+                "GIBBS-0",
+                "STD-REDUCTION-POTENTIAL",
+                "REACTION-DIRECTION",
+                "REACTION-BALANCE-STATUS",
+                "SYSTEMATIC-NAME",
+                "COMMENT",  # TODO: link to other nodes
+            }:
                 _add_kv_to_dict(props, k, v, as_list=False)
             elif k == "IN-PATHWAY":
                 session.write_transaction(
