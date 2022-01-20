@@ -59,6 +59,7 @@ class Metacyc:
         db_name: Optional[str] = None,
         reactions: Optional[Union[str, Path]] = None,
         pathways: Optional[Union[str, Path]] = None,
+        compounds: Optional[Union[str, Path]] = None,
         publications: Optional[Union[str, Path]] = None,
         classes: Optional[Union[str, Path]] = None,
     ):
@@ -80,6 +81,9 @@ class Metacyc:
             classes: The path to the ``class.dat`` file. If given, the file
                 will be parsed and annotations on ``Compartment``, ``Taxa``,
                 and ``Compound`` nodes will be added.
+            compounds: The path to the ``compound.dat`` file. If given, the
+                file will be parsed and annotations on ``Compound`` nodes will
+                be added.
         """
         # Neo4j driver
         self.neo4j_driver = neo4j_driver
@@ -91,6 +95,7 @@ class Metacyc:
             "pathways": self._validate_path(pathways),
             "publications": self._validate_path(publications),
             "classes": self._validate_path(classes),
+            "compounds": self._validate_path(compounds),
         }
 
         # Misc variables
@@ -136,6 +141,26 @@ class Metacyc:
                 for pw in all_pws:
                     self.pathway_to_graph(pw, pw_dat, session)
                     logger.debug(f"Added pathway annotation for {pw}")
+
+            # Compounds in compounds.dat
+            if self.input_files["compounds"]:
+                logger.info("Annotating Compound nodes")
+                cpd_dat = self._read_dat_file(self.input_files["compounds"])
+
+                # All Compound node with RDF have BioCyc IDs
+                # The META: prefix in BioCyc IDs need to be stripped
+                all_cpds = [
+                    (cpd["c.displayName"], cpd["r.Biocyc"][5:])
+                    for cpd in session.run(
+                        """
+                        MATCH (c:Compound)-[:is]->(r:RDF)
+                        RETURN c.displayName, r.Biocyc;
+                        """
+                    )
+                ]  # TODO: 38 POLYMER nodes don't have BioCyc IDs
+                for cpd, biocyc in all_cpds:
+                    self.compounds_to_graph(cpd, biocyc, cpd_dat, session)
+                    logger.debug(f"Added annotation for compound {cpd} with {biocyc}")
 
             # Read publications file if given
             if self.input_files["publications"]:
@@ -536,6 +561,75 @@ class Metacyc:
             )
         )
 
+    def compounds_to_graph(
+        self,
+        cpd: str,
+        biocyc: str,
+        cpd_dat: Dict[str, List[List[str]]],
+        session: db.Session,
+    ):
+        """Annotate a compound node with data from the compound.dat file.
+
+        Args:
+            cpd: The ``displayName`` of the compound.
+            biocyc: The biocyc id of the compound.
+            cpd_dat: The compound.dat data.
+            session: The neo4j session.
+        """
+        lines = cpd_dat[biocyc]
+        c_props: Dict[str, Union[str, List[str]]] = {}
+        rdf_props: Dict[str, Union[str, List[str]]] = {}
+        for k, v in lines:
+            if k in {
+                "GIBBS-0",
+                "LOGP",
+                "MOLECULAR-WEIGHT",
+                "MONOISOTOPIC-MW",
+                "POLAR-SURFACE-AREA",
+                "PKA1",
+                "PKA2",
+                "PKA3",
+                "COMMENT",
+            }:
+                _add_kv_to_dict(c_props, k, v, as_list=False)
+            elif k == "SYNONYMS":
+                _add_kv_to_dict(c_props, k, v, as_list=True)
+            elif k in {"SMILES", "INCHI"}:
+                _add_kv_to_dict(rdf_props, k, v, as_list=False)
+            elif k == "DBLINKS":
+                pass  # TODO: parse DBLINKS
+            elif k == "CITATIONS":
+                self._link_node_to_citation(session, "Compound", cpd, v)
+
+        c_props = self._clean_props(
+            c_props,
+            num_fields=[
+                _snake_to_camel(x)
+                for x in [
+                    "GIBBS-0",
+                    "LOGP",
+                    "MOLECULAR-WEIGHT",
+                    "MONOISOTOPIC-MW",
+                    "POLAR-SURFACE-AREA",
+                    "PKA1",
+                    "PKA2",
+                    "PKA3",
+                ]
+            ],
+            enum_fields=[],
+        )
+        session.write_transaction(
+            lambda tx: tx.run(
+                """
+                MATCH (c:Compound {displayName: $cpd_id})-[:is]->(r:RDF)
+                SET c += $c_props, r += $rdf_props;
+                """,
+                cpd_id=cpd,
+                c_props=c_props,
+                rdf_props=rdf_props,
+            )
+        )
+
     def citation_to_graph(
         self, cit_id: str, pub_dat: Dict[str, List[List[str]]], session: db.Session
     ):
@@ -924,7 +1018,7 @@ class Metacyc:
 
         Args:
             session: Neo4j session.
-            node_type: Type of the node (Reaction or Pathway).
+            node_type: Type of the node (Reaction, Pathway, or Compound).
             node_display_name: ``displayName`` of the node.
             citation_id: ``mcId`` of the ``Citation`` node.
         """
@@ -948,7 +1042,11 @@ class Metacyc:
 
         Args:
             props: Properties to normalize.
+            num_fields: Fields that should be converted to float numbers.
+            enum_fields: Fields that should be converted to alphanumerical strings.
 
+        Returns:
+            A dictionary with normalized properties.
         """
         for f in num_fields:
             if f in props:
