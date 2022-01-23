@@ -10,15 +10,15 @@ logger = logging.getLogger(__name__)
 class BaseDB:
     def __init__(
         self,
-        uri: str = "localhost:7687",
+        uri: str = "neo4j://localhost:7687",
         neo4j_user: str = "neo4j",
         neo4j_password: str = "neo4j",
     ):
         """setup Neo4j driver.
 
         Args:
-            uri: URI of the Neo4j server. Defaults to ``localhost:7687``. For more
-                details, see :class:`neo4j.driver.Driver`.
+            uri: URI of the Neo4j server. Defaults to ``neo4j://localhost:7687``.
+            For more details, see :class:`neo4j.driver.Driver`.
             neo4j_user: Neo4j user. Defaults to "neo4j".
             neo4j_password: Neo4j password. Defaults to "neo4j".
 
@@ -29,7 +29,7 @@ class BaseDB:
         self.driver: Union[Neo4jDriver, BoltDriver] = GraphDatabase.driver(
             uri, auth=(neo4j_user, neo4j_password)
         )
-        logger.debug(self.driver.verify_connectivity())
+        # logger.debug(self.driver.verify_connectivity())
 
     def close(self):
         self.session.close()
