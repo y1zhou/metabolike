@@ -118,6 +118,9 @@ class Metacyc:
             # TODO: add pathway annotations for superpathways as well.
             # These pathway nodes are created during self.pathway_to_graph.
             for pw in all_pws:
+                if pw not in pw_dat:
+                    logger.warning(f"Key {pw} not found in pathways.dat file")
+                    continue
                 self.pathway_to_graph(pw, pw_dat)
                 logger.debug(f"Added pathway annotation for {pw}")
 
@@ -128,6 +131,9 @@ class Metacyc:
 
             all_cpds = self.db.get_all_compounds()
             for cpd, biocyc in all_cpds:
+                if biocyc not in all_cpds:
+                    logger.warning(f"Key {biocyc} not found in compounds.dat file")
+                    continue
                 self.compounds_to_graph(cpd, biocyc, cpd_dat)
                 logger.debug(f"Added annotation for compound {cpd} with {biocyc}")
 
@@ -138,6 +144,9 @@ class Metacyc:
 
             all_cits = self.db.get_all_nodes("Citation", "mcId")
             for cit in all_cits:
+                if cit not in pub_dat:
+                    logger.warning(f"Key {cit} not found in pubs.dat file")
+                    continue
                 self.citation_to_graph(cit, pub_dat)
                 logger.debug(f"Added annotation for citation {cit}")
 
@@ -431,29 +440,33 @@ class Metacyc:
         # Common names for cell components
         all_cco = self.db.get_all_nodes("Compartment", "displayName")
         for cco in all_cco:
-            if cco in class_dat:
-                props: Dict[str, Union[str, List[str]]] = {}
-                for k, v in class_dat[cco]:
-                    if k == "COMMON-NAME":
-                        _add_kv_to_dict(props, k, v, as_list=False)
-                    elif k == "SYNONYMS":
-                        _add_kv_to_dict(props, k, v, as_list=True)
+            if cco not in class_dat:
+                logger.warning(f"No class data for {cco}")
+                continue
+            props: Dict[str, Union[str, List[str]]] = {}
+            for k, v in class_dat[cco]:
+                if k == "COMMON-NAME":
+                    _add_kv_to_dict(props, k, v, as_list=False)
+                elif k == "SYNONYMS":
+                    _add_kv_to_dict(props, k, v, as_list=True)
 
-                self.db.add_props_to_node("Compartment", "displayName", cco, props)
+            self.db.add_props_to_node("Compartment", "displayName", cco, props)
 
         # Common names and synonyms for organisms. Some also have strain names
         all_taxon = self.db.get_all_nodes("Taxa", "mcId")
         for taxa in all_taxon:
-            if taxa in class_dat:
-                props: Dict[str, Union[str, List[str]]] = {}
-                for k, v in class_dat[taxa]:
-                    if k in {"COMMON-NAME", "STRAIN-NAME", "COMMENT"}:
-                        _add_kv_to_dict(props, k, v, as_list=False)
-                    elif k == "SYNONYMS":
-                        _add_kv_to_dict(props, k, v, as_list=True)
-                    # TODO: TYPES links the taxon
+            if taxa not in class_dat:
+                logger.warning(f"No class data for {taxa}")
+                continue
+            props: Dict[str, Union[str, List[str]]] = {}
+            for k, v in class_dat[taxa]:
+                if k in {"COMMON-NAME", "STRAIN-NAME", "COMMENT"}:
+                    _add_kv_to_dict(props, k, v, as_list=False)
+                elif k == "SYNONYMS":
+                    _add_kv_to_dict(props, k, v, as_list=True)
+                # TODO: TYPES links the taxon
 
-                self.db.add_props_to_node("Taxa", "mcId", taxa, props)
+            self.db.add_props_to_node("Taxa", "mcId", taxa, props)
 
         # TODO: Evidence code in citations are in the `Evidence` attr
 
@@ -795,5 +808,3 @@ def _add_kv_to_dict(
         d[k_camel] = v
 
     return d
-
-
