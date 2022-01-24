@@ -131,7 +131,7 @@ class Metacyc:
 
             all_cpds = self.db.get_all_compounds()
             for cpd, biocyc in all_cpds:
-                if biocyc not in all_cpds:
+                if biocyc not in cpd_dat:
                     logger.warning(f"Key {biocyc} not found in compounds.dat file")
                     continue
                 self.compounds_to_graph(cpd, biocyc, cpd_dat)
@@ -144,9 +144,6 @@ class Metacyc:
 
             all_cits = self.db.get_all_nodes("Citation", "mcId")
             for cit in all_cits:
-                if cit not in pub_dat:
-                    logger.warning(f"Key {cit} not found in pubs.dat file")
-                    continue
                 self.citation_to_graph(cit, pub_dat)
                 logger.debug(f"Added annotation for citation {cit}")
 
@@ -441,7 +438,7 @@ class Metacyc:
         all_cco = self.db.get_all_nodes("Compartment", "displayName")
         for cco in all_cco:
             if cco not in class_dat:
-                logger.warning(f"No class data for {cco}")
+                logger.warning(f"No class data for compartment {cco}")
                 continue
             props: Dict[str, Union[str, List[str]]] = {}
             for k, v in class_dat[cco]:
@@ -456,7 +453,7 @@ class Metacyc:
         all_taxon = self.db.get_all_nodes("Taxa", "mcId")
         for taxa in all_taxon:
             if taxa not in class_dat:
-                logger.warning(f"No class data for {taxa}")
+                logger.warning(f"No class data for taxa {taxa}")
                 continue
             props: Dict[str, Union[str, List[str]]] = {}
             for k, v in class_dat[taxa]:
@@ -653,7 +650,10 @@ class Metacyc:
             # Split key-attribute pairs
             doc = [l.split(" - ", maxsplit=1) for l in doc]
             uniq_id = doc[0][1]
-            doc = doc[1:]
+
+            # Remove empty values like "SYNONYMS - " in ORG-6026
+            doc = [x for x in doc[1:] if len(x) == 2]
+
             docs[uniq_id] = doc
 
         return docs

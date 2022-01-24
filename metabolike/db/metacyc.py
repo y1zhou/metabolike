@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from metabolike.db.base import BaseDB
 
@@ -163,7 +163,7 @@ class MetaDB(BaseDB):
             group_id=group_id,
         )
 
-    def get_all_nodes(self, label: str, prop: str):
+    def get_all_nodes(self, label: str, prop: str) -> List[str]:
         """Fetch an property of nodes with a certain label."""
         if label not in NODE_LABELS:
             raise ValueError(f"Invalid label: {label}")
@@ -176,7 +176,7 @@ class MetaDB(BaseDB):
         )
         return [n["prop"] for n in res]
 
-    def get_all_compounds(self):
+    def get_all_compounds(self) -> List[Tuple[str, str]]:
         """Fetch all ``Compound`` nodes.
 
         All Compound node with RDF have BioCyc IDs.
