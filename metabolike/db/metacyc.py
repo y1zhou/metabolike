@@ -26,7 +26,7 @@ class MetaDB(BaseDB):
 
     def setup_graph_db(self, create_db: bool = True, **kwargs):
         """
-        Create Neo4j database and set proper constraints. `Reaction` nodes are
+        Create Neo4j database and set proper constraints. ``Reaction`` nodes are
         central in the schema.
 
         Args:

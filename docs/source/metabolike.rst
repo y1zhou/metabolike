@@ -7,15 +7,25 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
+   metabolike.api
+   metabolike.db
    metabolike.parser
 
 Submodules
 ----------
 
-metabolike.db module
---------------------
+metabolike.config module
+------------------------
 
-.. automodule:: metabolike.db
+.. automodule:: metabolike.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+metabolike.main module
+----------------------
+
+.. automodule:: metabolike.main
    :members:
    :undoc-members:
    :show-inheritance:

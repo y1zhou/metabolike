@@ -31,7 +31,7 @@ class BaseTransformer(Transformer):
 class GenericTreeTransformer(BaseTransformer):
     """Transform extracted values from bottom-up.
 
-    Formats the tree into a dictionary, as described in :meth:`entry`.
+    Formats the tree into a dictionary, as described in :meth:`.entry`.
     """
 
     def description(self, children) -> Token:
@@ -53,7 +53,7 @@ class GenericTreeTransformer(BaseTransformer):
 
 class ReactionTreeTransformer(GenericTreeTransformer):
     """
-    Commentary in `(...)` are on substrates, and in `|...|` on products.
+    Commentary in ``(...)`` are on substrates, and in ``|...|`` on products.
     """
 
     def reaction(self, children) -> Token:
@@ -61,10 +61,10 @@ class ReactionTreeTransformer(GenericTreeTransformer):
 
         There should be three parts:
             - The left-hand-side of the reaction, which is a list of chemical
-                names, separated by ` + `.
-            - The separator ` = `.
+                names, separated by ``<space>+<space>``.
+            - The separator ``<space>=<space>``.
             - The right-hand-side of the reaction, which is a list of chemical
-                names, separated by ` + `.
+                names, separated by ``<space>+<space>``.
         """
         reaction = " ".join([x.value.strip() for x in children])
         reaction = self._fix_string(reaction)
@@ -84,7 +84,7 @@ class ReactionTreeTransformer(GenericTreeTransformer):
 
     def reversibility(self, children) -> Token:
         """
-        `r` for reversible, `ir` for irreversible, `?` for unknown.
+        ``r`` for reversible, ``ir`` for irreversible, ``?`` for unknown.
         """
         x = children[0].value
         x = x.replace("{", "")
