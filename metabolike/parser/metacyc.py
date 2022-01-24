@@ -6,7 +6,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import libsbml
 from metabolike.db.metacyc import MetaDB
-from typer import progressbar
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -106,10 +106,9 @@ class Metacyc:
             rxn_dat = self._read_dat_file(self.input_files["reactions"])
 
             all_rxns = self.db.get_all_nodes("Reaction", "displayName")
-            with progressbar(all_rxns, label="Iterating reactions.dat") as bar:
-                for rxn in bar:
-                    self.reaction_to_graph(rxn, rxn_dat)
-                    logger.debug(f"Added extra info for reaction {rxn}")
+            for rxn in tqdm(all_rxns, desc="reactions.dat file"):
+                self.reaction_to_graph(rxn, rxn_dat)
+                logger.debug(f"Added extra info for reaction {rxn}")
 
         # Read pathways file if given
         if self.input_files["pathways"]:
@@ -119,10 +118,9 @@ class Metacyc:
             all_pws = self.db.get_all_nodes("Pathway", "mcId")
             # TODO: add pathway annotations for superpathways as well.
             # These pathway nodes are created during self.pathway_to_graph.
-            with progressbar(all_pws, label="Iterating pathways.dat") as bar:
-                for pw in bar:
-                    self.pathway_to_graph(pw, pw_dat)
-                    logger.debug(f"Added pathway annotation for {pw}")
+            for pw in tqdm(all_pws, desc="pathways.dat file"):
+                self.pathway_to_graph(pw, pw_dat)
+                logger.debug(f"Added pathway annotation for {pw}")
 
         # Compounds in compounds.dat
         if self.input_files["compounds"]:
@@ -130,10 +128,9 @@ class Metacyc:
             cpd_dat = self._read_dat_file(self.input_files["compounds"])
 
             all_cpds = self.db.get_all_compounds()
-            with progressbar(all_cpds, label="Iterating compounds.dat") as bar:
-                for cpd, biocyc in bar:
-                    self.compounds_to_graph(cpd, biocyc, cpd_dat)
-                    logger.debug(f"Added annotation for compound {cpd} with {biocyc}")
+            for cpd, biocyc in tqdm(all_cpds, desc="compounds.dat file"):
+                self.compounds_to_graph(cpd, biocyc, cpd_dat)
+                logger.debug(f"Added annotation for compound {cpd} with {biocyc}")
 
         # Read publications file if given
         if self.input_files["publications"]:
@@ -141,10 +138,9 @@ class Metacyc:
             pub_dat = self._read_dat_file(self.input_files["publications"])
 
             all_cits = self.db.get_all_nodes("Citation", "mcId")
-            with progressbar(all_cits, label="Iterating pubs.dat") as bar:
-                for cit in all_cits:
-                    self.citation_to_graph(cit, pub_dat)
-                    logger.debug(f"Added annotation for citation {cit}")
+            for cit in tqdm(all_cits, desc="pubs.dat file"):
+                self.citation_to_graph(cit, pub_dat)
+                logger.debug(f"Added annotation for citation {cit}")
 
         # Compartments, Taxon, and comments of Compounds in classes.dat
         if self.input_files["classes"]:
@@ -168,7 +164,7 @@ class Metacyc:
 
         # Compounds, i.e. metabolites, species
         logger.info("Creating Compound nodes")
-        for s in model.getListOfSpecies():
+        for s in tqdm(model.getListOfSpecies(), desc="Compounds"):
             s: libsbml.Species
             # Basic properties
             mcid: str = s.getMetaId()
@@ -191,7 +187,7 @@ class Metacyc:
         # Gene products
         logger.info("Creating GeneProduct nodes")
         fbc: libsbml.FbcModelPlugin = model.getPlugin("fbc")
-        for gp in fbc.getListOfGeneProducts():
+        for gp in tqdm(fbc.getListOfGeneProducts(), desc="GeneProducts"):
             gp: libsbml.GeneProduct
             mcid = gp.getMetaId()
             props = {
@@ -207,7 +203,7 @@ class Metacyc:
 
         # Reactions
         logger.info("Creating Reaction nodes")
-        for r in model.getListOfReactions():
+        for r in tqdm(model.getListOfReactions(), desc="Reactions"):
             r: libsbml.Reaction
             mcid = r.getMetaId()
 
@@ -459,20 +455,19 @@ class Metacyc:
 
         # Common names and synonyms for organisms. Some also have strain names
         all_taxon = self.db.get_all_nodes("Taxa", "mcId")
-        with progressbar(all_taxon, label="Iterating taxon in classes.dat") as bar:
-            for taxa in bar:
-                if taxa not in class_dat:
-                    logger.warning(f"No class data for taxa {taxa}")
-                    continue
-                props: Dict[str, Union[str, List[str]]] = {}
-                for k, v in class_dat[taxa]:
-                    if k in {"COMMON-NAME", "STRAIN-NAME", "COMMENT"}:
-                        _add_kv_to_dict(props, k, v, as_list=False)
-                    elif k == "SYNONYMS":
-                        _add_kv_to_dict(props, k, v, as_list=True)
-                    # TODO: TYPES links the taxon
+        for taxa in tqdm(all_taxon, desc="Taxon in classes.dat"):
+            if taxa not in class_dat:
+                logger.warning(f"No class data for taxa {taxa}")
+                continue
+            props: Dict[str, Union[str, List[str]]] = {}
+            for k, v in class_dat[taxa]:
+                if k in {"COMMON-NAME", "STRAIN-NAME", "COMMENT"}:
+                    _add_kv_to_dict(props, k, v, as_list=False)
+                elif k == "SYNONYMS":
+                    _add_kv_to_dict(props, k, v, as_list=True)
+                # TODO: TYPES links the taxon
 
-                self.db.add_props_to_node("Taxa", "mcId", taxa, props)
+            self.db.add_props_to_node("Taxa", "mcId", taxa, props)
 
         # TODO: Evidence code in citations are in the `Evidence` attr
 

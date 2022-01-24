@@ -19,7 +19,7 @@ app = typer.Typer()
 
 
 def load_config(config_file: str) -> Config:
-    logging.info(f"Parsing config file {config_file}")
+    logger.info(f"Parsing config file {config_file}")
     conf_file = Path(config_file).expanduser().resolve()
     with conf_file.open("r") as f:
         conf_data = yaml.safe_load(f)
