@@ -1,8 +1,10 @@
+#!/usr/bin/env python
 import logging
 from pathlib import Path
 from typing import Optional
 
 import typer
+import uvicorn
 import yaml
 
 from metabolike.config import Config
@@ -10,7 +12,7 @@ from metabolike.db.metacyc import MetaDB
 from metabolike.parser.metacyc import Metacyc
 
 logging.basicConfig(
-    format="[%(levelname)s] %(asctime)s - %(name)s:%(lineno)s - %(message)s",
+    format="[%(levelname)s] %(asctime)s - %(name)s:%(lineno)s:%(funcName)s - %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)

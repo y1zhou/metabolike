@@ -185,7 +185,7 @@ class MetaDB(BaseDB):
         res = self.read(
             """
             MATCH (c:Compound)-[:is]->(r:RDF)
-            RETURN c.displayName, r.Biocyc;
+            RETURN DISTINCT c.displayName, r.Biocyc;
             """
         )  # TODO: 38 POLYMER nodes don't have BioCyc IDs
         return [(cpd["c.displayName"], cpd["r.Biocyc"][5:]) for cpd in res]
