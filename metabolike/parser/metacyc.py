@@ -6,6 +6,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import libsbml
 from metabolike.db.metacyc import MetaDB
+from typer import progressbar
 
 logger = logging.getLogger(__name__)
 
@@ -105,9 +106,10 @@ class Metacyc:
             rxn_dat = self._read_dat_file(self.input_files["reactions"])
 
             all_rxns = self.db.get_all_nodes("Reaction", "displayName")
-            for rxn in all_rxns:
-                self.reaction_to_graph(rxn, rxn_dat)
-                logger.debug(f"Added extra info for reaction {rxn}")
+            with progressbar(all_rxns, label="Iterating reactions.dat") as bar:
+                for rxn in bar:
+                    self.reaction_to_graph(rxn, rxn_dat)
+                    logger.debug(f"Added extra info for reaction {rxn}")
 
         # Read pathways file if given
         if self.input_files["pathways"]:
@@ -117,12 +119,10 @@ class Metacyc:
             all_pws = self.db.get_all_nodes("Pathway", "mcId")
             # TODO: add pathway annotations for superpathways as well.
             # These pathway nodes are created during self.pathway_to_graph.
-            for pw in all_pws:
-                if pw not in pw_dat:
-                    logger.warning(f"Key {pw} not found in pathways.dat file")
-                    continue
-                self.pathway_to_graph(pw, pw_dat)
-                logger.debug(f"Added pathway annotation for {pw}")
+            with progressbar(all_pws, label="Iterating pathways.dat") as bar:
+                for pw in bar:
+                    self.pathway_to_graph(pw, pw_dat)
+                    logger.debug(f"Added pathway annotation for {pw}")
 
         # Compounds in compounds.dat
         if self.input_files["compounds"]:
@@ -130,12 +130,10 @@ class Metacyc:
             cpd_dat = self._read_dat_file(self.input_files["compounds"])
 
             all_cpds = self.db.get_all_compounds()
-            for cpd, biocyc in all_cpds:
-                if biocyc not in cpd_dat:
-                    logger.warning(f"Key {biocyc} not found in compounds.dat file")
-                    continue
-                self.compounds_to_graph(cpd, biocyc, cpd_dat)
-                logger.debug(f"Added annotation for compound {cpd} with {biocyc}")
+            with progressbar(all_cpds, label="Iterating compounds.dat") as bar:
+                for cpd, biocyc in bar:
+                    self.compounds_to_graph(cpd, biocyc, cpd_dat)
+                    logger.debug(f"Added annotation for compound {cpd} with {biocyc}")
 
         # Read publications file if given
         if self.input_files["publications"]:
@@ -143,9 +141,10 @@ class Metacyc:
             pub_dat = self._read_dat_file(self.input_files["publications"])
 
             all_cits = self.db.get_all_nodes("Citation", "mcId")
-            for cit in all_cits:
-                self.citation_to_graph(cit, pub_dat)
-                logger.debug(f"Added annotation for citation {cit}")
+            with progressbar(all_cits, label="Iterating pubs.dat") as bar:
+                for cit in all_cits:
+                    self.citation_to_graph(cit, pub_dat)
+                    logger.debug(f"Added annotation for citation {cit}")
 
         # Compartments, Taxon, and comments of Compounds in classes.dat
         if self.input_files["classes"]:
@@ -304,6 +303,9 @@ class Metacyc:
             pw_dat: The pathways.dat file as an attribute-value list.
             session: The graph database session to use.
         """
+        if pw_id not in pw_dat:
+            logger.warning(f"Key {pw_id} not found in pathways.dat file")
+            return
         lines = pw_dat[pw_id]
         props: Dict[str, Union[str, List[str]]] = {"displayName": pw_id}
         for k, v in lines:
@@ -361,6 +363,9 @@ class Metacyc:
             cpd_dat: The compound.dat data.
             session: The neo4j session.
         """
+        if biocyc not in cpd_dat:
+            logger.warning(f"Key {biocyc} not found in compounds.dat file")
+            return
         lines = cpd_dat[biocyc]
         c_props: Dict[str, Union[str, List[str]]] = {}
         rdf_props: Dict[str, Union[str, List[str]]] = {}
@@ -411,6 +416,9 @@ class Metacyc:
         if not pub_dat_id:
             return
         pub_dat_id = "PUB-" + pub_dat_id
+        if pub_dat_id not in pub_dat:
+            logger.warning(f"{cit_id} -> {pub_dat_id} not found in pubs.dat file")
+            return
         # TODO: deal with evidence frames
 
         lines = pub_dat[pub_dat_id]
@@ -451,19 +459,20 @@ class Metacyc:
 
         # Common names and synonyms for organisms. Some also have strain names
         all_taxon = self.db.get_all_nodes("Taxa", "mcId")
-        for taxa in all_taxon:
-            if taxa not in class_dat:
-                logger.warning(f"No class data for taxa {taxa}")
-                continue
-            props: Dict[str, Union[str, List[str]]] = {}
-            for k, v in class_dat[taxa]:
-                if k in {"COMMON-NAME", "STRAIN-NAME", "COMMENT"}:
-                    _add_kv_to_dict(props, k, v, as_list=False)
-                elif k == "SYNONYMS":
-                    _add_kv_to_dict(props, k, v, as_list=True)
-                # TODO: TYPES links the taxon
+        with progressbar(all_taxon, label="Iterating taxon in classes.dat") as bar:
+            for taxa in bar:
+                if taxa not in class_dat:
+                    logger.warning(f"No class data for taxa {taxa}")
+                    continue
+                props: Dict[str, Union[str, List[str]]] = {}
+                for k, v in class_dat[taxa]:
+                    if k in {"COMMON-NAME", "STRAIN-NAME", "COMMENT"}:
+                        _add_kv_to_dict(props, k, v, as_list=False)
+                    elif k == "SYNONYMS":
+                        _add_kv_to_dict(props, k, v, as_list=True)
+                    # TODO: TYPES links the taxon
 
-            self.db.add_props_to_node("Taxa", "mcId", taxa, props)
+                self.db.add_props_to_node("Taxa", "mcId", taxa, props)
 
         # TODO: Evidence code in citations are in the `Evidence` attr
 
