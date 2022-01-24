@@ -407,15 +407,25 @@ class Metacyc:
         self.db.add_props_to_compound(cpd, c_props, rdf_props)
 
     def citation_to_graph(self, cit_id: str, pub_dat: Dict[str, List[List[str]]]):
-        pub_dat_id = re.sub(r"[\[\]]", "", cit_id.split(":")[0].upper())
-        pub_dat_id = re.sub(r"-(\d+)$", r"\1", pub_dat_id)
+        # TODO: deal with evidence frames
+        # Evidence frames are in the form of 10066805:EV-EXP-IDA:3354997111:hartmut,
+        # where the fields are separated by colons. The first field is the
+        # citation ID, the second is the evidence type (in classes.dat),
+        # the third is not documented, and the fourth is the curator's name.
+        # In most cases the citation ID should match:
+        # ^PUB-[A-Z0-9]+$
+        # with a few exceptions containing double dashes, e.g. PUB--8
+        # and some dashes within author names, e.g. PUB-CHIH-CHING95
+        pub_dat_id = re.sub(r"[\[\]\s,']", "", cit_id.split(":")[0].upper())
+        pub_dat_id = re.sub(r"-(\d+)", r"\1", pub_dat_id)
+        if pub_dat_id == "BOREJSZA-WYSOCKI94":
+            pub_dat_id = "BOREJSZAWYSOCKI94"  # only exception with dash removed
         if not pub_dat_id:
             return
         pub_dat_id = "PUB-" + pub_dat_id
         if pub_dat_id not in pub_dat:
             logger.warning(f"{cit_id} -> {pub_dat_id} not found in pubs.dat file")
             return
-        # TODO: deal with evidence frames
 
         lines = pub_dat[pub_dat_id]
         props: Dict[str, Union[str, List[str]]] = {"citationId": pub_dat_id}
