@@ -1,0 +1,1796 @@
+UNIQUE-ID - TAX-548
+TYPES - TAX-570
+COMMON-NAME - Klebsiella aerogenes
+SYNONYMS - Klebsiella mobilis
+SYNONYMS - Enterobacter aerogenes
+SYNONYMS - Aerobacter aerogenes
+//
+UNIQUE-ID - CCO-CHROM-STR
+TYPES - CCO-PLASTID-STR
+COMMON-NAME - chromoplast stroma
+//
+UNIQUE-ID - TAX-1580
+TYPES - TAX-1578
+COMMON-NAME - Lactobacillus brevis
+SYNONYMS - Lactobacterium breve
+SYNONYMS - Lactobacillus sp. TD4
+SYNONYMS - Lactobacillus sp. TD10
+SYNONYMS - Lactobacillus sp. NCIM 2090
+SYNONYMS - Betabacterium breve
+SYNONYMS - Bacillus sp. DM9218
+SYNONYMS - Bacillus g
+SYNONYMS - Bacillus casei g
+//
+UNIQUE-ID - TAX-1140
+TYPES - TAX-32046
+COMMON-NAME - Synechococcus elongatus
+SYNONYMS - Synechococcus elongatus PCC 7942 = FACHB-805
+SYNONYMS - Synechococcus sp. PCC 7942
+SYNONYMS - Synechococcus sp. IAM M-200
+SYNONYMS - Synechococcus sp. FACHB-805
+SYNONYMS - Synechococcus leopoliensis UTEX 2434
+SYNONYMS - Synechococcus leopoliensis strain PCC 7942
+SYNONYMS - Synechococcus elongatus PCC 7942
+SYNONYMS - Anacystis nidulans R2
+STRAIN-NAME - PCC 7942 = FACHB-805
+//
+UNIQUE-ID - TAX-67814
+TYPES - TAX-2498710
+COMMON-NAME - Caldiserica
+SYNONYMS - candidate phylum OP5
+SYNONYMS - candidate division OP5
+SYNONYMS - Caldisericota
+SYNONYMS - Caldisericaeota
+//
+UNIQUE-ID - TAX-5741
+TYPES - TAX-5740
+COMMON-NAME - Giardia intestinalis
+SYNONYMS - Lamblia intestinalis
+SYNONYMS - Giardia duodenalis
+//
+UNIQUE-ID - TAX-573
+TYPES - TAX-570
+COMMON-NAME - Klebsiella pneumoniae
+SYNONYMS - Klebsiella sp. RCE-7
+SYNONYMS - Klebsiella sp. PB12
+SYNONYMS - Klebsiella sp. M-AI-2
+SYNONYMS - Klebsiella sp. C1(2016)
+SYNONYMS - Klebsiella sp. 2N3
+SYNONYMS - Klebsiella pneumoniae aerogenes
+SYNONYMS - Klebsiella aerogenes (Kruse) Taylor et al. 1956
+SYNONYMS - Hyalococcus pneumoniae
+SYNONYMS - Bacterium pneumoniae crouposae
+SYNONYMS - Bacillus pneumoniae
+//
+UNIQUE-ID - ORG-6236
+TYPES - TAX-287
+COMMON-NAME - Pseudomonas aeruginosa
+SYNONYMS - Pseudomonas aeruginosa O11
+STRAIN-NAME - O11
+//
+UNIQUE-ID - TAX-1501
+TYPES - TAX-1485
+COMMON-NAME - Clostridium pasteurianum
+SYNONYMS - Clostridium pastorianus
+SYNONYMS - Butyribacillus pasteurianus
+SYNONYMS - Bacillus winogradsky
+SYNONYMS - Bacillus pastorianus
+//
+UNIQUE-ID - CCO-THY-MEM-CYA
+TYPES - CCO-THY-MEM
+COMMON-NAME - thylakoid membrane (sensu Cyanobacteria)
+//
+UNIQUE-ID - TAX-1520
+TYPES - TAX-1485
+COMMON-NAME - Clostridium beijerinckii
+SYNONYMS - Clostridium sp. H18
+SYNONYMS - Clostridium rubrum
+//
+UNIQUE-ID - TAX-7130
+TYPES - TAX-7129
+COMMON-NAME - Manduca sexta
+SYNONYMS - tomato hornworm <Manduca sexta>
+SYNONYMS - tomato hornworm
+SYNONYMS - tobacco hornworm
+SYNONYMS - tobacco hawkmoth
+SYNONYMS - hornblower
+SYNONYMS - Carolina sphinx
+//
+UNIQUE-ID - TAX-40674
+TYPES - TAX-32524
+COMMON-NAME - Mammalia
+SYNONYMS - mammals <genbank common name>
+SYNONYMS - mammals
+//
+UNIQUE-ID - TAX-508458
+TYPES - TAX-2
+COMMON-NAME - Synergistetes
+SYNONYMS - Synergistota
+SYNONYMS - Synergistaeota
+SYNONYMS - Aminanaerobia
+//
+UNIQUE-ID - TAX-200940
+TYPES - TAX-2
+COMMON-NAME - Thermodesulfobacteria <phylum>
+SYNONYMS - Thermodesulfobacteriota
+SYNONYMS - Thermodesulfobacteria
+SYNONYMS - Thermodesulfobacteraeota
+//
+UNIQUE-ID - TAX-43080
+TYPES - TAX-2284
+COMMON-NAME - Sulfolobus islandicus
+//
+UNIQUE-ID - TAX-1488
+TYPES - TAX-1485
+COMMON-NAME - Clostridium acetobutylicum
+SYNONYMS - Granulobacter pectinovorum
+SYNONYMS - Clostridium sp. NCIM 2878
+SYNONYMS - Clostridium sp. NCIM 2877
+SYNONYMS - Clostridium sp. NCIM 2337
+SYNONYMS - Clostridium acetonobutylicum
+SYNONYMS - Clostridium acetobutyricum
+//
+UNIQUE-ID - TAX-29197
+TYPES - TAX-136419
+COMMON-NAME - Chlorarachniophyceae
+SYNONYMS - chlorarachniophytes
+SYNONYMS - Chlorarachniophyta
+SYNONYMS - Chlorarachnida
+//
+UNIQUE-ID - TAX-4922
+TYPES - TAX-460517
+COMMON-NAME - Komagataella pastoris
+SYNONYMS - Zygosaccharomyces pastoris
+SYNONYMS - Pichia pastoris
+//
+UNIQUE-ID - CCO-PEROX-LUM
+TYPES - CCO-MICRO-LUM
+COMMON-NAME - peroxisomal lumen
+//
+UNIQUE-ID - TAX-1625
+TYPES - TAX-1578
+COMMON-NAME - Lactobacillus sanfranciscensis
+SYNONYMS - Lactobacillus sanfrancisco
+//
+UNIQUE-ID - CCO-PM-BAC-NEG
+TYPES - CCO-PM-BACTERIA
+COMMON-NAME - inner membrane (sensu Gram-negative Bacteria)
+SYNONYMS - plasma membrane (sensu Gram-negative Bacteria)
+SYNONYMS - cell membrane
+SYNONYMS - cytoplasmic membrane
+SYNONYMS - plasmalemma
+//
+UNIQUE-ID - TAX-1598
+TYPES - TAX-1578
+COMMON-NAME - Lactobacillus reuteri
+SYNONYMS - Lactobacillus sp. I49
+SYNONYMS - Lactobacillus sp. 1B
+SYNONYMS - Lactobacillus reuteri (plasmid pGT232)
+SYNONYMS - Lactobacillus fermentum subsp. reuteri
+SYNONYMS - Lactobacillus fermentum biotype II
+//
+UNIQUE-ID - TAX-428
+TYPES - TAX-425
+COMMON-NAME - Methylosinus sporium
+//
+UNIQUE-ID - TAX-32011
+TYPES - TAX-32003
+COMMON-NAME - Methylophilaceae
+SYNONYMS - Methylophilus group
+SYNONYMS - beta-subdivision methylotrophs
+SYNONYMS - beta subdivision methylotrophs
+//
+UNIQUE-ID - TAX-3983
+TYPES - TAX-3982
+COMMON-NAME - Manihot esculenta
+SYNONYMS - yuca
+SYNONYMS - tapioca
+SYNONYMS - manioc
+SYNONYMS - Manihot utilissima
+SYNONYMS - cassava
+//
+UNIQUE-ID - TAX-186801
+TYPES - TAX-1239
+COMMON-NAME - Clostridia
+//
+UNIQUE-ID - TAX-68336
+TYPES - TAX-1783270
+COMMON-NAME - Bacteroidetes/Chlorobi group
+SYNONYMS - Cytophagales/Green sulfur bacteria group
+SYNONYMS - CFB/Green sulfur bacteria group
+SYNONYMS - CFB/Chlorobi group
+//
+UNIQUE-ID - TAX-6344
+TYPES - TAX-6343
+COMMON-NAME - Arenicola marina
+SYNONYMS - rock worm
+SYNONYMS - lugworm
+//
+UNIQUE-ID - TAX-224756
+TYPES - TAX-2290931
+COMMON-NAME - Methanomicrobia
+SYNONYMS - Methanomicrobia
+SYNONYMS - Methanogen Class II
+//
+UNIQUE-ID - TAX-79930
+TYPES - TAX-145262
+COMMON-NAME - Methanothermobacter thermautotrophicus
+SYNONYMS - Methanothermobacter thermautotrophicus str. Winter
+SYNONYMS - Methanobacterium thermoautotrophicum str. Winter
+SYNONYMS - Methanobacterium thermoautotrophicum (strain Winter)
+STRAIN-NAME - Winter
+//
+UNIQUE-ID - CCO-UNKNOWN-SPACE
+TYPES - CCO-SPACE
+COMMON-NAME - unknown space
+//
+UNIQUE-ID - TAX-2
+TYPES - TAX-131567
+COMMON-NAME - Bacteria
+SYNONYMS - eubacteria
+SYNONYMS - Bacteria <bacteria>
+//
+UNIQUE-ID - TAX-2252
+TYPES - TAX-2251
+COMMON-NAME - Haloferax mediterranei
+SYNONYMS - Halobacterium mediterranei
+//
+UNIQUE-ID - TAX-2262
+TYPES - TAX-2260
+COMMON-NAME - Pyrococcus woesei
+SYNONYMS - Pyrococcus furiosus subsp. woesei
+//
+UNIQUE-ID - TAX-2759
+TYPES - TAX-131567
+COMMON-NAME - Eukaryota
+SYNONYMS - eukaryotes <common name>
+SYNONYMS - eukaryotes
+SYNONYMS - Eukaryotae
+SYNONYMS - Eukarya
+SYNONYMS - eucaryotes
+SYNONYMS - Eucaryotae
+SYNONYMS - Eucarya
+//
+UNIQUE-ID - ORG-5862
+TYPES - TAX-3702
+COMMON-NAME - Arabidopsis thaliana
+SYNONYMS - A. thaliana
+STRAIN-NAME - ler
+//
+UNIQUE-ID - ORG-5914
+TYPES - TAX-46896
+COMMON-NAME - Methylomonas aminofaciens
+SYNONYMS - M. aminofaciens
+STRAIN-NAME - 77a
+//
+UNIQUE-ID - TAX-28889
+TYPES - TAX-1783275
+COMMON-NAME - Crenarchaeota <Crenarchaeota>
+SYNONYMS - Thermoproteota
+SYNONYMS - Thermoproteaeota
+SYNONYMS - eocytes
+SYNONYMS - Eocyta
+SYNONYMS - Crenarchaeota
+//
+UNIQUE-ID - TAX-4895
+TYPES - TAX-4894
+COMMON-NAME - Schizosaccharomyces
+//
+UNIQUE-ID - ORG-6000
+TYPES - TAX-48292
+COMMON-NAME - Hyphomicrobium zavarzinii
+SYNONYMS - Hyphomicrobium zavarzinii ZV580
+STRAIN-NAME - ZV580
+//
+UNIQUE-ID - TAX-183939
+TYPES - TAX-2283794
+COMMON-NAME - Methanococci
+SYNONYMS - Methanothermea
+//
+UNIQUE-ID - TAX-3847
+TYPES - TAX-1462606
+COMMON-NAME - Glycine max
+SYNONYMS - soybeans
+SYNONYMS - soybean
+//
+UNIQUE-ID - TAX-6446
+TYPES - TAX-6445
+COMMON-NAME - Sipunculus nudus
+SYNONYMS - Sipunculus titubans
+SYNONYMS - marine worm
+//
+UNIQUE-ID - TAX-141464
+TYPES - TAX-45948
+COMMON-NAME - Corbicula japonica
+//
+UNIQUE-ID - TAX-1247
+TYPES - TAX-46254
+COMMON-NAME - Oenococcus oeni
+SYNONYMS - Leuconostoc oenos
+SYNONYMS - Leuconostoc oeni
+SYNONYMS - Leuconostoc blayaisense
+//
+UNIQUE-ID - TAX-5477
+TYPES - TAX-1540042
+COMMON-NAME - [Candida] boidinii
+SYNONYMS - Hansenula alcolica Urakami, 1975
+SYNONYMS - Hansenula alcolica
+SYNONYMS - Candida boidinii
+//
+UNIQUE-ID - TAX-33966
+TYPES - TAX-1245
+COMMON-NAME - Leuconostoc mesenteroides
+SYNONYMS - Leuconostoc mesenteroides subsp. dextranicum
+SYNONYMS - Leuconostoc mesenteroides dextranicum
+SYNONYMS - Leuconostoc dextranicum
+SYNONYMS - Lactococcus dextranicus
+SYNONYMS - Betacoccus bovis
+//
+UNIQUE-ID - ORG-5993
+TYPES - TAX-3702
+COMMON-NAME - Arabidopsis thaliana
+SYNONYMS - Arabidopsis thaliana col
+STRAIN-NAME - col
+//
+UNIQUE-ID - TAX-3906
+TYPES - TAX-3904
+COMMON-NAME - Vicia faba
+SYNONYMS - fava bean
+SYNONYMS - faba bean
+SYNONYMS - broad bean
+//
+UNIQUE-ID - ORG4FS-2
+TYPES - TAX-3702
+COMMON-NAME - Arabidopsis thaliana
+SYNONYMS - Arabidopsis thaliana Ws
+SYNONYMS - Arabidopsis thaliana Wassilewskija
+COMMENT - The Ws (Wassilewskija) ecotype was originally collected in Wassilewskija, Russia. Links to information about Ws <A href="http://"http://www.arabidopsis.org/servlets/Search?action=new_search&type=ecotype>seed stocks</A> are available at TAIR.
+//
+UNIQUE-ID - TAX-6340
+TYPES - TAX-1206795
+COMMON-NAME - Annelida
+SYNONYMS - annelid worms
+//
+UNIQUE-ID - CCO-MIT-IMEM
+TYPES - CCO-MIT-MEM
+COMMON-NAME - mitochondrial inner membrane
+//
+UNIQUE-ID - TAX-4081
+TYPES - TAX-49274
+COMMON-NAME - Solanum lycopersicum
+SYNONYMS - tomato
+SYNONYMS - Solanum lycopersicum var. humboldtii
+SYNONYMS - Solanum esculentum
+SYNONYMS - Lycopersicon esculentum var. esculentum
+//
+UNIQUE-ID - TAX-6549
+TYPES - TAX-6548
+COMMON-NAME - Mytilus californianus
+SYNONYMS - California mussel
+//
+UNIQUE-ID - TAX-429
+TYPES - TAX-403
+COMMON-NAME - Methylobacter
+//
+UNIQUE-ID - TAX-187420
+TYPES - TAX-145262
+COMMON-NAME - Methanothermobacter thermautotrophicus
+SYNONYMS - Methanothermobacter thermautotrophicus str. Delta H
+SYNONYMS - Methanothermobacter thermautotrophicus str. deltaH
+SYNONYMS - Methanobacterium thermoautotrophicum str. deltaH
+SYNONYMS - Methanobacterium thermoautotrophicum str. Delta H
+STRAIN-NAME - Delta H
+//
+UNIQUE-ID - TAX-4932
+TYPES - TAX-4930
+COMMON-NAME - Saccharomyces cerevisiae
+SYNONYMS - S. cerevisiae
+SYNONYMS - Saccharomyces uvarum var. melibiosus
+SYNONYMS - Saccharomyces oviformis
+SYNONYMS - Saccharomyces italicus
+SYNONYMS - Saccharomyces capensis
+SYNONYMS - Mycoderma cerevisiae
+SYNONYMS - Candida robusta
+SYNONYMS - brewers yeast
+SYNONYMS - bakers yeast
+//
+UNIQUE-ID - TAX-200938
+TYPES - TAX-2
+COMMON-NAME - Chrysiogenetes <phylum>
+SYNONYMS - Chrysiogenetota
+SYNONYMS - Chrysiogenetes
+SYNONYMS - Chrysiogenaeota
+//
+UNIQUE-ID - TAX-2836
+TYPES - TAX-2696291
+COMMON-NAME - Bacillariophyta
+SYNONYMS - diatoms <genbank common name>
+SYNONYMS - diatoms
+SYNONYMS - Diatomophyceae
+SYNONYMS - Diatomea
+SYNONYMS - Diatomeae
+SYNONYMS - bacillariophytes
+//
+UNIQUE-ID - TAX-2833
+TYPES - TAX-569578
+COMMON-NAME - Xanthophyceae
+SYNONYMS - yellow-green algae <genbank common name>
+SYNONYMS - yellow-green algae
+SYNONYMS - Xanthophyta
+SYNONYMS - Tribophyceae
+SYNONYMS - Heterocontae
+//
+UNIQUE-ID - TAX-1245
+TYPES - TAX-1243
+COMMON-NAME - Leuconostoc mesenteroides
+SYNONYMS - Leuconostoc sp. 13HN
+SYNONYMS - Betacoccus arabinosaceus
+SYNONYMS - Ascococcus mesenteroides
+//
+UNIQUE-ID - TAX-1680
+TYPES - TAX-1678
+COMMON-NAME - Bifidobacterium adolescentis
+SYNONYMS - Bifidobacterium stercoris
+//
+UNIQUE-ID - TAX-6656
+TYPES - TAX-88770
+COMMON-NAME - Arthropoda
+SYNONYMS - arthropods <genbank common name>
+SYNONYMS - arthropods
+//
+UNIQUE-ID - TAX-7380
+TYPES - TAX-7377
+COMMON-NAME - Phormia regina
+SYNONYMS - black blowfly
+//
+UNIQUE-ID - TAX-284812
+TYPES - TAX-4896
+COMMON-NAME - Schizosaccharomyces pombe
+SYNONYMS - Schizosaccharomyces pombe 972h-
+STRAIN-NAME - 972h-
+//
+UNIQUE-ID - CCO-CHLOR-STR
+TYPES - CCO-PLASTID-STR
+COMMON-NAME - chloroplast stroma
+//
+UNIQUE-ID - TAX-224308
+TYPES - TAX-135461
+COMMON-NAME - Bacillus subtilis
+SYNONYMS - Bacillus subtilis subsp. subtilis str. 168
+SYNONYMS - Bacillus subtilis subsp. subtilis str. BGSC 1A700
+SYNONYMS - Bacillus subtilis subsp. subtilis 168
+SYNONYMS - Bacillus subtilis 168
+COMMENT - BsubCyc is a model-organism database for <i>Bacillus subtilis</i> strain 168.
+/
+/The <i>B. subtilis</i> genome sequence and annotation used is GenBank accession number AL009126.3, GI:225184640 |CITS: [19383706]|.  The database has undergone some manual curation, primarily to import gene name synonyms and add citations to selected new <i>B. subtilis</i> literature that elucidated new gene functions.  A subset of the transcriptional regulatory data captured in DBTBS |CITS: [17962296]| was imported from an XML file provided by K. Nakai and Y. Makita.  Gene Ontology terms were imported from the UniProtKB-GOA Gene Association File deposited on October 20, 2010.
+STRAIN-NAME - 168
+//
+UNIQUE-ID - CCO-PLASTID-STR
+TYPES - CCO-SPACE
+COMMON-NAME - plastid stroma
+//
+UNIQUE-ID - TAX-9823
+TYPES - TAX-9822
+COMMON-NAME - Sus scrofa
+SYNONYMS - wild boar
+SYNONYMS - swine
+SYNONYMS - pigs <Sus scrofa>
+SYNONYMS - pigs
+SYNONYMS - pig
+//
+UNIQUE-ID - TAX-5476
+TYPES - TAX-1535326
+COMMON-NAME - Candida albicans
+SYNONYMS - Syringospora albicans
+SYNONYMS - Saccharomyces albicans
+SYNONYMS - Procandida stellatoidea
+SYNONYMS - Procandida albicans
+SYNONYMS - Parasaccharomyces albicans
+SYNONYMS - Oidium albicans
+SYNONYMS - Mycotorula albicans
+SYNONYMS - Myceloblastanon albicans
+SYNONYMS - Monilia stellatoidea
+SYNONYMS - Monilia albicans
+SYNONYMS - Endomyces albicans
+SYNONYMS - Dematium albicans
+SYNONYMS - Candida stellatoidea type I
+SYNONYMS - Candida stellatoidea
+SYNONYMS - Candida albicans var. stellatoidea
+//
+UNIQUE-ID - TAX-3041
+TYPES - TAX-33090
+COMMON-NAME - Chlorophyta
+SYNONYMS - green algae <genbank common name>
+SYNONYMS - green algae
+SYNONYMS - Chlorophyta sensu Bremer 1985
+SYNONYMS - Chlorophycota
+//
+UNIQUE-ID - TAX-272562
+TYPES - TAX-1488
+COMMON-NAME - Clostridium acetobutylicum
+SYNONYMS - Clostridium acetobutylicum ATCC 824
+SYNONYMS - Clostridium acetobutylicum str. ATCC 824
+SYNONYMS - Clostridium acetobutylicum strain ATCC 824
+SYNONYMS - Clostridium acetobutylicum DSM 792
+STRAIN-NAME - ATCC 824
+//
+UNIQUE-ID - TAX-3027
+TYPES - TAX-2759
+COMMON-NAME - Cryptophyceae
+SYNONYMS - cryptophytes
+SYNONYMS - Cryptophyta
+SYNONYMS - cryptomonads <genbank common name>
+SYNONYMS - cryptomonads
+SYNONYMS - Cryptomonadida
+//
+UNIQUE-ID - TAX-559292
+TYPES - TAX-4932
+COMMON-NAME - Saccharomyces cerevisiae
+SYNONYMS - Saccharomyces cerevisiae S288C
+STRAIN-NAME - S288C
+//
+UNIQUE-ID - TAX-2763
+TYPES - TAX-2759
+COMMON-NAME - Rhodophyta
+SYNONYMS - rhodophytes
+SYNONYMS - Rhodophycota
+SYNONYMS - Rhodophyceae
+SYNONYMS - red algae <genbank common name>
+SYNONYMS - red algae
+//
+UNIQUE-ID - TAX-4930
+TYPES - TAX-4893
+COMMON-NAME - Saccharomyces
+SYNONYMS - Pachytichospora
+//
+UNIQUE-ID - TAX-2271
+TYPES - TAX-2270
+COMMON-NAME - Thermoproteus tenax
+//
+UNIQUE-ID - TAX-287
+TYPES - TAX-136841
+COMMON-NAME - Pseudomonas aeruginosa
+SYNONYMS - Pseudomonas sp. UFT2/2016
+SYNONYMS - Pseudomonas sp. RV3
+SYNONYMS - Pseudomonas sp. PSE5
+SYNONYMS - Pseudomonas sp. PR_01
+SYNONYMS - Pseudomonas sp. NCIM 2862
+SYNONYMS - Pseudomonas sp. NCIM 2036
+SYNONYMS - Pseudomonas sp. HSA1/2016
+SYNONYMS - Pseudomonas sp. CRRI 93
+SYNONYMS - Pseudomonas sp. ACP_02
+SYNONYMS - Pseudomonas sp. 2_1_26
+SYNONYMS - Pseudomonas pyocyanea
+SYNONYMS - Pseudomonas polycolor
+SYNONYMS - probable synonym or variety: "Pseudomonas polycolor" Clara 1930
+SYNONYMS - Micrococcus pyocyaneus
+SYNONYMS - Bacterium pyocyaneum
+SYNONYMS - bacterium CRM125
+SYNONYMS - bacterium ASFP-48
+SYNONYMS - bacterium ASFP-46
+SYNONYMS - bacterium ASFP-45
+SYNONYMS - bacterium ASFP-38
+SYNONYMS - bacterium ASFP-37
+SYNONYMS - Bacterium aeruginosum
+SYNONYMS - Bacillus pyocyaneus
+SYNONYMS - Bacillus aeruginosus
+//
+UNIQUE-ID - TAX-1297
+TYPES - TAX-1783272
+COMMON-NAME - Deinococcus-Thermus
+SYNONYMS - Thermus/Deinococcus group
+SYNONYMS - Deinococcota
+SYNONYMS - Deinococcaeota
+//
+UNIQUE-ID - TAX-68297
+TYPES - TAX-2
+COMMON-NAME - Dictyoglomi <Dictyoglomi>
+SYNONYMS - Dictyoglomus group
+SYNONYMS - Dictyoglomota
+SYNONYMS - Dictyoglomi
+SYNONYMS - Dictyoglomaeota
+//
+UNIQUE-ID - TAX-201174
+TYPES - TAX-1783272
+COMMON-NAME - Actinobacteria <actinobacteria>
+SYNONYMS - Actinobacteriota
+SYNONYMS - Actinobacteria
+SYNONYMS - Actinobacteraeota
+//
+UNIQUE-ID - TAX-2234
+TYPES - TAX-2233
+COMMON-NAME - Archaeoglobus fulgidus
+//
+UNIQUE-ID - TAX-32066
+TYPES - TAX-2
+COMMON-NAME - Fusobacteria <Fusobacteria>
+SYNONYMS - Fusobacteriota
+SYNONYMS - Fusobacteria
+SYNONYMS - Fusobacteraeota
+//
+UNIQUE-ID - TAX-40117
+TYPES - TAX-2
+COMMON-NAME - Nitrospirae
+SYNONYMS - Thermodesulfovibrio group
+SYNONYMS - Nitrospirota
+SYNONYMS - Nitrospira group
+SYNONYMS - Nitrospiraeota
+//
+UNIQUE-ID - TAX-200918
+TYPES - TAX-2
+COMMON-NAME - Thermotogae <phylum>
+SYNONYMS - Thermotogota
+SYNONYMS - Thermotogae
+SYNONYMS - Thermotogaeota
+//
+UNIQUE-ID - TAX-29292
+TYPES - TAX-2260
+COMMON-NAME - Pyrococcus abyssi
+//
+UNIQUE-ID - TAX-39119
+TYPES - TAX-2696291
+COMMON-NAME - Dictyochophyceae
+SYNONYMS - silicoflagellates
+SYNONYMS - Silicoflagellata
+//
+UNIQUE-ID - TAX-5747
+TYPES - TAX-2696291
+COMMON-NAME - Eustigmatophyceae
+SYNONYMS - eustigmatophytes
+SYNONYMS - Eustigmatophyta
+//
+UNIQUE-ID - TAX-1117
+TYPES - TAX-1798711
+COMMON-NAME - Cyanobacteria
+SYNONYMS - Oxyphotobacteria
+SYNONYMS - Oxygenic photosynthetic bacteria
+SYNONYMS - cyanophytes
+SYNONYMS - Cyanophyta
+SYNONYMS - Cyanophycota
+SYNONYMS - Cyanophyceae
+SYNONYMS - blue-green bacteria
+SYNONYMS - blue-green algae
+//
+UNIQUE-ID - TAX-6040
+TYPES - TAX-33208
+COMMON-NAME - Porifera
+SYNONYMS - sponges <genbank common name>
+SYNONYMS - sponges
+SYNONYMS - Parazoa
+//
+UNIQUE-ID - TAX-382
+TYPES - TAX-28105
+COMMON-NAME - Sinorhizobium meliloti
+SYNONYMS - Rhizobium sp. AC50e
+SYNONYMS - Rhizobium meliloti
+SYNONYMS - Rhizobium meliloti plasmid pRmeGR4b
+SYNONYMS - Rhizobium meliloti (plasmid pRmeGR4b)
+SYNONYMS - Rhizobium meliloti (megaplasmid pRME41B SYM)
+SYNONYMS - Ensifer sp. AC50e
+SYNONYMS - Ensifer sp. AC50a
+SYNONYMS - Ensifer meliloti
+//
+UNIQUE-ID - TAX-6433
+TYPES - TAX-1206795
+COMMON-NAME - Sipuncula
+SYNONYMS - sipunculids
+SYNONYMS - peanut worms <genbank common name>
+SYNONYMS - peanut worms
+SYNONYMS - peanut worm <Sipuncula>
+SYNONYMS - peanut worm
+//
+UNIQUE-ID - TAX-29470
+TYPES - TAX-133
+COMMON-NAME - Methylocystis pyriformis
+SYNONYMS - Methylocystis pyriformis
+//
+UNIQUE-ID - TAX-2238
+TYPES - TAX-2237
+COMMON-NAME - Haloarcula marismortui
+SYNONYMS - Halobacterium marismortui
+SYNONYMS - Flavobacterium (Halobacterium) maris-mortui
+//
+UNIQUE-ID - CCO-EXTRACELLULAR
+TYPES - CCO-SPACE
+COMMON-NAME - extracellular space
+//
+UNIQUE-ID - TAX-3750
+TYPES - TAX-3749
+COMMON-NAME - Malus domestica
+SYNONYMS - Pyrus malus
+SYNONYMS - Malus x domestica
+SYNONYMS - Malus sylvestris var. domestica
+SYNONYMS - Malus pumila var. domestica
+SYNONYMS - Malus pumila auct.
+SYNONYMS - Malus communis
+SYNONYMS - cultivated apple
+SYNONYMS - apple tree
+SYNONYMS - apple
+//
+UNIQUE-ID - TAX-106590
+TYPES - TAX-106589
+COMMON-NAME - Cupriavidus necator
+SYNONYMS - Wautersia eutropha
+SYNONYMS - Hydrogenomonas eutropha
+SYNONYMS - Cupriavidus sp. NH9
+SYNONYMS - Cupriavidus sp. JCM 20695
+SYNONYMS - Alcaligenes eutrophus
+SYNONYMS - Alcaligenes eutrophus 335
+//
+UNIQUE-ID - TAX-38254
+TYPES - TAX-2759
+COMMON-NAME - Glaucocystophyceae
+SYNONYMS - Glaucophyta
+SYNONYMS - Glaucophyceae
+SYNONYMS - glaucocystophytes
+//
+UNIQUE-ID - TAX-29159
+TYPES - TAX-6564
+COMMON-NAME - Crassostrea gigas
+SYNONYMS - Pacific oyster
+SYNONYMS - Ostrea gigas
+//
+UNIQUE-ID - TAX-4097
+TYPES - TAX-4085
+COMMON-NAME - Nicotiana tabacum
+SYNONYMS - tobacco
+SYNONYMS - common tobacco
+SYNONYMS - American tobacco
+//
+UNIQUE-ID - TAX-216816
+TYPES - TAX-1678
+COMMON-NAME - Bifidobacterium longum
+SYNONYMS - Bifidobacterium sp. 12_1_47BFAA
+//
+UNIQUE-ID - ORG-5879
+TYPES - TAX-1393
+COMMON-NAME - Brevibacillus brevis
+SYNONYMS - B. brevis
+SYNONYMS - Bacillus brevis
+STRAIN-NAME - S1
+//
+UNIQUE-ID - TAX-7107
+TYPES - TAX-7106
+COMMON-NAME - Spodoptera exigua
+SYNONYMS - small mottled willow caterpillar
+SYNONYMS - pigweed caterpillar
+SYNONYMS - beet armyworm
+//
+UNIQUE-ID - TAX-208964
+TYPES - TAX-287
+COMMON-NAME - Pseudomonas aeruginosa
+SYNONYMS - Pseudomonas aeruginosa PAO1
+SYNONYMS - Pseudomonas sp. PAO1
+STRAIN-NAME - PAO1
+//
+UNIQUE-ID - TAX-7091
+TYPES - TAX-7090
+COMMON-NAME - Bombyx mori
+SYNONYMS - silkworm
+SYNONYMS - silk moth
+SYNONYMS - domestic silkworm
+//
+UNIQUE-ID - TAX-7108
+TYPES - TAX-7106
+COMMON-NAME - Spodoptera frugiperda
+SYNONYMS - fall armyworm
+//
+UNIQUE-ID - TAX-1423
+TYPES - TAX-653685
+COMMON-NAME - Bacillus subtilis
+SYNONYMS - Vibrio subtilis
+SYNONYMS - Brevibacillus sp. BHR3P2B5-M
+SYNONYMS - Bacillus uniflagellatus
+SYNONYMS - Bacillus sp. UMX-03
+SYNONYMS - Bacillus sp. SWI06
+SYNONYMS - Bacillus sp. S2 BC-1
+SYNONYMS - Bacillus sp. RSP-GLU
+SYNONYMS - Bacillus sp. PW19
+SYNONYMS - Bacillus sp. PW16b
+SYNONYMS - Bacillus sp. LKM-BL
+SYNONYMS - Bacillus sp. LB002
+SYNONYMS - Bacillus sp. JKR21
+SYNONYMS - Bacillus sp. HE08
+SYNONYMS - Bacillus sp. BV5
+SYNONYMS - Bacillus sp. BV3
+SYNONYMS - Bacillus sp. BS9(2013)
+SYNONYMS - Bacillus sp. BS4(2013)
+SYNONYMS - Bacillus sp. AECSB14
+SYNONYMS - Bacillus sp. AECSB13
+SYNONYMS - Bacillus sp. AECSB12
+SYNONYMS - Bacillus sp. AECSB08
+SYNONYMS - Bacillus sp. AECSB07
+SYNONYMS - Bacillus sp. AECSB06
+SYNONYMS - Bacillus sp. AECSB05
+SYNONYMS - Bacillus sp. AECSB04
+SYNONYMS - Bacillus sp. AECSB01
+SYNONYMS - Bacillus sp. 15:2
+SYNONYMS - Bacillus sp. 10405
+SYNONYMS - Bacillus natto
+SYNONYMS - Arthrobacter sp. CHR2P1B1-M
+//
+UNIQUE-ID - TAX-2285
+TYPES - TAX-2284
+COMMON-NAME - Sulfolobus acidocaldarius
+//
+UNIQUE-ID - TAX-2246
+TYPES - TAX-2251
+COMMON-NAME - Haloferax volcanii
+SYNONYMS - Haloferax sp. BRTH2
+SYNONYMS - Halobacterium volcanii
+//
+UNIQUE-ID - TAX-1583
+TYPES - TAX-46255
+COMMON-NAME - Weissella confusa
+SYNONYMS - Lactobacillus coprophilus subsp. confusus
+SYNONYMS - Lactobacillus confusus
+SYNONYMS - Lactobacillus confusa (sic)
+//
+UNIQUE-ID - TAX-2864
+TYPES - TAX-33630
+COMMON-NAME - Dinophyceae
+SYNONYMS - Pyrrophyta
+SYNONYMS - Pyrrhophyta
+SYNONYMS - dinophytes
+SYNONYMS - Dinophyta
+SYNONYMS - Dinophycidae
+SYNONYMS - dinoflagellates <genbank common name>
+SYNONYMS - dinoflagellates
+SYNONYMS - Dinoflagellata
+//
+UNIQUE-ID - TAX-3562
+TYPES - TAX-3561
+COMMON-NAME - Spinacia oleracea
+SYNONYMS - spinach
+SYNONYMS - Spinacea oleracea
+//
+UNIQUE-ID - TAX-111955
+TYPES - TAX-69655
+COMMON-NAME - Sulfurisphaera tokodaii
+SYNONYMS - Sulfolobus tokodaii
+//
+UNIQUE-ID - TAX-511145
+TYPES - TAX-83333
+COMMON-NAME - Escherichia coli
+SYNONYMS - Escherichia coli str. K-12 substr. MG1655
+SYNONYMS - Escherichia coli str. MG1655
+SYNONYMS - Escherichia coli str. K12 substr. MG1655
+SYNONYMS - Escherichia coli strain MG1655
+SYNONYMS - Escherichia coli MG1655
+COMMENT - EcoCyc is a model-organism database for <i>Escherichia coli</i> K-12 MG1655.  For more information, see URL EcoCyc.org.
+/
+/The <i>E. coli</i> genome sequence used in EcoCyc is GenBank accession number U00096.2.  Despite the
+/involvement of EcoCyc staff in ongoing updates to the U00096 record, some annotation differences may
+/be found between U00096 and EcoCyc, such as due to recent updates to EcoCyc.
+/
+STRAIN-NAME - K-12 substr. MG1655
+//
+UNIQUE-ID - TAX-33090
+TYPES - TAX-2759
+COMMON-NAME - Viridiplantae
+SYNONYMS - green plants <common name>
+SYNONYMS - green plants
+SYNONYMS - Chloroplastida
+SYNONYMS - chlorophyte/embryophyte group
+SYNONYMS - Chlorophyta/Embryophyta group
+SYNONYMS - Chlorobionta
+//
+UNIQUE-ID - TAX-3708
+TYPES - TAX-3705
+COMMON-NAME - Brassica napus
+SYNONYMS - rapeseeds
+SYNONYMS - rape
+SYNONYMS - oilseed rape
+//
+UNIQUE-ID - TAX-2303
+TYPES - TAX-2302
+COMMON-NAME - Thermoplasma acidophilum
+SYNONYMS - Thermoplasma acidophila
+//
+UNIQUE-ID - TAX-29158
+TYPES - TAX-6548
+COMMON-NAME - Mytilus galloprovincialis
+SYNONYMS - Mediterranean mussel
+//
+UNIQUE-ID - TAX-410
+TYPES - TAX-407
+COMMON-NAME - Methylobacterium organophilum
+SYNONYMS - Methylobacterium organophilum xx
+SYNONYMS - Methylobacterium organophilum (strain xx)
+SYNONYMS - Methylobacterium organophilum (ATCC 27886)
+//
+UNIQUE-ID - TAX-319
+TYPES - TAX-29438
+COMMON-NAME - Pseudomonas savastanoi
+SYNONYMS - Pseudomonas savastanoi pv. phaseolicola
+SYNONYMS - Pseudomonas syringae (PV. PHASEOLICOLA)
+SYNONYMS - Pseudomonas syringae phaseolicola
+STRAIN-NAME - pv. phaseolicola
+//
+UNIQUE-ID - TAX-10090
+TYPES - TAX-862507
+COMMON-NAME - Mus musculus
+SYNONYMS - transgenic mice
+SYNONYMS - nude mice
+SYNONYMS - Mus sp. 129SV
+SYNONYMS - mouse <Mus musculus>
+SYNONYMS - mouse
+SYNONYMS - LK3 transgenic mice
+SYNONYMS - house mouse
+//
+UNIQUE-ID - TAX-2248
+TYPES - TAX-56688
+COMMON-NAME - Halorubrum saccharovorum
+SYNONYMS - Halorubrobacterium saccharovorum
+SYNONYMS - Halobacterium saccharovorum
+//
+UNIQUE-ID - TAX-4513
+TYPES - TAX-4512
+COMMON-NAME - Hordeum vulgare
+SYNONYMS - barley
+//
+UNIQUE-ID - TAX-145262
+TYPES - TAX-145260
+COMMON-NAME - Methanothermobacter thermautotrophicus
+SYNONYMS - Methanobacterium thermoformicicum
+SYNONYMS - "Methanobacterium thermoautotrophicus" (sic) Zeikus and Wolfe 1972
+SYNONYMS - Methanobacterium thermoautotrophicum
+SYNONYMS - Methanobacterium thermoalcaliphilum
+SYNONYMS - Methanobacterium thermautotrophicum
+SYNONYMS - Methanobacterium thermalcaliphilum
+//
+UNIQUE-ID - TAX-580239
+TYPES - TAX-4932
+COMMON-NAME - Saccharomyces cerevisiae
+SYNONYMS - Saccharomyces cerevisiae SK1
+SYNONYMS - Saccharomyces cerevisiae SK-1
+STRAIN-NAME - SK1
+//
+UNIQUE-ID - ORG-5917
+TYPES - TAX-1777
+COMMON-NAME - Mycobacterium gastri
+SYNONYMS - M. gastri
+STRAIN-NAME - MN19
+//
+UNIQUE-ID - TAX-6073
+TYPES - TAX-6072
+COMMON-NAME - Cnidaria
+SYNONYMS - coelenterates <cnidarians>
+SYNONYMS - coelenterates
+SYNONYMS - cnidarians <genbank common name>
+SYNONYMS - cnidarians
+//
+UNIQUE-ID - TAX-200930
+TYPES - TAX-2
+COMMON-NAME - Deferribacteres <phylum>
+SYNONYMS - Deferribacterota
+SYNONYMS - Deferribacteres
+SYNONYMS - Deferribacteraeota
+//
+UNIQUE-ID - TAX-39947
+TYPES - TAX-4530
+COMMON-NAME - Oryza sativa
+SYNONYMS - Oryza sativa Japonica Group
+SYNONYMS - Oryza sativa subsp. japonica
+SYNONYMS - Oryza sativa (japonica cultivar-group)
+SYNONYMS - Japonica rice
+SYNONYMS - Japanese rice
+STRAIN-NAME - Japonica Group
+//
+UNIQUE-ID - TAX-5758
+TYPES - TAX-33084
+COMMON-NAME - Entamoeba
+//
+UNIQUE-ID - TAX-2210
+TYPES - TAX-2207
+COMMON-NAME - Methanosarcina thermophila
+//
+UNIQUE-ID - TAX-74152
+TYPES - TAX-2
+COMMON-NAME - Elusimicrobia <phylum>
+SYNONYMS - Elusimicrobiota
+SYNONYMS - Elusimicrobia
+SYNONYMS - Elusimicrobaeota Oren et al. 2015
+SYNONYMS - candidate phylum Termite Group 1
+SYNONYMS - candidate division TG1
+SYNONYMS - candidate division Termite Group 1
+//
+UNIQUE-ID - TAX-3659
+TYPES - TAX-3655
+COMMON-NAME - Cucumis sativus
+SYNONYMS - cucumbers
+SYNONYMS - cucumber <Cucumis sativus>
+SYNONYMS - cucumber
+//
+UNIQUE-ID - TAX-4113
+TYPES - TAX-4107
+COMMON-NAME - Solanum tuberosum
+SYNONYMS - Solanum tuberosum subsp. tuberosum
+SYNONYMS - potato
+SYNONYMS - potatoes
+//
+UNIQUE-ID - TAX-1091494
+TYPES - TAX-271065
+COMMON-NAME - Methylomicrobium alcaliphilum
+SYNONYMS - Methylomicrobium alcaliphilum 20Z
+SYNONYMS - Methylomicrobium alcaliphilum strain 20Z
+SYNONYMS - Methylomicrobium alcaliphilum str. 20Z
+STRAIN-NAME - 20Z
+//
+UNIQUE-ID - TAX-4577
+TYPES - TAX-4575
+COMMON-NAME - Zea mays
+SYNONYMS - Zea mays var. japonica
+SYNONYMS - maize <Zea mays>
+SYNONYMS - maize
+//
+UNIQUE-ID - TAX-4751
+TYPES - TAX-33154
+COMMON-NAME - Fungi
+//
+UNIQUE-ID - TAX-10116
+TYPES - TAX-10114
+COMMON-NAME - Rattus norvegicus
+SYNONYMS - zitter rats
+SYNONYMS - Wistar rats
+SYNONYMS - Sprague-Dawley rat
+SYNONYMS - Rattus sp. strain Wistar
+SYNONYMS - Rattus PC12 clone IS
+SYNONYMS - rats <Rattus norvegicus>
+SYNONYMS - rats
+SYNONYMS - rat <Rattus norvegicus>
+SYNONYMS - rat
+SYNONYMS - Norway rat
+SYNONYMS - laboratory rat
+SYNONYMS - Buffalo rat
+SYNONYMS - brown rat
+//
+UNIQUE-ID - TAX-6231
+TYPES - TAX-1206794
+COMMON-NAME - Nematoda
+SYNONYMS - roundworms
+SYNONYMS - roundworm <Nematoda>
+SYNONYMS - roundworm
+SYNONYMS - nematodes <common name>
+SYNONYMS - nematodes
+SYNONYMS - nematode
+SYNONYMS - Nemata
+//
+UNIQUE-ID - CCO-RGH-ER-LUM
+TYPES - CCO-ER-LUM
+COMMON-NAME - rough endoplasmic reticulum lumen
+SYNONYMS - rough ER lumen
+//
+UNIQUE-ID - TAX-7227
+TYPES - TAX-32351
+COMMON-NAME - Drosophila melanogaster
+SYNONYMS - Sophophora melanogaster
+SYNONYMS - fruit fly <Drosophila melanogaster>
+SYNONYMS - fruit fly
+SYNONYMS - Diptera sp. DNAS-2A9-224646
+//
+UNIQUE-ID - CCO-THY-LUM-CYA
+TYPES - CCO-THY-LUM
+COMMON-NAME - thylakoid lumen (sensu Cyanobacteria)
+//
+UNIQUE-ID - TAX-40222
+TYPES - TAX-135616
+COMMON-NAME - Methylophaga
+SYNONYMS - Methyliphaga
+//
+UNIQUE-ID - TAX-1581
+TYPES - TAX-1578
+COMMON-NAME - Lactobacillus buchneri
+SYNONYMS - Ulvina buchneri
+SYNONYMS - Lactobacterium buchneri
+SYNONYMS - Bacterium buchneri
+SYNONYMS - Bacillus Buchneri
+//
+UNIQUE-ID - TAX-1246
+TYPES - TAX-1243
+COMMON-NAME - Leuconostoc lactis
+SYNONYMS - Leuconostoc sp. R-21065
+SYNONYMS - Leuconostoc sp. LMG 22650
+SYNONYMS - Leuconostoc argentinum
+//
+UNIQUE-ID - TAX-7460
+TYPES - TAX-7459
+COMMON-NAME - Apis mellifera
+SYNONYMS - Western honey bee
+SYNONYMS - honey bee
+SYNONYMS - honeybee
+SYNONYMS - European honey bee
+SYNONYMS - bee <Apis mellifera>
+SYNONYMS - bee
+SYNONYMS - Apis mellifica
+//
+UNIQUE-ID - TAX-210
+TYPES - TAX-209
+COMMON-NAME - Helicobacter pylori
+SYNONYMS - Helicobacter nemestrinae
+SYNONYMS - Campylobacter pylori
+SYNONYMS - Campylobacter pylori subsp. pylori
+SYNONYMS - Campylobacter pyloridis
+//
+UNIQUE-ID - TAX-1398
+TYPES - TAX-1386
+COMMON-NAME - Bacillus coagulans
+SYNONYMS - Lactobacillus sp. T4
+SYNONYMS - Bacillus sp. NCIM 2323
+//
+UNIQUE-ID - TAX-1224
+TYPES - TAX-2
+COMMON-NAME - Proteobacteria
+SYNONYMS - purple photosynthetic bacteria
+SYNONYMS - purple photosynthetic bacteria and relatives
+SYNONYMS - purple non-sulfur bacteria
+SYNONYMS - purple bacteria
+SYNONYMS - purple bacteria and relatives
+SYNONYMS - Alphaproteobacteriota
+SYNONYMS - Alphaproteobacteraeota
+//
+UNIQUE-ID - TAX-6252
+TYPES - TAX-6251
+COMMON-NAME - Ascaris lumbricoides
+SYNONYMS - common roundworm
+//
+UNIQUE-ID - TAX-1239
+TYPES - TAX-1783272
+COMMON-NAME - Firmicutes
+SYNONYMS - low G+C Gram-positive bacteria
+SYNONYMS - low GC Gram+
+SYNONYMS - Low G+C firmicutes
+SYNONYMS - Firmacutes
+SYNONYMS - Clostridium group firmicutes
+SYNONYMS - clostridial firmicutes
+SYNONYMS - Bacillus/Clostridium group
+SYNONYMS - Bacillota
+SYNONYMS - Bacillaeota
+//
+UNIQUE-ID - TAX-1681
+TYPES - TAX-1678
+COMMON-NAME - Bifidobacterium bifidum
+SYNONYMS - Tissieria bifida
+SYNONYMS - Nocardia bifida
+SYNONYMS - Lactobacillus parabifidus
+SYNONYMS - Lactobacillus bifidus type II
+SYNONYMS - Cohnistreptothrix bifidus
+SYNONYMS - Bifidibacterium bifidum
+SYNONYMS - Bacteroides bifidus
+SYNONYMS - Bacterium bifidum
+SYNONYMS - Bacillus bifidus
+SYNONYMS - Bacillus bifidus communis
+SYNONYMS - Actinomyces parabifidus
+SYNONYMS - Actinomyces bifidus
+SYNONYMS - Actinobacterium bifidum
+//
+UNIQUE-ID - TAX-1156966
+TYPES - TAX-461281
+COMMON-NAME - Ogataea methanolica
+SYNONYMS - Pichia methanolica
+SYNONYMS - Pichia cellobiosa
+//
+UNIQUE-ID - TAX-7010
+TYPES - TAX-7008
+COMMON-NAME - Schistocerca gregaria
+SYNONYMS - Locusta gregaria
+SYNONYMS - desert locust
+//
+UNIQUE-ID - ORG-6238
+TYPES - TAX-287
+COMMON-NAME - Pseudomonas aeruginosa
+SYNONYMS - Pseudomonas aeruginosa O12
+STRAIN-NAME - O12
+//
+UNIQUE-ID - CCO-VAC-LUM
+TYPES - CCO-SPACE
+COMMON-NAME - vacuolar lumen
+//
+UNIQUE-ID - CCO-MIT-LUM
+TYPES - CCO-SPACE
+COMMON-NAME - mitochondrial lumen
+//
+UNIQUE-ID - CCO-CW-BAC-POS
+TYPES - CCO-CW-BAC
+COMMON-NAME - cell wall (sensu Gram-positive Bacteria)
+//
+UNIQUE-ID - TAX-33965
+TYPES - TAX-1245
+COMMON-NAME - Leuconostoc mesenteroides
+SYNONYMS - Leuconostoc mesenteroides subsp. cremoris
+SYNONYMS - Leuconostoc mesenteroides (subsp. cremoris)
+SYNONYMS - Leuconostoc mesenteroides cremoris
+SYNONYMS - Leuconostoc cremoris
+SYNONYMS - Betacoccus cremoris (X form)
+//
+UNIQUE-ID - TAX-134
+TYPES - TAX-133
+COMMON-NAME - Methylocystis parvus
+//
+UNIQUE-ID - TAX-272634
+TYPES - TAX-2104
+COMMON-NAME - Mycoplasma pneumoniae
+SYNONYMS - Mycoplasma pneumoniae M129
+SYNONYMS - Mycoplasma pneumoniae str. M129
+SYNONYMS - Mycoplasma pneumoniae strain M129
+SYNONYMS - Mycoplasma pneumoniae ATCC 29342
+STRAIN-NAME - M129
+//
+UNIQUE-ID - TAX-1148
+TYPES - TAX-2640012
+COMMON-NAME - Synechocystis sp. PCC 6803
+SYNONYMS - Synechocystis sp. (strain PCC 6803)
+SYNONYMS - Synechocystis sp. (PCC 6803)
+SYNONYMS - Synechocystis sp. PCC 6803 B
+SYNONYMS - Synechocystis sp. PCC 6803 A
+SYNONYMS - Synechocystis sp. ATCC 27184
+SYNONYMS - Synechocystis sp. (ATCC 27184)
+SYNONYMS - Aphanocapsa sp. (strain N-1)
+SYNONYMS - Aphanocapsa sp. N-1
+//
+UNIQUE-ID - CCO-LYS-LUM
+TYPES - CCO-SPACE
+COMMON-NAME - lysosome lumen
+//
+UNIQUE-ID - TAX-1613
+TYPES - TAX-2742598
+COMMON-NAME - Limosilactobacillus fermentum
+SYNONYMS - Lactobacterium fermentum
+SYNONYMS - Lactobacillus sp. NCIM 2165
+SYNONYMS - Lactobacillus fermentum
+SYNONYMS - Lactobacillus cellobiosus
+SYNONYMS - Bacillus d
+SYNONYMS - Bacillus casei d
+//
+UNIQUE-ID - TAX-39770
+TYPES - TAX-429
+COMMON-NAME - Methylobacter whittenburyi
+SYNONYMS - Methylococcus whittenburyi
+SYNONYMS - Methylococcus vinelandii
+SYNONYMS - "Methylobacter capsulatus" (sic)
+//
+UNIQUE-ID - ORG-6178
+TYPES - TAX-2234
+COMMON-NAME - Archaeoglobus fulgidus
+SYNONYMS - Archaeoglobus fulgidus 7324
+SYNONYMS - Archaeoglobus fulgidus strain 7324
+SYNONYMS - Archaeoglobus fulgidus DSM 8774
+STRAIN-NAME - 7324
+//
+UNIQUE-ID - TAX-62319
+TYPES - TAX-2249
+COMMON-NAME - Halococcus saccharolyticus
+//
+UNIQUE-ID - TAX-2336
+TYPES - TAX-2335
+COMMON-NAME - Thermotoga maritima
+COMMENT - |FRAME:TAX-2336| is a strictly anaerobic hyperthermophilic bacterium that grows at up to 90&deg;C by carbohydrate fermentation.
+//
+UNIQUE-ID - TAX-29058
+TYPES - TAX-7112
+COMMON-NAME - Helicoverpa armigera
+SYNONYMS - tobacco budworm <Helicoverpa armigera>
+SYNONYMS - tobacco budworm
+SYNONYMS - scarce bordered straw
+SYNONYMS - Heliothis (Helicoverpa) armigera
+SYNONYMS - Heliothis armigera
+SYNONYMS - cotton bollworm
+SYNONYMS - corn ear worm
+SYNONYMS - American bollworm
+//
+UNIQUE-ID - TAX-4550
+TYPES - TAX-4549
+COMMON-NAME - Secale cereale
+SYNONYMS - Secale cereale subsp. cereale
+SYNONYMS - rye
+//
+UNIQUE-ID - TAX-6550
+TYPES - TAX-6548
+COMMON-NAME - Mytilus edulis
+SYNONYMS - edible mussel
+SYNONYMS - blue mussel
+//
+UNIQUE-ID - TAX-6253
+TYPES - TAX-6251
+COMMON-NAME - Ascaris suum
+SYNONYMS - pig roundworm
+//
+UNIQUE-ID - TAX-426
+TYPES - TAX-425
+COMMON-NAME - Methylosinus trichosporium
+//
+UNIQUE-ID - TAX-3916
+TYPES - TAX-157791
+COMMON-NAME - Vigna radiata
+SYNONYMS - Vigna radiata var. radiata
+SYNONYMS - Phaseolus radiatus
+SYNONYMS - Phaseolus aureus
+SYNONYMS - mung bean <Vigna radiata var. radiata>
+SYNONYMS - mung bean
+SYNONYMS - green gram
+SYNONYMS - golden gram
+//
+UNIQUE-ID - CCO-MEMBRANE
+TYPES - CCO
+COMMON-NAME - membrane
+//
+UNIQUE-ID - TAX-4641
+TYPES - TAX-4640
+COMMON-NAME - Musa acuminata
+SYNONYMS - sweet banana
+SYNONYMS - Musa sp. Pisang lilin
+SYNONYMS - Musa nana
+SYNONYMS - Musa acuminata AA Group
+SYNONYMS - Musa AA Group
+SYNONYMS - dwarf banana
+SYNONYMS - dessert bananas
+SYNONYMS - banana <Musa acuminata>
+SYNONYMS - banana
+//
+UNIQUE-ID - TAX-877183
+TYPES - TAX-33630
+COMMON-NAME - Colpodellida
+SYNONYMS - Chromerida
+//
+UNIQUE-ID - TAX-2825
+TYPES - TAX-2696291
+COMMON-NAME - Chrysophyceae
+SYNONYMS - golden algae <genbank common name>
+SYNONYMS - golden algae
+SYNONYMS - chrysophytes
+SYNONYMS - Chrysophyta
+SYNONYMS - chrysomonads
+SYNONYMS - Chrysomonadida
+SYNONYMS - Chrysomonada
+//
+UNIQUE-ID - TAX-106592
+TYPES - TAX-106591
+COMMON-NAME - Ensifer adhaerens
+SYNONYMS - Sinorhizobium sp. J1(2011)
+SYNONYMS - Sinorhizobium morelense
+SYNONYMS - Sinorhizobium adhaerens
+SYNONYMS - Ensifer morelensis
+SYNONYMS - Ensifer morelense
+//
+UNIQUE-ID - TAX-169679
+TYPES - TAX-1485
+COMMON-NAME - Clostridium saccharobutylicum
+//
+UNIQUE-ID - TAX-265072
+TYPES - TAX-405
+COMMON-NAME - Methylobacillus flagellatus
+SYNONYMS - Methylobacillus flagellatus KT
+SYNONYMS - Methylobacillus flagellatus str. KT
+SYNONYMS - Methylobacillus flagellatus strain KT
+STRAIN-NAME - KT
+//
+UNIQUE-ID - TAX-6192
+TYPES - TAX-6191
+COMMON-NAME - Fasciola hepatica
+SYNONYMS - liver fluke
+//
+UNIQUE-ID - TAX-203691
+TYPES - TAX-2
+COMMON-NAME - Spirochaetes <Spirochaetes>
+SYNONYMS - Spirochaetota
+SYNONYMS - Spirochaetes
+SYNONYMS - Spirochaetae
+SYNONYMS - Spirochaetaeota
+//
+UNIQUE-ID - TAX-3710
+TYPES - TAX-3705
+COMMON-NAME - Brassica nigra
+SYNONYMS - black mustard
+//
+UNIQUE-ID - CCO-VES-LUM
+TYPES - CCO-SPACE
+COMMON-NAME - vesicle lumen
+//
+UNIQUE-ID - TAX-43687
+TYPES - TAX-41980
+COMMON-NAME - Metallosphaera sedula
+SYNONYMS - Sulfolobus sp. IFO 15160
+SYNONYMS - Metallosphaera sp. TA-2
+//
+UNIQUE-ID - TAX-2261
+TYPES - TAX-2260
+COMMON-NAME - Pyrococcus furiosus
+COMMENT - A hyperthermophilic anaerobic heterotroph that grows optimally at 100 &deg;C by the fermentation of carbohydrates and peptides through the |FRAME: P341-PWY| pathway, to produce acetate, alanine, |FRAME: HYDROGEN-MOLECULE| and |FRAME: CARBON-DIOXIDE|. In the presence of elemental sulfur, |FRAME: HS| is formed instead of |FRAME: HYDROGEN-MOLECULE|.
+//
+UNIQUE-ID - TAX-183988
+TYPES - TAX-28890
+COMMON-NAME - Methanopyri
+//
+UNIQUE-ID - CCO-CHL-THY-LUM
+TYPES - CCO-THY-LUM
+COMMON-NAME - chloroplast thylakoid lumen
+//
+UNIQUE-ID - TAX-3055
+TYPES - TAX-3052
+COMMON-NAME - Chlamydomonas reinhardtii
+SYNONYMS - Chlamydomonas smithii
+SYNONYMS - Chlamydomonas reinhardtii strain CC-1373
+//
+UNIQUE-ID - CCO-PERI-BAC
+TYPES - CCO-PERIPLASM
+COMMON-NAME - periplasm (sensu Gram-negative Bacteria)
+SYNONYMS - periplasm (sensu Gram-negative Bacteria)
+//
+UNIQUE-ID - TAX-68459
+TYPES - TAX-5739
+COMMON-NAME - Giardiinae
+//
+UNIQUE-ID - TAX-59689
+TYPES - TAX-3701
+COMMON-NAME - Arabidopsis lyrata
+SYNONYMS - lyrate rockcress
+//
+UNIQUE-ID - TAX-7159
+TYPES - TAX-53541
+COMMON-NAME - Aedes aegypti
+SYNONYMS - yellow fever mosquito
+SYNONYMS - Stegomyia aegypti
+SYNONYMS - Aedes (Stegomyia) aegypti
+//
+UNIQUE-ID - TAX-203682
+TYPES - TAX-1783257
+COMMON-NAME - Planctomycetes <Planctomycetes>
+SYNONYMS - Planctomycetota
+SYNONYMS - Planctomycetes
+SYNONYMS - Planctomycetaeota
+//
+UNIQUE-ID - CCO-GOLGI-LUM
+TYPES - CCO-SPACE
+COMMON-NAME - Golgi lumen
+//
+UNIQUE-ID - TAX-200795
+TYPES - TAX-1783272
+COMMON-NAME - Chloroflexi <Chloroflexi>
+SYNONYMS - Thermomicrobiota
+SYNONYMS - Thermomicrobia <Chloroflexi>
+SYNONYMS - Thermomicrobia
+SYNONYMS - Thermomicrobaeota
+SYNONYMS - green nonsulfur bacteria
+SYNONYMS - green non-sulfur bacteria
+SYNONYMS - Chloroflexota
+SYNONYMS - Chloroflexi
+SYNONYMS - Chloroflexaeota
+//
+UNIQUE-ID - CCO-CYTOSOL
+TYPES - CCO-SPACE
+COMMON-NAME - cytosol
+//
+UNIQUE-ID - TAX-9606
+TYPES - TAX-9605
+COMMON-NAME - Homo sapiens
+SYNONYMS - man
+SYNONYMS - human
+COMMENT - The HumanCyc project is described at URL  http://HumanCyc.org/
+//
+UNIQUE-ID - TAX-1582
+TYPES - TAX-655183
+COMMON-NAME - Lactobacillus casei
+SYNONYMS - Streptobacterium casei
+SYNONYMS - Lactobacterium casei
+SYNONYMS - Lactobacillus sp. T2
+SYNONYMS - Lactobacillus sp. T20
+SYNONYMS - Lactobacillus sp. NCIM 2732
+SYNONYMS - Lactobacillus sp. NCIM 2363
+SYNONYMS - Lactobacillus casei subsp. casei
+SYNONYMS - Caseobacterium vulgare
+SYNONYMS - Bacterium casei a
+SYNONYMS - Bacillus casei a
+SYNONYMS - Bacillus a
+//
+UNIQUE-ID - TAX-7004
+TYPES - TAX-7003
+COMMON-NAME - Locusta migratoria
+SYNONYMS - migratory locust
+//
+UNIQUE-ID - TAX-2830
+TYPES - TAX-2608109
+COMMON-NAME - Haptophyta
+SYNONYMS - Prymnesiophyta
+SYNONYMS - Haptophyceae
+SYNONYMS - coccolithophorids
+//
+UNIQUE-ID - TAX-1783270
+TYPES - TAX-2
+COMMON-NAME - FCB group
+SYNONYMS - Fibrobacteres-Chlorobi-Bacteroidetes superphylum
+//
+UNIQUE-ID - TAX-183963
+TYPES - TAX-2290931
+COMMON-NAME - Halobacteria
+//
+UNIQUE-ID - TAX-79929
+TYPES - TAX-145263
+COMMON-NAME - Methanothermobacter marburgensis
+SYNONYMS - Methanothermobacter marburgensis str. Marburg
+SYNONYMS - Methanothermobacter marburgensis strain Marburg
+SYNONYMS - Methanobacterium thermoautotrophicum str. Marburg
+SYNONYMS - Methanobacterium thermoautotrophicum (strain Marburg / DSM 2133)
+STRAIN-NAME - Marburg
+//
+UNIQUE-ID - TAX-3888
+TYPES - TAX-3887
+COMMON-NAME - Pisum sativum
+SYNONYMS - peas
+SYNONYMS - pea
+SYNONYMS - garden pea
+//
+UNIQUE-ID - ORG-6222
+TYPES - TAX-84
+COMMON-NAME - Hyphomicrobium methylovorum
+SYNONYMS - Hyphomicrobium methylovorum GM2
+STRAIN-NAME - GM2
+//
+UNIQUE-ID - TAX-29469
+TYPES - TAX-133
+COMMON-NAME - Methylocystis minimus
+SYNONYMS - Methylocystis minimus
+//
+UNIQUE-ID - TAX-3745
+TYPES - TAX-3744
+COMMON-NAME - Rosaceae
+SYNONYMS - rose family
+SYNONYMS - Malaceae
+//
+UNIQUE-ID - TAX-200783
+TYPES - TAX-2
+COMMON-NAME - Aquificae <phylum>
+SYNONYMS - Aquificaeota
+SYNONYMS - Aquificae
+//
+UNIQUE-ID - TAX-45353
+TYPES - TAX-5475
+COMMON-NAME - [Candida] methylica
+SYNONYMS - Candida methylica
+//
+UNIQUE-ID - TAX-3981
+TYPES - TAX-3980
+COMMON-NAME - Hevea brasiliensis
+SYNONYMS - siringa
+SYNONYMS - rubber tree
+SYNONYMS - Para rubber tree
+SYNONYMS - jebe
+//
+UNIQUE-ID - TAX-302911
+TYPES - TAX-28025
+COMMON-NAME - Bifidobacterium animalis
+SYNONYMS - Bifidobacterium animalis subsp. lactis
+SYNONYMS - Bifidobacterium lactis
+//
+UNIQUE-ID - TAX-870730
+TYPES - TAX-461281
+COMMON-NAME - Ogataea angusta
+SYNONYMS - Pichia angusta
+SYNONYMS - Hansenula angusta
+//
+UNIQUE-ID - TAX-3039
+TYPES - TAX-3038
+COMMON-NAME - Euglena gracilis
+SYNONYMS - Euglena gracilis bacillaris
+//
+UNIQUE-ID - TAX-142182
+TYPES - TAX-1783270
+COMMON-NAME - Gemmatimonadetes <phylum>
+SYNONYMS - Gemmatimonadota
+SYNONYMS - Gemmatimonadetes
+SYNONYMS - Gemmatimonadaeota
+SYNONYMS - candidate division BD
+//
+UNIQUE-ID - TAX-6157
+TYPES - TAX-1206795
+COMMON-NAME - Platyhelminthes
+SYNONYMS - flatworms <genbank common name>
+SYNONYMS - flatworms
+SYNONYMS - flatworm
+//
+UNIQUE-ID - TAX-58024
+TYPES - TAX-78536
+COMMON-NAME - Spermatophyta
+SYNONYMS - seed plants <common name>
+SYNONYMS - seed plants
+//
+UNIQUE-ID - TAX-38410
+TYPES - TAX-2696291
+COMMON-NAME - Raphidophyceae
+SYNONYMS - raphidophytes
+SYNONYMS - Raphidophyta
+SYNONYMS - Chloromonadophyceae
+//
+UNIQUE-ID - TAX-33154
+TYPES - TAX-2759
+COMMON-NAME - Opisthokonta
+SYNONYMS - opisthokonts
+SYNONYMS - Fungi/Metazoa group
+//
+UNIQUE-ID - TAX-44386
+TYPES - TAX-34622
+COMMON-NAME - Haemaphysalis longicornis
+SYNONYMS - longhorned tick
+//
+UNIQUE-ID - TAX-39773
+TYPES - TAX-403
+COMMON-NAME - Methylomicrobium
+//
+UNIQUE-ID - TAX-405
+TYPES - TAX-404
+COMMON-NAME - Methylobacillus flagellatus
+SYNONYMS - Methylovorus sp. L1B
+//
+UNIQUE-ID - CCO-VESICLE
+TYPES - CCO-MEM-ORG
+COMMON-NAME - vesicle
+SYNONYMS - cytoplasmic membrane-bounded vesicle
+//
+UNIQUE-ID - TAX-1249
+TYPES - TAX-46255
+COMMON-NAME - Weissella paramesenteroides
+SYNONYMS - Leuconostoc paramesenteroides
+//
+UNIQUE-ID - TAX-6447
+TYPES - TAX-1206795
+COMMON-NAME - Mollusca
+SYNONYMS - mollusks
+SYNONYMS - molluscs <common name>
+SYNONYMS - molluscs
+//
+UNIQUE-ID - TAX-272630
+TYPES - TAX-408
+COMMON-NAME - Methylorubrum extorquens
+SYNONYMS - Methylorubrum extorquens AM1
+SYNONYMS - Pseudomonas sp. AM1
+SYNONYMS - Methylobacterium extorquens AM1
+STRAIN-NAME - AM1
+//
+UNIQUE-ID - TAX-4565
+TYPES - TAX-4564
+COMMON-NAME - Triticum aestivum
+SYNONYMS - wheat
+SYNONYMS - Triticum vulgare
+SYNONYMS - Triticum aestivum subsp. aestivum
+SYNONYMS - common wheat
+SYNONYMS - Canadian hard winter wheat
+SYNONYMS - bread wheat
+//
+UNIQUE-ID - TAX-1783257
+TYPES - TAX-2
+COMMON-NAME - PVC group
+SYNONYMS - Chlamydiales/Verrucomicrobia group
+SYNONYMS - Chlamydiae/Verrucomicrobia group
+//
+UNIQUE-ID - TAX-2870
+TYPES - TAX-569578
+COMMON-NAME - Phaeophyceae
+SYNONYMS - Phaeophyta
+SYNONYMS - Fucophyceae
+SYNONYMS - Chromophycota
+SYNONYMS - brown algae <genbank common name>
+SYNONYMS - brown algae
+//
+UNIQUE-ID - TAX-183967
+TYPES - TAX-2283796
+COMMON-NAME - Thermoplasmata
+//
+UNIQUE-ID - TAX-2157
+TYPES - TAX-131567
+COMMON-NAME - Archaea
+SYNONYMS - Metabacteria
+SYNONYMS - Mendosicutes
+SYNONYMS - Archaebacteria
+//
+UNIQUE-ID - TAX-183924
+TYPES - TAX-28889
+COMMON-NAME - Thermoprotei
+SYNONYMS - Thermoprotea
+SYNONYMS - Crenarchaeota <Thermoprotei>
+SYNONYMS - Crenarchaeota
+//
+UNIQUE-ID - TAX-2287
+TYPES - TAX-2100760
+COMMON-NAME - Saccharolobus solfataricus
+SYNONYMS - Sulfolobus solfataricus
+//
+UNIQUE-ID - TAX-33208
+TYPES - TAX-33154
+COMMON-NAME - Metazoa
+SYNONYMS - multicellular animals
+SYNONYMS - metazoans
+SYNONYMS - Animalia
+//
+UNIQUE-ID - TAX-546
+TYPES - TAX-1344959
+COMMON-NAME - Citrobacter freundii
+SYNONYMS - the Bethesda group of bacteria
+SYNONYMS - the Ballerup group of bacteria
+SYNONYMS - Salmonella hormaechei
+SYNONYMS - Salmonella ballerup
+SYNONYMS - Escherichia freundii
+SYNONYMS - Citrobacter sp. KDS 3
+SYNONYMS - Citrobacter sp. HPC1276
+SYNONYMS - Citrobacter ballerupensis
+SYNONYMS - Bacterium freundii
+//
+UNIQUE-ID - CCO-PLAST-IM-SPC
+TYPES - CCO-SPACE
+COMMON-NAME - plastid intermembrane space
+//
+UNIQUE-ID - TAX-185332
+TYPES - TAX-666
+COMMON-NAME - Vibrio cholerae O37
+SYNONYMS - Vibrio cholerae serogroup O37
+//
+UNIQUE-ID - TAX-1309
+TYPES - TAX-1301
+COMMON-NAME - Streptococcus mutans
+//
+UNIQUE-ID - TAX-53953
+TYPES - TAX-2260
+COMMON-NAME - Pyrococcus horikoshii
+SYNONYMS - Pyrococcus shinkaii
+//
+UNIQUE-ID - TAX-345219
+TYPES - TAX-1398
+COMMON-NAME - Bacillus coagulans
+SYNONYMS - Bacillus coagulans 36D1
+SYNONYMS - Bacillus coagulans strain 36D1
+SYNONYMS - Bacillus coagulans str. 36D1
+STRAIN-NAME - 36D1
+//
+UNIQUE-ID - TAX-229990
+TYPES - TAX-7004
+COMMON-NAME - Locusta migratoria
+SYNONYMS - Locusta migratoria manilensis
+SYNONYMS - Oriental migratory locust
+//
+UNIQUE-ID - TAX-29468
+TYPES - TAX-133
+COMMON-NAME - Methylocystis echinoides
+//
+UNIQUE-ID - TAX-36026
+TYPES - TAX-461281
+COMMON-NAME - Ogataea minuta
+SYNONYMS - Torulopsis methanolovescens
+SYNONYMS - Pichia minuta var. minuta
+SYNONYMS - Pichia minuta
+SYNONYMS - Ogataea minuta var. minuta
+SYNONYMS - Hansenula minuta
+SYNONYMS - Candida methanolovescens
+//
+UNIQUE-ID - TAX-6551
+TYPES - TAX-6548
+COMMON-NAME - Mytilus trossulus
+SYNONYMS - common blue mussel
+SYNONYMS - bay mussel
+//
+UNIQUE-ID - TAX-3988
+TYPES - TAX-3987
+COMMON-NAME - Ricinus communis
+SYNONYMS - Ricinus sanguineus
+SYNONYMS - castor bean
+//
+UNIQUE-ID - TAX-183925
+TYPES - TAX-2283794
+COMMON-NAME - Methanobacteria
+SYNONYMS - Archaeobacteria
+//
+UNIQUE-ID - TAX-4530
+TYPES - TAX-4527
+COMMON-NAME - Oryza sativa
+SYNONYMS - rice
+SYNONYMS - red rice <Oryza sativa>
+SYNONYMS - red rice
+//
+UNIQUE-ID - TAX-544448
+TYPES - TAX-1783272
+COMMON-NAME - Tenericutes
+SYNONYMS - Mollicutota
+SYNONYMS - Mollicutaeota
+//
+UNIQUE-ID - TAX-33682
+TYPES - TAX-2611352
+COMMON-NAME - Euglenozoa
+SYNONYMS - Euglenozoans
+//
