@@ -1,0 +1,12 @@
+database:
+  uri: "neo4j://localhost:7687"
+  neo4j_user: neo4j
+  neo4j_password: neo4j
+
+metacyc:
+  sbml: tests/data/metabolic-reactions.sbml
+  reactions: tests/data/reactions.dat
+  pathways: tests/data/pathways.dat
+  compounds: tests/data/compounds.dat
+  publications: tests/data/pubs.dat
+  classes: tests/data/classes.dat
