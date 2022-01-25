@@ -107,6 +107,7 @@ class Metacyc:
         # Placeholder for missing IDs in the dat files
         self.missing_ids: Dict[str, Set[str]] = {
             "reactions": set(),
+            "atom_mappings": set(),
             "pathways": set(),
             "compounds": set(),
             "publications": set(),
@@ -386,7 +387,7 @@ class Metacyc:
         """
         canonical_id = self._find_rxn_canonical_id(rxn_id, smiles.keys())
         if canonical_id not in smiles:
-            self.missing_ids["reactions"].add(canonical_id)
+            self.missing_ids["atom_mappings"].add(canonical_id)
             return
         props = {"smiles_atom_mapping": smiles[canonical_id]}
         self.db.add_props_to_node("Reaction", "displayName", rxn_id, props)
@@ -820,7 +821,6 @@ class Metacyc:
         )
         if match_canonical_id:
             canonical_id = match_canonical_id.group(0)
-            assert canonical_id in all_ids
             return canonical_id
         else:
             raise ValueError(f"rxn_id has no canonical form: {rxn_id}")
