@@ -2,7 +2,7 @@ import logging
 import re
 from itertools import groupby
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import libsbml
 from metabolike.db.metacyc import MetaDB
@@ -148,6 +148,8 @@ class Metacyc:
             class_dat = self._read_dat_file(self.input_files["classes"])
             self.classes_to_graph(class_dat)
 
+        self._report_missing_ids()
+
     def sbml_to_graph(self, model: libsbml.Model):
         """
         Populate Neo4j database with SBML data.
@@ -256,6 +258,9 @@ class Metacyc:
             A string containing the canonical ID of the reaction.
         """
         canonical_id = self._find_rxn_canonical_id(rxn_id, rxn_dat.keys())
+        if canonical_id not in rxn_dat:
+            self.missing_ids["reactions"].add(canonical_id)
+            return
         lines = rxn_dat[canonical_id]
         props: Dict[str, Union[str, List[str]]] = {"canonical_id": canonical_id}
         for k, v in lines:
@@ -300,7 +305,7 @@ class Metacyc:
             session: The graph database session to use.
         """
         if pw_id not in pw_dat:
-            logger.warning(f"Key {pw_id} not found in pathways.dat file")
+            self.missing_ids["pathways"].add(pw_id)
             return
         lines = pw_dat[pw_id]
         props: Dict[str, Union[str, List[str]]] = {"displayName": pw_id}
@@ -360,7 +365,7 @@ class Metacyc:
             session: The neo4j session.
         """
         if biocyc not in cpd_dat:
-            logger.warning(f"Key {biocyc} not found in compounds.dat file")
+            self.missing_ids["compounds"].add(biocyc)
             return
         lines = cpd_dat[biocyc]
         c_props: Dict[str, Union[str, List[str]]] = {}
@@ -424,7 +429,7 @@ class Metacyc:
             return
         pub_dat_id = "PUB-" + pub_dat_id
         if pub_dat_id not in pub_dat:
-            logger.warning(f"{cit_id} -> {pub_dat_id} not found in pubs.dat file")
+            self.missing_ids["publications"].add(pub_dat_id)
             return
 
         lines = pub_dat[pub_dat_id]
@@ -452,7 +457,7 @@ class Metacyc:
         all_cco = self.db.get_all_nodes("Compartment", "displayName")
         for cco in all_cco:
             if cco not in class_dat:
-                logger.warning(f"No class data for compartment {cco}")
+                self.missing_ids["compartments"].add(cco)
                 continue
             props: Dict[str, Union[str, List[str]]] = {}
             for k, v in class_dat[cco]:
@@ -467,7 +472,7 @@ class Metacyc:
         all_taxon = self.db.get_all_nodes("Taxa", "mcId")
         for taxa in tqdm(all_taxon, desc="Taxon in classes.dat"):
             if taxa not in class_dat:
-                logger.warning(f"No class data for taxa {taxa}")
+                self.missing_ids["taxon"].add(taxa)
                 continue
             props: Dict[str, Union[str, List[str]]] = {}
             for k, v in class_dat[taxa]:
@@ -781,6 +786,11 @@ class Metacyc:
         if prefix:
             d = {k: [f"{prefix}{e}" for e in v] for k, v in d.items()}
         return rxn_id, d
+
+    def _report_missing_ids(self):
+        for datfile, ids in self.missing_ids.items():
+            if ids:
+                logger.warning(f"The following IDs were not found in {datfile}: {ids}")
 
 
 def _snake_to_camel(s: str, sep: str = "-") -> str:
