@@ -12,6 +12,7 @@ class DatabaseConfig(BaseModel):
 class MetacycConfig(BaseModel):
     sbml: str
     reactions: Optional[str]
+    atom_mapping: Optional[str]
     pathways: Optional[str]
     compounds: Optional[str]
     publications: Optional[str]

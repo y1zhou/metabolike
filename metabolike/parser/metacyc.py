@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import libsbml
+import pandas as pd
 from metabolike.db.metacyc import MetaDB
 from tqdm import tqdm
 
@@ -45,6 +46,9 @@ class Metacyc:
         reactions: The path to the ``reaction.dat`` file. If given,
             the file will be parsed and extra annotation on ``Reaction``
             nodes will be added.
+        atom_mapping: The path to the ``atom-mappings-smiles.dat`` file. If
+            given, the file will be parsed and chemical reactions in the ``SMILES``
+            format will be added to the ``Reaction`` nodes.
         pathways: The path to the ``pathway.dat`` file. If given,
             the file will be parsed and pathway links will be added to the
             ``Reaction`` nodes.
@@ -76,6 +80,7 @@ class Metacyc:
         neo4j: MetaDB,
         sbml: Union[str, Path],
         reactions: Optional[Union[str, Path]] = None,
+        atom_mapping: Optional[Union[str, Path]] = None,
         pathways: Optional[Union[str, Path]] = None,
         compounds: Optional[Union[str, Path]] = None,
         publications: Optional[Union[str, Path]] = None,
@@ -91,11 +96,13 @@ class Metacyc:
         self.input_files = {
             "sbml": self._validate_path(sbml),
             "reactions": self._validate_path(reactions),
+            "atom_mapping": self._validate_path(atom_mapping),
             "pathways": self._validate_path(pathways),
             "compounds": self._validate_path(compounds),
             "publications": self._validate_path(publications),
             "classes": self._validate_path(classes),
         }
+        logger.info(f"Input files: {self.input_files}")
 
         # Placeholder for missing IDs in the dat files
         self.missing_ids: Dict[str, Set[str]] = {
@@ -124,6 +131,8 @@ class Metacyc:
            reaction balance status, systematic name, comment attributes to
            ``Reaction`` nodes. Also link ``Reaction`` nodes to ``Pathway`` and
            ``Citation`` nodes.
+        #. If ``atom-mappings-smiles.dat`` is given, parse the file and add
+           SMILES_ mappings to ``Reaction`` nodes.
         #. If ``pathways.dat`` is given:
 
            * Add synonyms, types, comments, common names to ``Pathway`` nodes.
@@ -149,6 +158,8 @@ class Metacyc:
 
            * Add common name and synonyms to ``Compartment`` nodes.
            * Add common name, strain name, comment, and synonyms to ``Taxa`` nodes.
+
+        .. _SMILES: https://en.wikipedia.org/wiki/SMILES
         """
         # Read SBML file and set default database name
         doc = self._read_sbml(self.input_files["sbml"])
@@ -162,14 +173,29 @@ class Metacyc:
         self.sbml_to_graph(model)
 
         # Add additional information of reactions to the graph if given
-        if self.input_files["reactions"]:
-            logger.info("Adding additional reaction information to the graph")
-            rxn_dat = self._read_dat_file(self.input_files["reactions"])
-
+        if self.input_files["reactions"] or self.input_files["atom_mapping"]:
             all_rxns = self.db.get_all_nodes("Reaction", "displayName")
-            for rxn in tqdm(all_rxns, desc="reactions.dat file"):
-                self.reaction_to_graph(rxn, rxn_dat)
-                logger.debug(f"Added extra info for reaction {rxn}")
+
+            if self.input_files["reactions"]:
+                logger.info("Adding additional reaction information to the graph")
+                rxn_dat = self._read_dat_file(self.input_files["reactions"])
+
+                for rxn in tqdm(all_rxns, desc="reactions.dat file"):
+                    self.reaction_to_graph(rxn, rxn_dat)
+                    logger.debug(f"Added extra info for reaction {rxn}")
+
+            # SMILES reactions
+            if self.input_files["atom_mapping"]:
+                logger.info("Adding SMILES to reactions")
+                smiles = pd.read_table(
+                    self.input_files["atom_mapping"],
+                    sep="\t",
+                    header=None,
+                    names=["rxn", "smiles"],
+                )
+                smiles: Dict[str, str] = smiles.set_index("rxn").to_dict()["smiles"]
+                for rxn in tqdm(all_rxns, desc="atom_mapping.dat file"):
+                    self.atom_mapping_to_graph(rxn, smiles)
 
         # Read pathways file if given
         if self.input_files["pathways"]:
@@ -314,9 +340,6 @@ class Metacyc:
         Args:
             rxn_id: The *full* reaction ID from the graph database.
             rxn_dat: The reactions.dat file as an attribute-value list.
-
-        Returns:
-            A string containing the canonical ID of the reaction.
         """
         canonical_id = self._find_rxn_canonical_id(rxn_id, rxn_dat.keys())
         if canonical_id not in rxn_dat:
@@ -353,6 +376,19 @@ class Metacyc:
                 for x in ["REACTION-BALANCE-STATUS", "REACTION-DIRECTION"]
             ],
         )
+        self.db.add_props_to_node("Reaction", "displayName", rxn_id, props)
+
+    def atom_mapping_to_graph(self, rxn_id: str, smiles: Dict[str, str]):
+        """
+        Args:
+            rxn_id: The *full* reaction ID from the graph database.
+            smiles: The reaction ID -> SMILES dictionary from the atom mapping file.
+        """
+        canonical_id = self._find_rxn_canonical_id(rxn_id, smiles.keys())
+        if canonical_id not in smiles:
+            self.missing_ids["reactions"].add(canonical_id)
+            return
+        props = {"smiles_atom_mapping": smiles[canonical_id]}
         self.db.add_props_to_node("Reaction", "displayName", rxn_id, props)
 
     def pathway_to_graph(self, pw_id: str, pw_dat: Dict[str, List[List[str]]]):

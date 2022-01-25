@@ -6,6 +6,7 @@ database:
 metacyc:
   sbml: tests/data/metabolic-reactions.sbml
   reactions: tests/data/reactions.dat
+  atom_mapping: tests/data/atom-mappings-smiles.dat
   pathways: tests/data/pathways.dat
   compounds: tests/data/compounds.dat
   publications: tests/data/pubs.dat
