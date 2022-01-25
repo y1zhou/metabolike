@@ -35,9 +35,40 @@ class Metacyc:
     Converting MetaCyc files to a Neo4j database.
     Documentation on the MetaCyc files and format FAQs can be found at:
 
-    - MetaCyc data files download: https://metacyc.org/downloads.shtml
-    - MetaCyc file formats: http://bioinformatics.ai.sri.com/ptools/flatfile-format.html
-    - SBML FAQ: https://synonym.caltech.edu/documents/faq
+    * MetaCyc data files download: https://metacyc.org/downloads.shtml
+    * MetaCyc file formats: http://bioinformatics.ai.sri.com/ptools/flatfile-format.html
+    * SBML FAQ: https://synonym.caltech.edu/documents/faq
+
+    Args:
+        neo4j: A :class:`.MetaDB` instance.
+        sbml: The path to the MetaCyc SBML file to convert.
+        reactions: The path to the ``reaction.dat`` file. If given,
+            the file will be parsed and extra annotation on ``Reaction``
+            nodes will be added.
+        pathways: The path to the ``pathway.dat`` file. If given,
+            the file will be parsed and pathway links will be added to the
+            ``Reaction`` nodes.
+        compounds: The path to the ``compound.dat`` file. If given, the
+            file will be parsed and annotations on ``Compound`` nodes will
+            be added.
+        publications: The path to the ``publication.dat`` file. If given,
+            the file will be parsed and annotations on ``Citation`` nodes
+            will be added.
+        classes: The path to the ``class.dat`` file. If given, the file
+            will be parsed and annotations on ``Compartment``, ``Taxa``,
+            and ``Compound`` nodes will be added.
+        db_name: The name of the database to create. If None, the ``metaid``
+            attribute of the SBML file is used.
+
+    Attributes:
+        db: A :class:`.MetaDB` instance. In :meth:`.setup`, this is connected
+            to neo4j and used to perform all database operations. Should be
+            closed after use.
+        input_files: A dictionary of the paths to the input ``.dat`` files.
+        missing_ids: A dictionary of sets of IDs that were not found in the
+            input files. This is helpful for collecting IDs that appear to be
+            in one class but are actually in another.
+            :meth:`._report_missing_ids` can be used to print them out.
     """
 
     def __init__(
@@ -51,28 +82,6 @@ class Metacyc:
         classes: Optional[Union[str, Path]] = None,
         db_name: Optional[str] = None,
     ):
-        """
-        Args:
-            neo4j: A :class:`MetaDB` instance.
-            sbml: The path to the MetaCyc SBML file to convert.
-            reactions: The path to the ``reaction.dat`` file. If given,
-                the file will be parsed and extra annotation on ``Reaction``
-                nodes will be added.
-            pathways: The path to the ``pathway.dat`` file. If given,
-                the file will be parsed and pathway links will be added to the
-                ``Reaction`` nodes.
-            compounds: The path to the ``compound.dat`` file. If given, the
-                file will be parsed and annotations on ``Compound`` nodes will
-                be added.
-            publications: The path to the ``publication.dat`` file. If given,
-                the file will be parsed and annotations on ``Citation`` nodes
-                will be added.
-            classes: The path to the ``class.dat`` file. If given, the file
-                will be parsed and annotations on ``Compartment``, ``Taxa``,
-                and ``Compound`` nodes will be added.
-            db_name: The name of the database to create. If None, the ``metaid``
-                attribute of the SBML file is used.
-        """
         # Neo4j driver
         self.db = neo4j
         if db_name:
@@ -83,12 +92,64 @@ class Metacyc:
             "sbml": self._validate_path(sbml),
             "reactions": self._validate_path(reactions),
             "pathways": self._validate_path(pathways),
+            "compounds": self._validate_path(compounds),
             "publications": self._validate_path(publications),
             "classes": self._validate_path(classes),
-            "compounds": self._validate_path(compounds),
+        }
+
+        # Placeholder for missing IDs in the dat files
+        self.missing_ids: Dict[str, Set[str]] = {
+            "reactions": set(),
+            "pathways": set(),
+            "compounds": set(),
+            "publications": set(),
+            "compartments": set(),
+            "taxon": set(),
         }
 
     def setup(self, create_db: bool = True, **kwargs):
+        """Enterpoint for setting up the database.
+
+        The process is as follows:
+
+        #. Parse the SBML file. All parsing errors are logged as warnings.
+        #. If ``db_name`` is not given, use the ``metaid`` attribute of the SBML
+           file to name the database.
+        #. Create the database and constraints.
+        #. Feed the SBML file into the database. This will populate
+           ``Compartment``, ``Reaction``, ``Compound``, ``GeneProduct``,
+           ``EntitySet``, ``Complex``, and ``RDF`` nodes.
+        #. If ``reactions.dat`` is given, parse the file and add standard Gibbs
+           free energy, standard reduction potential, reaction direction,
+           reaction balance status, systematic name, comment attributes to
+           ``Reaction`` nodes. Also link ``Reaction`` nodes to ``Pathway`` and
+           ``Citation`` nodes.
+        #. If ``pathways.dat`` is given:
+
+           * Add synonyms, types, comments, common names to ``Pathway`` nodes.
+           * Link ``Pathway`` nodes to super-pathway ``Pathway`` and taxonomy
+             ``Taxa`` nodes.
+           * Link ``Reaction`` nodes within the pathway with
+             ``isPrecedingEvent`` relationships.
+           * Link ``Pathway`` nodes with their rate limiting steps
+             (``Reaction`` nodes).
+           * Link ``Pathway`` nodes with primary reactant and product
+             ``Compound`` nodes.
+           * For ``Reaction`` nodes, add ``isPrimary[Reactant|Product]InPathway``
+             labels in their links to ``Compound`` nodes.
+
+        #. If ``compounds.dat`` is given, parse the file and add standard Gibbs
+           free energy, logP, molecular weight, monoisotopic molecular weight,
+           polar surface area, pKa {1,2,3}, comment, and synonyms to ``Compound``
+           nodes. Also add SMILES and INCHI strings to related ``RDF`` nodes, and
+           link the ``Compound`` nodes to ``Citation`` nodes.
+        #. If ``pubs.dat`` is given, parse the file and add DOI, PUBMED, MEDLINE IDs,
+           title, source, year, URL, and ``REFERENT-FRAME`` to ``Citation`` nodes.
+        #. If ``classes.dat`` is given, parse the file and:
+
+           * Add common name and synonyms to ``Compartment`` nodes.
+           * Add common name, strain name, comment, and synonyms to ``Taxa`` nodes.
+        """
         # Read SBML file and set default database name
         doc = self._read_sbml(self.input_files["sbml"])
         model: libsbml.Model = doc.getModel()
@@ -154,7 +215,7 @@ class Metacyc:
         """
         Populate Neo4j database with SBML data.
 
-        Nodes are created for each SBML element using `MERGE` statements:
+        Nodes are created for each SBML element using ``MERGE`` statements:
         https://neo4j.com/docs/cypher-manual/current/clauses/merge/#merge-merge-with-on-create
         """
         # Compartments
@@ -412,15 +473,23 @@ class Metacyc:
         self.db.add_props_to_compound(cpd, c_props, rdf_props)
 
     def citation_to_graph(self, cit_id: str, pub_dat: Dict[str, List[List[str]]]):
-        # TODO: deal with evidence frames
-        # Evidence frames are in the form of 10066805:EV-EXP-IDA:3354997111:hartmut,
-        # where the fields are separated by colons. The first field is the
-        # citation ID, the second is the evidence type (in classes.dat),
-        # the third is not documented, and the fourth is the curator's name.
-        # In most cases the citation ID should match:
-        # ^PUB-[A-Z0-9]+$
-        # with a few exceptions containing double dashes, e.g. PUB--8
-        # and some dashes within author names, e.g. PUB-CHIH-CHING95
+        """Annotate a citation node with data from the publication.dat file.
+
+        If there are multiple fields in the given ``cit_id``, then the fields are
+        separated by colons. The first field is the citation ID, the second is the
+        evidence type (in classes.dat), the third is not documented, and the
+        fourth is the curator's name.
+
+        In most cases the citation ID should match: ``PUB-[A-Z0-9]+$``,
+        with a few exceptions containing double dashes, e.g. ``PUB--8``,
+        or some dashes within author names, e.g. ``PUB-CHIH-CHING95``.
+
+        Args:
+            cit_id: The citation ``mcId`` property.
+            pub_dat: The publication.dat data.
+        """
+        # TODO: deal with evidence frames. Evidence frames are in the form of
+        # 10066805:EV-EXP-IDA:3354997111:hartmut
         pub_dat_id = re.sub(r"[\[\]\s,']", "", cit_id.split(":")[0].upper())
         pub_dat_id = re.sub(r"-(\d+)", r"\1", pub_dat_id)
         if pub_dat_id == "BOREJSZA-WYSOCKI94":
@@ -453,6 +522,14 @@ class Metacyc:
         self.db.add_props_to_node("Citation", "mcId", cit_id, props)
 
     def classes_to_graph(self, class_dat: Dict[str, List[List[str]]]):
+        """Parse the classes.dat file.
+
+        Add common name and synonyms to ``Compartment`` nodes. Add common name,
+        strain name, comment, and synonyms to ``Taxa`` nodes.
+
+        Args:
+            class_dat: The classes.dat data.
+        """
         # Common names for cell components
         all_cco = self.db.get_all_nodes("Compartment", "displayName")
         for cco in all_cco:
@@ -525,7 +602,7 @@ class Metacyc:
 
         Args:
             node_label: The label of the SBML node to annotate. Should be one
-                of the labels defined in `NODE_LABELS`.
+                of the labels defined in ``NODE_LABELS``.
             mcid: The MetaCyc ID of the SBML node to annotate.
             cvterm: The CVTerm that contains information to add to the RDF node.
         """
@@ -574,19 +651,19 @@ class Metacyc:
     ):
         """
         Add gene products to a reaction. When the added node is FbcAnd or FbcOr,
-        recursively add the children. This means a custom `mcId` is constructed
-        for the `Complex` and `EntitySet` nodes corresponding to the `FbcAnd`
-        and `FbcOr` nodes, respectively.
+        recursively add the children. This means a custom ``mcId`` is constructed
+        for the ``Complex`` and ``EntitySet`` nodes corresponding to the ``FbcAnd``
+        and ``FbcOr`` nodes, respectively.
 
         Args:
             node: The GeneProductAssociation child node to add.
             source_id: The MetaCyc ID of the source node. This should be the
-                MetaCyc ID of the `Reaction` node
+                MetaCyc ID of the ``Reaction`` node
             source_label: The label of the source node.
-            edge_type: The type of edge to add. Should be one of `hasGeneProduct`,
-                `hasComponent`, or `hasMember`.
+            edge_type: The type of edge to add. Should be one of ``hasGeneProduct``,
+                ``hasComponent``, or ``hasMember``.
             node_index: The index of the current node. This is used to construct
-                the `mcId` of the `Complex` and `EntitySet` nodes.
+                the ``mcId`` of the ``Complex`` and ``EntitySet`` nodes.
         """
         # If there's no nested association, add the node directly
         if isinstance(node, libsbml.GeneProductRef):
@@ -691,8 +768,8 @@ class Metacyc:
         This helper function extracts the leading part from the full ID.
 
         Args:
-            rxn_id: The MetaCyc ID of the reaction. all_ids: All UNIQUE-IDs in
-            the reactions.dat file.
+            rxn_id: The MetaCyc ID of the reaction.
+            all_ids: All UNIQUE-IDs in the reactions.dat file.
 
         Returns:
             The canonical ID for the reaction.
