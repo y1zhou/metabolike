@@ -9,6 +9,7 @@ import yaml
 
 from metabolike.config import Config
 from metabolike.db.metacyc import MetaDB
+from metabolike.parser.brenda import parse_brenda
 from metabolike.parser.metacyc import Metacyc
 
 logging.basicConfig(
@@ -53,8 +54,13 @@ def setup(
     db = MetaDB(**conf.database.dict())
     meta = Metacyc(db, **conf.metacyc.dict(), db_name=database)
 
-    logger.info("Setting up database")
+    logger.info("Setting up database using MetaCyc data")
     meta.setup(create_db=create_db, force=drop_if_exists)
+
+    if conf.brenda:
+        logger.info("Reading BRENDA text file")
+        brenda = parse_brenda(conf.brenda.brenda_file)
+
     meta.db.close()
 
 
