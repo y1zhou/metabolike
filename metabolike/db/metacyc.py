@@ -177,10 +177,8 @@ class MetaDB(BaseDB):
         return [n["prop"] for n in res]
 
     def get_all_compounds(self) -> List[Tuple[str, str]]:
-        """Fetch all ``Compound`` nodes.
-
-        All Compound node with RDF have BioCyc IDs.
-        The ``META:`` prefix in BioCyc IDs need to be stripped
+        """
+        Fetch all ``Compound`` nodes. All Compound node with RDF have BioCyc IDs.
         """
         res = self.read(
             """
@@ -188,7 +186,7 @@ class MetaDB(BaseDB):
             RETURN DISTINCT c.displayName, r.Biocyc;
             """
         )  # TODO: 38 POLYMER nodes don't have BioCyc IDs
-        return [(cpd["c.displayName"], cpd["r.Biocyc"][5:]) for cpd in res]
+        return [(cpd["c.displayName"], cpd["r.Biocyc"]) for cpd in res]
 
     def link_node_to_citation(
         self, node_label: str, node_display_name: str, citation_id: str
