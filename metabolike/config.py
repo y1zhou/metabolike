@@ -19,6 +19,12 @@ class MetacycConfig(BaseModel):
     classes: Optional[str]
 
 
+class BrendaConfig(BaseModel):
+    brenda_file: str
+    bkms_react_file: str
+
+
 class Config(BaseModel):
     database: DatabaseConfig
     metacyc: MetacycConfig
+    brenda: Optional[BrendaConfig]

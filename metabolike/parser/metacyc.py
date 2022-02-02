@@ -431,10 +431,7 @@ class Metacyc:
                 self.db.link_pathway_to_rate_limiting_step(pw_id, v)
             elif k in {"PRIMARY-PRODUCTS", "PRIMARY-REACTANTS"}:
                 relationship = "Product" if k == "PRIMARY-PRODUCTS" else "Reactant"
-                compound_id = f"META:{v}"
-                self.db.link_pathway_to_primary_compound(
-                    pw_id, compound_id, relationship
-                )
+                self.db.link_pathway_to_primary_compound(pw_id, v, relationship)
             elif k == "REACTION-LAYOUT":
                 rxn_id, d = self._parse_reaction_layout(v)
                 if not rxn_id:
@@ -757,7 +754,13 @@ class Metacyc:
         resource, identifier = res[0], res[1:]
         resource = resource.replace("-", ".")  # Ec-code
         resource = "".join(x.capitalize() for x in resource.split("."))
+        resource = resource[0].lower() + resource[1:]
         identifier = "".join(identifier)
+
+        # In some cases the identifier in the RDF nodes of the SBML file has a
+        # prefix, e.g. META: or HUMAN: for BioCyc IDs. We don't want these as
+        # they make later queries difficult.
+        identifier = re.sub(r"^[A-Z]+:", "", identifier)
         return resource, identifier
 
     @staticmethod
@@ -852,9 +855,7 @@ class Metacyc:
         return props
 
     @staticmethod
-    def _parse_reaction_layout(
-        s: str, prefix: Optional[str] = "META:"
-    ) -> Tuple[str, Dict[str, List[str]]]:
+    def _parse_reaction_layout(s: str) -> Tuple[str, Dict[str, List[str]]]:
         """Parse the reaction layout from the ``reactions.dat`` file.
 
         The attribute has the following format: ``(<rxn-id> (:LEFT-PRIMARIES
@@ -862,8 +863,6 @@ class Metacyc:
 
         Args:
             s: The layout string.
-            prefix: The prefix to add to the compound IDs. In the SBML file,
-                    the BioCyc IDs are prefixed with ``META:``.
 
         Returns:
             The reaction canonical ID, and a dictionary with the parsed layout
@@ -896,8 +895,7 @@ class Metacyc:
             "Reactant": reactants,
             "Product": products,
         }
-        if prefix:
-            d = {k: [f"{prefix}{e}" for e in v] for k, v in d.items()}
+
         return rxn_id, d
 
     def _report_missing_ids(self):

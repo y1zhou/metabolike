@@ -11,3 +11,7 @@ metacyc:
   compounds: tests/data/compounds.dat
   publications: tests/data/pubs.dat
   classes: tests/data/classes.dat
+
+brenda:
+  brenda_file: tests/data/brenda_test.txt
+  bkms_react_file: tests/data/Reactions_BKMS.tsv
