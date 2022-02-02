@@ -314,8 +314,8 @@ class MetaDB(BaseDB):
         logger.debug(f"Pathway {pathway_id} has primary {relationship} {compound_id}")
         self.write(
             f"""
-            MATCH (pw:Pathway {{mcId: $pw}}),
-                  (cpd:Compound)-[:is]->(:RDF {{Biocyc: $compound_id}})
+            MATCH (cpd:Compound)-[:is]->(:RDF {{Biocyc: $compound_id}}),
+                  (pw:Pathway {{mcId: $pw}})-[:hasReaction]->(:Reaction)-[:hasLeft|hasRight]->(cpd)
             MERGE (pw)-[:hasPrimary{relationship}]->(cpd)
             """,
             pw=pathway_id,
