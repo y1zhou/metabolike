@@ -754,6 +754,7 @@ class Metacyc:
         resource, identifier = res[0], res[1:]
         resource = resource.replace("-", ".")  # Ec-code
         resource = "".join(x.capitalize() for x in resource.split("."))
+        resource = resource[0].lower() + resource[1:]
         identifier = "".join(identifier)
 
         # In some cases the identifier in the RDF nodes of the SBML file has a
