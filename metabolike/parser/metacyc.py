@@ -350,7 +350,7 @@ class Metacyc:
         props: Dict[str, Union[str, List[str]]] = {"canonical_id": canonical_id}
         for k, v in lines:
             # SYNONYMS is a special case because it is a list
-            if k == "SYNONYMS":
+            if k in {"SYNONYMS", "TYPES"}:
                 _add_kv_to_dict(props, k, v, as_list=True)
             elif k in {
                 "GIBBS-0",
