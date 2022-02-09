@@ -183,10 +183,10 @@ class MetaDB(BaseDB):
         res = self.read(
             """
             MATCH (c:Compound)-[:is]->(r:RDF)
-            RETURN DISTINCT c.displayName, r.Biocyc;
+            RETURN DISTINCT c.displayName, r.biocyc;
             """
         )  # TODO: 38 POLYMER nodes don't have BioCyc IDs
-        return [(cpd["c.displayName"], cpd["r.Biocyc"]) for cpd in res]
+        return [(cpd["c.displayName"], cpd["r.biocyc"]) for cpd in res]
 
     def link_node_to_citation(
         self, node_label: str, node_display_name: str, citation_id: str
@@ -348,7 +348,7 @@ class MetaDB(BaseDB):
             f"""
             MATCH (r:Reaction {{canonical_id: $rxn_id}}),
                   (cpds:Compound)-[:is]->(rdf:RDF)
-            WHERE rdf.Biocyc IN $compound_ids
+            WHERE rdf.biocyc IN $compound_ids
             UNWIND cpds AS cpd
             MATCH (r)-[l:hasLeft|hasRight]->(cpd)
             SET l.isPrimary{side}InPathway = CASE
