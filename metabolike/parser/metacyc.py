@@ -185,6 +185,24 @@ class Metacyc:
                     self.reaction_to_graph(rxn, rxn_dat)
                     logger.debug(f"Added extra info for reaction {rxn}")
 
+                # Read pathways file if given
+                if self.input_files["pathways"]:
+                    logger.info("Creating pathway links")
+                    pw_dat = self._read_dat_file(self.input_files["pathways"])
+
+                    all_pws = self.db.get_all_nodes("Pathway", "mcId")
+                    self.super_pathways = set()
+                    for pw in tqdm(all_pws, desc="pathways.dat file"):
+                        self.pathway_to_graph(pw, pw_dat, rxn_dat)
+                        logger.debug(f"Added pathway annotation for {pw}")
+
+                    # Annotate the super-pathways
+                    for spw in tqdm(self.super_pathways, desc="Super-pathways"):
+                        self.pathway_to_graph(spw, pw_dat, rxn_dat)
+                        logger.debug(f"Added pathway annotation for {spw}")
+
+                    del self.super_pathways
+
             # SMILES reactions
             if self.input_files["atom_mapping"]:
                 logger.info("Adding SMILES to reactions")
@@ -197,22 +215,6 @@ class Metacyc:
                 smiles: Dict[str, str] = smiles.set_index("rxn").to_dict()["smiles"]
                 for rxn in tqdm(all_rxns, desc="atom_mapping.dat file"):
                     self.atom_mapping_to_graph(rxn, smiles)
-
-        # Read pathways file if given
-        if self.input_files["pathways"]:
-            logger.info("Creating pathway links")
-            pw_dat = self._read_dat_file(self.input_files["pathways"])
-
-            all_pws = self.db.get_all_nodes("Pathway", "mcId")
-            self.super_pathways = set()
-            for pw in tqdm(all_pws, desc="pathways.dat file"):
-                self.pathway_to_graph(pw, pw_dat)
-                logger.debug(f"Added pathway annotation for {pw}")
-            for spw in tqdm(self.super_pathways, desc="Super-pathways"):
-                self.pathway_to_graph(spw, pw_dat)
-                logger.debug(f"Added pathway annotation for {spw}")
-
-            del self.super_pathways
 
         # Compounds in compounds.dat
         if self.input_files["compounds"]:
@@ -396,7 +398,12 @@ class Metacyc:
         props = {"smiles_atom_mapping": smiles[canonical_id]}
         self.db.add_props_to_node("Reaction", "displayName", rxn_id, props)
 
-    def pathway_to_graph(self, pw_id: str, pw_dat: Dict[str, List[List[str]]]):
+    def pathway_to_graph(
+        self,
+        pw_id: str,
+        pw_dat: Dict[str, List[List[str]]],
+        rxn_dat: Dict[str, List[List[str]]],
+    ):
         """
         Parse one entry from the pathway attribute-value file, and add relevant
         information to the graph database in one transaction.
@@ -404,11 +411,21 @@ class Metacyc:
         Args:
             pw_id: The pathway ID from the graph database.
             pw_dat: The pathways.dat file as an attribute-value list.
-            session: The graph database session to use.
+            rxn_dat: The reactions.dat file as an attribute-value list. This is
+                used to find the annotation data for composite reactions marked
+                as pathways.
         """
-        if pw_id not in pw_dat:
+        if (pw_id not in pw_dat) and (pw_id not in rxn_dat):
             self.missing_ids["pathways"].add(pw_id)
             return
+
+        # Deal with pathway nodes with reaction IDs (composite reactions)
+        if pw_id in rxn_dat:
+            self.reaction_to_graph(pw_id, rxn_dat)
+            # Merge the Reaction node with the Pathway node under the same ID
+            self.db.merge_nodes("Pathway", "Reaction", "mcId", "displayName", pw_id)
+            return
+
         lines = pw_dat[pw_id]
         props: Dict[str, Union[str, List[str]]] = {"displayName": pw_id}
         for k, v in lines:
@@ -420,6 +437,7 @@ class Metacyc:
 
             # Relationship with other nodes
             elif k in {"IN-PATHWAY", "SUPER-PATHWAYS"}:
+                self.super_pathways.add(v)
                 self.db.link_pathway_to_pathway(pw_id, v)
             elif k == "CITATIONS":
                 self.db.link_node_to_citation("Pathway", pw_id, v)

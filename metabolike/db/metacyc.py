@@ -361,3 +361,29 @@ class MetaDB(BaseDB):
             compound_ids=compound_ids,
             pw=pathway_id,
         )
+
+    def merge_nodes(
+        self, n1_label: str, n2_label: str, n1_attr: str, n2_attr: str, attr_val: str
+    ):
+        """
+        Merge two nodes with the same attribute value. Note that properties is
+        hard-coded to be "override", which means all node attributes of ``n2``
+        will be used to override the attributes of ``n1``.
+
+        Args:
+            n1_label: The label of the first node.
+            n2_label: The label of the second node.
+            n1_attr: The attribute of the first node for filtering.
+            n2_attr: The attribute of the second node for filtering.
+            attr_val: The value of the attributes for filtering.
+        """
+        _ = self.write(
+            f"""
+            MATCH (n1:{n1_label} {{{n1_attr}: $val}}),
+                  (n2:{n2_label} {{{n2_attr}: $val}})
+            CALL apoc.refactor.mergeNodes([n1, n2], {{properties: 'override'}})
+            YIELD node
+            RETURN node;
+            """,
+            val=attr_val,
+        )
