@@ -204,11 +204,15 @@ class Metacyc:
             pw_dat = self._read_dat_file(self.input_files["pathways"])
 
             all_pws = self.db.get_all_nodes("Pathway", "mcId")
-            # TODO: add pathway annotations for superpathways as well.
-            # These pathway nodes are created during self.pathway_to_graph.
+            self.super_pathways = set()
             for pw in tqdm(all_pws, desc="pathways.dat file"):
                 self.pathway_to_graph(pw, pw_dat)
                 logger.debug(f"Added pathway annotation for {pw}")
+            for spw in tqdm(self.super_pathways, desc="Super-pathways"):
+                self.pathway_to_graph(spw, pw_dat)
+                logger.debug(f"Added pathway annotation for {spw}")
+
+            del self.super_pathways
 
         # Compounds in compounds.dat
         if self.input_files["compounds"]:
@@ -467,6 +471,7 @@ class Metacyc:
         rdf_props: Dict[str, Union[str, List[str]]] = {}
         for k, v in lines:
             if k in {
+                "COMMON-NAME",
                 "GIBBS-0",
                 "LOGP",
                 "MOLECULAR-WEIGHT",
