@@ -94,13 +94,13 @@ class Metacyc:
 
         # File paths
         self.input_files = {
-            "sbml": self._validate_path(sbml),
-            "reactions": self._validate_path(reactions),
-            "atom_mapping": self._validate_path(atom_mapping),
-            "pathways": self._validate_path(pathways),
-            "compounds": self._validate_path(compounds),
-            "publications": self._validate_path(publications),
-            "classes": self._validate_path(classes),
+            "sbml": validate_path(sbml),
+            "reactions": validate_path(reactions),
+            "atom_mapping": validate_path(atom_mapping),
+            "pathways": validate_path(pathways),
+            "compounds": validate_path(compounds),
+            "publications": validate_path(publications),
+            "classes": validate_path(classes),
         }
         logger.info(f"Input files: {self.input_files}")
 
@@ -621,17 +621,6 @@ class Metacyc:
         # TODO: Evidence code in citations are in the `Evidence` attr
 
     @staticmethod
-    def _validate_path(filepath: Optional[Union[str, Path]]) -> Optional[Path]:
-        if not filepath:
-            return None
-        f = Path(filepath).expanduser().resolve()
-        if not f.is_file():
-            logger.error(f"File does not exist: {f}")
-            raise FileNotFoundError(str(f))
-
-        return f
-
-    @staticmethod
     def _read_sbml(sbml_file: Path) -> libsbml.SBMLDocument:
         reader = libsbml.SBMLReader()
         metacyc = reader.readSBMLFromFile(sbml_file)
@@ -925,6 +914,17 @@ class Metacyc:
         for datfile, ids in self.missing_ids.items():
             if ids:
                 logger.warning(f"The following IDs were not found in {datfile}: {ids}")
+
+
+def validate_path(filepath: Optional[Union[str, Path]]) -> Optional[Path]:
+    if not filepath:
+        return None
+    f = Path(filepath).expanduser().resolve()
+    if not f.is_file():
+        logger.error(f"File does not exist: {f}")
+        raise FileNotFoundError(str(f))
+
+    return f
 
 
 def _snake_to_camel(s: str, sep: str = "-") -> str:
