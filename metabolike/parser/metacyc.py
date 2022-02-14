@@ -353,7 +353,7 @@ class Metacyc:
             self.missing_ids["reactions"].add(canonical_id)
             return
         lines = rxn_dat[canonical_id]
-        props: Dict[str, Union[str, List[str]]] = {"canonical_id": canonical_id}
+        props: Dict[str, Union[str, List[str]]] = {"canonicalId": canonical_id}
         for k, v in lines:
             # SYNONYMS is a special case because it is a list
             if k in {"SYNONYMS", "TYPES"}:

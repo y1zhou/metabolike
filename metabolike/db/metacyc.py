@@ -299,7 +299,7 @@ class MetaDB(BaseDB):
         self.write(
             """
             MATCH (pw:Pathway {mcId: $pw}),
-                  (r:Reaction {canonical_id: $rxn})
+                  (r:Reaction {canonicalId: $rxn})
             MERGE (pw)-[l:hasReaction]->(r)
                 ON MATCH SET l.isRateLimitingStep = true
             """,
@@ -326,8 +326,8 @@ class MetaDB(BaseDB):
         logger.debug(f"Reaction {r1} has next steps {r2} in {pathway_id}")
         self.write(
             """
-            MATCH (r1:Reaction {canonical_id: $r1})
-            MATCH (r2:Reaction) WHERE r2.canonical_id IN $r2
+            MATCH (r1:Reaction {canonicalId: $r1})
+            MATCH (r2:Reaction) WHERE r2.canonicalId IN $r2
             UNWIND r2 AS pred
             MERGE (pred)-[l:isPrecedingEvent]->(r1)
                 ON CREATE SET l.hasRelatedPathway = $pw
@@ -347,7 +347,7 @@ class MetaDB(BaseDB):
         logger.debug(f"Reaction {reaction_id} has primary {side}s {compound_ids}")
         self.write(
             f"""
-            MATCH (r:Reaction {{canonical_id: $rxn_id}}),
+            MATCH (r:Reaction {{canonicalId: $rxn_id}}),
                   (cpds:Compound)-[:is]->(rdf:RDF)
             WHERE rdf.biocyc IN $compound_ids
             UNWIND cpds AS cpd
