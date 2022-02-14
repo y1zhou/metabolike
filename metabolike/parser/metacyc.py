@@ -166,10 +166,10 @@ class Metacyc:
         doc = self._read_sbml(self.input_files["sbml"])
         model: libsbml.Model = doc.getModel()
         if not self.db.db_name:
-            self.db.use_database(model.getMetaId().lower())
+            self.db.db_name = model.getMetaId().lower()
 
         # Setup Neo4j database and populate it with data
-        self.db.start_session(database=self.db.db_name)
+        self.db.use_database(self.db.db_name)
         self.db.setup_graph_db(create_db=create_db, **kwargs)
         self.sbml_to_graph(model)
 

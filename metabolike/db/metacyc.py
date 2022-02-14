@@ -23,6 +23,7 @@ class MetaDB(BaseDB):
     def use_database(self, db_name: str):
         """Set the name of the database to use."""
         self.db_name = db_name
+        self.start_session(database=self.db_name)
 
     def setup_graph_db(self, create_db: bool = True, **kwargs):
         """
