@@ -388,3 +388,50 @@ class MetaDB(BaseDB):
             """,
             val=attr_val,
         )
+
+    def get_view_of_pathway(self, pathway_id: str):
+        """
+        Get the view of a pathway.
+
+        Args:
+            pathway_id: The pathway ID.
+
+        Returns:
+            The view of the pathway.
+        """
+        nodes = self.read(
+            """
+        MATCH (:Pathway {mcId: $pw_id})-[l:hasReaction]->(r:Reaction)
+        WHERE r.canonical_id = r.displayName
+        WITH r
+        MATCH (r)-[:is]->(rrdf:RDF),
+              (r)-[:hasGeneProduct|hasComponent|hasMember*]->(gp:GeneProduct)-[:isEncodedBy]->(grdf:RDF)
+        WITH r, rrdf.ecCode AS ec,
+             COLLECT(gp.displayName) as symbol, COLLECT(grdf.ncbigene) AS ncbi
+        RETURN {
+          id: id(r), name: r.displayName, ec: ec, gibbs: r.gibbs0,
+          direction: r.reactionDirection, reversible: r.reversible,
+          genes: {symbol: symbol, ncbi: ncbi}
+        };
+            """,
+            pw_id=pathway_id,
+        )
+
+        edges = self.read(
+            """
+        MATCH (:Pathway {mcId: $pw_id})-[l:hasReaction]->(r:Reaction)
+        WHERE r.canonical_id = r.displayName
+        WITH COLLECT(r.mcId) AS rxnid
+        MATCH p=(r1:Reaction)-[:isPrecedingEvent]->(r2:Reaction)
+        WHERE r1.mcId IN rxnid
+          AND r2.mcId IN rxnid
+          AND r2.mcId <> r1.mcId
+        UNWIND relationships(p) AS edge
+        RETURN {
+            id: id(edge), source: id(startNode(edge)), target: id(endNode(edge))
+        };
+            """,
+            pw_id=pathway_id,
+        )
+
+        return nodes, edges
