@@ -421,11 +421,11 @@ class MetaDB(BaseDB):
             """
         MATCH (:Pathway {mcId: $pw_id})-[l:hasReaction]->(r:Reaction)
         WHERE r.canonical_id = r.displayName
-        WITH COLLECT(r.mcId) AS rxnid
-        MATCH p=(r1:Reaction)-[:isPrecedingEvent]->(r2:Reaction)
-        WHERE r1.mcId IN rxnid
-          AND r2.mcId IN rxnid
-          AND r2.mcId <> r1.mcId
+        WITH COLLECT(r) AS nodes
+        UNWIND nodes AS r1
+        UNWIND nodes AS r2
+        WITH * WHERE id(r1) < id(r2)
+        MATCH p=(r1)-[:isPrecedingEvent]-(r2)
         UNWIND relationships(p) AS edge
         RETURN {
             id: id(edge), source: id(startNode(edge)), target: id(endNode(edge))
