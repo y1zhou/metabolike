@@ -1,7 +1,5 @@
 """
-A Python package that aggregates the data from BRENDA and BioCyc into one
-unified graph database. See the homepage for more information:
-
-https://github.com/y1zhou/metabolike
+Aggregates data from BRENDA and BioCyc into a graph database for studying
+reprogrammed metabolisms.
 """
-__version__ = "0.2.0"
+__version__ = "0.3.0"
