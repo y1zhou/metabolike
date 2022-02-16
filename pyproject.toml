@@ -1,0 +1,52 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "metabolike"
+authors = [{ name = "Yi Zhou", email = "metabolike@y1zhou.com" }]
+readme = "README.rst"
+license = { file = "LICENSE" }
+requires-python = ">=3.6,<4"
+keywords = ["bioinformatics", "metabolic-pathway", "network", "graph-database"]
+dependencies = [
+    "lark>=0.11.3,<1.0.0",
+    "pandas",
+    "pyarrow",
+    "numpy",
+    "python-libsbml>=5.19.2",
+    "neo4j>=4.0.0",
+    "tqdm",
+    "pyyaml",
+    "typer>=0.4.0,<0.5.0",
+    "fastapi>=0.70.0,<0.71.0",
+    "uvicorn>=0.16.0,<0.17.0",
+]
+classifiers = [
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3",
+    "Framework :: FastAPI",
+    "Framework :: Pytest",
+    "Framework :: Sphinx",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Typing :: Typed",
+]
+dynamic = ["version", "description"]
+
+[project.urls]
+# Documentation = ""
+Source = "https://github.com/y1zhou/metabolike"
+
+[project.scripts]
+metabolike = "metabolike.main:app"
+
+[project.optional-dependencies]
+test = ["pytest"]
+doc = ["sphinx", "sphinx_rtd_theme", "sphinx-autodoc-typehints"]
+dev = ["black"]
+
+[tool.flit.sdist]
+include = ["doc/"]
+exclude = ["doc/*.html"]
