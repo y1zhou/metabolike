@@ -207,6 +207,9 @@ class Metacyc:
 
                     del self.super_pathways
 
+                    # Correct composite reactions
+                    self.db.set_composite_reaction_labels()
+
             # SMILES reactions
             if self.input_files["atom_mapping"]:
                 logger.info("Adding SMILES to reactions")

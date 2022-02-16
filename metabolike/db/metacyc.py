@@ -425,6 +425,20 @@ class MetaDB(BaseDB):
             """
         )
 
+    def set_composite_reaction_labels(self):
+        """
+        Composite reaction nodes are labeled as ``Pathway`` and ``Reaction``.
+        The ``Pathway`` label should be removed and a ``isCompositeReaction``
+        property is added to the ``Reaction`` node.
+        """
+        self.write(
+            """
+            MATCH (n:Pathway:Reaction)
+            REMOVE n:Pathway
+            SET n.isCompositeReaction = true;
+            """
+        )
+
     def get_view_of_pathway(self, pathway_id: str):
         """
         Get the view of a pathway.
