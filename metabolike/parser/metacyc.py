@@ -132,21 +132,23 @@ class Metacyc:
            reaction balance status, systematic name, comment attributes to
            ``Reaction`` nodes. Also link ``Reaction`` nodes to ``Pathway`` and
            ``Citation`` nodes.
+           #. If ``pathways.dat`` is given:
+
+              * Add synonyms, types, comments, common names to ``Pathway`` nodes.
+              * Link ``Pathway`` nodes to super-pathway ``Pathway`` and taxonomy
+                  ``Taxa`` nodes.
+              * Link ``Reaction`` nodes within the pathway with
+                  ``isPrecedingEvent`` relationships.
+              * Link ``Pathway`` nodes with their rate limiting steps
+                  (``Reaction`` nodes).
+              * Link ``Pathway`` nodes with primary reactant and product
+                  ``Compound`` nodes.
+              * Link ``Pathway`` nodes with other ``Pathway`` nodes and annotate
+                the shared ``Compound`` nodes.
+              * For ``Reaction`` nodes, add ``isPrimary[Reactant|Product]InPathway``
+                  labels in their links to ``Compound`` nodes.
         #. If ``atom-mappings-smiles.dat`` is given, parse the file and add
            SMILES_ mappings to ``Reaction`` nodes.
-        #. If ``pathways.dat`` is given:
-
-           * Add synonyms, types, comments, common names to ``Pathway`` nodes.
-           * Link ``Pathway`` nodes to super-pathway ``Pathway`` and taxonomy
-             ``Taxa`` nodes.
-           * Link ``Reaction`` nodes within the pathway with
-             ``isPrecedingEvent`` relationships.
-           * Link ``Pathway`` nodes with their rate limiting steps
-             (``Reaction`` nodes).
-           * Link ``Pathway`` nodes with primary reactant and product
-             ``Compound`` nodes.
-           * For ``Reaction`` nodes, add ``isPrimary[Reactant|Product]InPathway``
-             labels in their links to ``Compound`` nodes.
 
         #. If ``compounds.dat`` is given, parse the file and add standard Gibbs
            free energy, logP, molecular weight, monoisotopic molecular weight,
