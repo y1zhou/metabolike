@@ -438,7 +438,7 @@ class Metacyc:
             # Relationship with other nodes
             elif k in {"IN-PATHWAY", "SUPER-PATHWAYS"}:
                 self.super_pathways.add(v)
-                self.db.link_pathway_to_pathway(pw_id, v)
+                self.db.link_pathway_to_superpathway(pw_id, v)
             elif k == "CITATIONS":
                 self.db.link_node_to_citation("Pathway", pw_id, v)
             elif k == "SPECIES":
@@ -463,6 +463,10 @@ class Metacyc:
                     self.db.link_reaction_to_primary_compound(
                         rxn_id, compounds, pw_id, side
                     )
+            elif k == "PATHWAY-LINKS":
+                cpd_id, pw_ids, direction = self._parse_pathway_links(v)
+                if pw_ids:
+                    self.db.link_pathway_to_pathway(pw_id, pw_ids, direction, cpd_id)
 
         # Write Pathway node properties
         self.db.add_props_to_node("Pathway", "mcId", pw_id, props)
@@ -909,6 +913,80 @@ class Metacyc:
         }
 
         return rxn_id, d
+
+    @staticmethod
+    def _parse_pathway_links(s: str) -> Tuple[str, List[str], str]:
+        """
+        Parse ``PATHWAY-LINKS`` from the ``pathways.dat`` file. This connects
+        the ``Pathway`` nodes in the graph through shared ``Compound`` nodes.
+        The format of the input string has several possibilities. The simplest
+        is when the pathway points to one or more target pathways:
+
+            (<compound-id> <target-pathway-ids ...>)
+
+        These ``target-pathway-ids`` are inheriently *outgoing* links. Sometimes
+        the direction is explicitly specified. When there are multiple pathway
+        IDs and only one is specified as ``OUTGOING``, all the other pathways
+        are also *outgoing* links.
+
+            (<compound-id> (<target-pathway-id> . :OUTGOING))
+            (<compound-id> (<target-pathway-id> . :INCOMING))
+
+        The compound or pathway ID could also be a frame ID instead of the unique
+        ID of the object, in which case the ID is wrapped in pipe symbols. This
+        mostly happens for compound IDs, and when it happens for pathway IDs it's
+        often a pathway type instead of the unique ID.
+
+            (|<compound-frame-id>| <target-pathway-id>)
+
+        Finally, the target pathway ID could be some random string wrapped in
+        quotes. We can safely ignore most of these (e.g. "dietary input",
+        "release from the lysosome"), but in several cases valid pathway IDs
+        are also wrapped in quotes.
+
+        Args:
+            s: The pathway links string to parse.
+
+        Returns:
+            A tuple with the first element being the compound ID, the second
+            element being a list of pathway IDs, and the third element being
+            the direction of the link. The list of pathway IDs could be empty
+            because non-canonical pathway IDs are dropped.
+        """
+        # Extract the compound ID at the beginning of the string
+        cpd_id_rgx = re.compile(r"^\(([^\s]+) ")
+        res = cpd_id_rgx.match(s)
+        if not res:
+            raise ValueError(f"Pathway links string doesn't have a compound: {s}")
+        cpd = res.group(1)
+        s = s[res.end() : -1]  # remove cpd ID and closing parenthesis
+
+        # Extract pathway links recursively
+        pathways: List[str] = []
+        direction = ""
+        pw_id = r"\"[^\"]+\"|[^\s]+"
+        directed_pw_rgx = re.compile(rf"\(({pw_id}) \. :(INCOMING|OUTGOING)\)")
+        pw_rgx = re.compile(pw_id)
+
+        while s:
+            # Directed pathway links wrapped in parentheses
+            if s[0] == "(":
+                m = directed_pw_rgx.match(s)
+                pathways.append(m.group(1))
+                direction = m.group(2)
+            # Regular pathway links separated by spaces
+            else:
+                m = pw_rgx.match(s)
+                pathways.append(m.group(0))
+            s = s[m.end() :].strip()
+
+        # Final cleanup
+        cpd = cpd.replace("|", "")
+        pathways = [
+            p.replace('"', "") for p in pathways if (" " not in p) and p.isupper()
+        ]  # remove frame IDs and quoted annotations
+        direction = "INCOMING" if direction == "INCOMING" else "OUTGOING"
+        return cpd, pathways, direction
 
     def _report_missing_ids(self):
         for datfile, ids in self.missing_ids.items():

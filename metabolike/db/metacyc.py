@@ -265,7 +265,7 @@ class MetaDB(BaseDB):
             pathway=pathway_id,
         )
 
-    def link_pathway_to_pathway(self, pathway_id: str, superpathway_id: str):
+    def link_pathway_to_superpathway(self, pathway_id: str, superpathway_id: str):
         """Link a ``Pathway`` to its super-pathway."""
         logger.debug(f"Pathway {pathway_id} has SuperPathway {superpathway_id}")
         self.write(
@@ -277,6 +277,31 @@ class MetaDB(BaseDB):
             """,
             pw_id=pathway_id,
             super_pw=superpathway_id,
+        )
+
+    def link_pathway_to_pathway(
+        self, pw: str, pws: List[str], direction: str, cpd: str
+    ):
+        """
+        Connect a ``Pathway`` to a list of other ``Pathway``s. The ``Compound``
+        that is involved in both sides of the connection is specified in the
+        relationship.
+        """
+        if direction == "INCOMING":
+            rel_type = "-[l:hasRelatedPathway]->"
+        else:
+            rel_type = "<-[l:hasRelatedPathway]-"
+        self.write(
+            f"""
+            MATCH (pw1:Pathway {{displayName: $pw_id}})
+            MATCH (pw2s:Pathway) WHERE pw2s.displayName IN $pws
+            UNWIND pw2s AS pw2
+            MERGE (pw1){rel_type}(pw2)
+                ON CREATE SET l.hasRelatedCompound = $cpd
+            """,
+            pw_id=pw,
+            pws=pws,
+            cpd=cpd,
         )
 
     def link_pathway_to_taxa(self, pathway_id: str, tax_id: str, relationship: str):
