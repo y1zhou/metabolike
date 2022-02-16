@@ -414,6 +414,17 @@ class MetaDB(BaseDB):
             val=attr_val,
         )
 
+    def delete_bad_reaction_nodes(self):
+        """
+        Delete reaction nodes with non-canonical mcIds and all their relationships.
+        """
+        self.write(
+            """
+            MATCH (r:Reaction) WHERE r.displayName <> r.canonicalId
+            DETACH DELETE r;
+            """
+        )
+
     def get_view_of_pathway(self, pathway_id: str):
         """
         Get the view of a pathway.
