@@ -270,7 +270,7 @@ class MetaDB(BaseDB):
         logger.debug(f"Pathway {pathway_id} has SuperPathway {superpathway_id}")
         self.write(
             """
-            MATCH (pw:Pathway {mcId: $pw_id})
+            MATCH (pw:Pathway {displayName: $pw_id})
             MERGE (spw:Pathway {mcId: $super_pw})
                 ON CREATE SET spw.displayName = $super_pw
             MERGE (spw)-[:hasSubPathway]->(pw)
@@ -311,7 +311,7 @@ class MetaDB(BaseDB):
         logger.debug(f"Pathway {pathway_id} {relationship} {tax_id}")
         self.write(
             f"""
-            MATCH (pw:Pathway {{mcId: $pw}})
+            MATCH (pw:Pathway {{displayName: $pw}})
             MERGE (s:Taxa {{mcId: $taxa_id}})
             MERGE (pw)-[:{relationship}]->(s)
             """,
@@ -323,7 +323,7 @@ class MetaDB(BaseDB):
         logger.debug(f"Pathway {pathway_id} has rate limiting step {reaction_id}")
         self.write(
             """
-            MATCH (pw:Pathway {mcId: $pw}),
+            MATCH (pw:Pathway {displayName: $pw}),
                   (r:Reaction {canonicalId: $rxn})
             MERGE (pw)-[l:hasReaction]->(r)
                 ON MATCH SET l.isRateLimitingStep = true
@@ -339,7 +339,7 @@ class MetaDB(BaseDB):
         self.write(
             f"""
             MATCH (cpd:Compound)-[:is]->(:RDF {{Biocyc: $compound_id}}),
-                  (pw:Pathway {{mcId: $pw}})-[:hasReaction]->(:Reaction)-[:hasLeft|hasRight]->(cpd)
+                  (pw:Pathway {{displayName: $pw}})-[:hasReaction]->(:Reaction)-[:hasLeft|hasRight]->(cpd)
             MERGE (pw)-[:hasPrimary{relationship}]->(cpd)
             """,
             pw=pathway_id,
@@ -426,8 +426,8 @@ class MetaDB(BaseDB):
         """
         nodes = self.read(
             """
-        MATCH (:Pathway {mcId: $pw_id})-[l:hasReaction]->(r:Reaction)
-        WHERE r.canonical_id = r.displayName
+        MATCH (:Pathway {displayName: $pw_id})-[l:hasReaction]->(r:Reaction)
+        WHERE r.canonicalId = r.displayName
         WITH r
         MATCH (r)-[:is]->(rrdf:RDF),
               (r)-[:hasGeneProduct|hasComponent|hasMember*]->(gp:GeneProduct)-[:isEncodedBy]->(grdf:RDF)
@@ -444,8 +444,8 @@ class MetaDB(BaseDB):
 
         edges = self.read(
             """
-        MATCH (:Pathway {mcId: $pw_id})-[l:hasReaction]->(r:Reaction)
-        WHERE r.canonical_id = r.displayName
+        MATCH (:Pathway {displayName: $pw_id})-[l:hasReaction]->(r:Reaction)
+        WHERE r.canonicalId = r.displayName
         WITH COLLECT(r) AS nodes
         UNWIND nodes AS r1
         UNWIND nodes AS r2
