@@ -66,6 +66,15 @@ def setup(
 
 @app.command()
 def serve():
+    """Serves an API to the graph database.
+
+    The command uses the following environment variables to configure the
+    database connection: METABOLIKE_DB_URI, METABOLIKE_DB_USER,
+    METABOLIKE_DB_PASSWORD, and METABOLIKE_DB_NAME.
+
+    Alternatively, you may save the variables in a file named "metabolike.env"
+    in the current directory.
+    """
     uvicorn.run(
         "metabolike.api.main:app",
         host="0.0.0.0",
