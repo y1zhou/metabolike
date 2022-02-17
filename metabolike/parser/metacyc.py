@@ -203,7 +203,9 @@ class Metacyc:
                         logger.debug(f"Added pathway annotation for {pw}")
 
                     # Annotate the super-pathways
-                    for spw in tqdm(self.super_pathways, desc="Super-pathways"):
+                    self.super_pathways = self.super_pathways - set(all_pws)
+                    while self.super_pathways:
+                        spw = self.super_pathways.pop()
                         self.pathway_to_graph(spw, pw_dat, rxn_dat)
                         logger.debug(f"Added pathway annotation for {spw}")
 
