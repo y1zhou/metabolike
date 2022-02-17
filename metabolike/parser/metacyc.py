@@ -785,8 +785,7 @@ class Metacyc:
         res = uri.split("/")[3:]
         resource, identifier = res[0], res[1:]
         resource = resource.replace("-", ".")  # Ec-code
-        resource = "".join(x.capitalize() for x in resource.split("."))
-        resource = resource[0].lower() + resource[1:]
+        resource = _snake_to_camel(resource, ".")
         identifier = "".join(identifier)
 
         # In some cases the identifier in the RDF nodes of the SBML file has a
@@ -1052,10 +1051,7 @@ def _add_kv_to_dict(
     """
     k_camel = _snake_to_camel(k)
     if as_list:
-        if k_camel in d:
-            d[k_camel].append(v)
-        else:
-            d[k_camel] = [v]
+        d.setdefault(k_camel, []).append(v)
     else:
         d[k_camel] = v
 
