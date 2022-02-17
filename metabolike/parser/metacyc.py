@@ -972,7 +972,8 @@ class Metacyc:
         cpd_id_rgx = re.compile(r"^\(([^\s]+) ")
         res = cpd_id_rgx.match(s)
         if not res:
-            raise ValueError(f"Pathway links string doesn't have a compound: {s}")
+            logging.warning(f"Pathway links string doesn't have a compound: {s}")
+            return "", [], ""
         cpd = res.group(1)
         s = s[res.end() : -1]  # remove cpd ID and closing parenthesis
 
