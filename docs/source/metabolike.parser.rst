@@ -4,6 +4,14 @@ metabolike.parser package
 Submodules
 ----------
 
+metabolike.parser.bkms\_react module
+------------------------------------
+
+.. automodule:: metabolike.parser.bkms_react
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 metabolike.parser.brenda module
 -------------------------------
 

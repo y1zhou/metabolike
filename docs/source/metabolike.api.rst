@@ -4,6 +4,14 @@ metabolike.api package
 Submodules
 ----------
 
+metabolike.api.config module
+----------------------------
+
+.. automodule:: metabolike.api.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 metabolike.api.main module
 --------------------------
 
