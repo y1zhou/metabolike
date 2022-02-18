@@ -133,6 +133,17 @@ class MetaDB(BaseDB):
             props=props,
         )
 
+    def link_reaction_to_compartment(self, reaction_id: str, compartment_name: str):
+        self.write(
+            """
+            MATCH (r:Reaction {displayName: $reaction}),
+                  (c:Compartment {displayName: $compartment})
+            MERGE (r)-[:hasCompartment]->(c);
+            """,
+            reaction=reaction_id,
+            compartment=compartment_name,
+        )
+
     def link_node_to_gene(
         self,
         node_label: str,

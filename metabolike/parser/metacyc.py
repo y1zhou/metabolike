@@ -387,6 +387,8 @@ class Metacyc:
                 _add_kv_to_dict(props, k, v, as_list=False)
             elif k == "IN-PATHWAY":
                 self.db.link_reaction_to_pathway(rxn_id, v)
+            elif k == "RXN-LOCATIONS":
+                self.db.link_reaction_to_compartment(rxn_id, v)
             elif k == "CITATIONS":
                 self.db.link_node_to_citation("Reaction", rxn_id, v)
 
