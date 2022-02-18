@@ -36,7 +36,7 @@ classifiers = [
 dynamic = ["version", "description"]
 
 [project.urls]
-# Documentation = ""
+Documentation = "https://metabolike.readthedocs.io/"
 Source = "https://github.com/y1zhou/metabolike"
 
 [project.scripts]
