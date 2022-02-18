@@ -681,8 +681,13 @@ class Metacyc:
             self._split_uri(cvterm.getResourceURI(i))
             for i in range(cvterm.getNumResources())
         ]
-        uris = {x[0]: x[1] for x in uris}
-        self.db.link_node_to_rdf(node_label, mcid, bio_qual, uris)
+
+        props: Dict[str, Union[str, List[str]]] = {}
+        for resource, identifier in uris:
+            is_list_resource = resource == "ec-code"
+            _add_kv_to_dict(props, resource, identifier, as_list=is_list_resource)
+
+        self.db.link_node_to_rdf(node_label, mcid, bio_qual, props)
 
     def _link_reaction_to_compound(
         self,
@@ -786,8 +791,7 @@ class Metacyc:
         # First three elements are from http://identifiers.org/
         res = uri.split("/")[3:]
         resource, identifier = res[0], res[1:]
-        resource = resource.replace("-", ".")  # Ec-code
-        resource = _snake_to_camel(resource, ".")
+        resource = resource.replace(".", "-")  # Ec-code
         identifier = "".join(identifier)
 
         # In some cases the identifier in the RDF nodes of the SBML file has a

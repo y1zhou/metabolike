@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 from metabolike.db.base import BaseDB
 
@@ -95,7 +95,11 @@ class MetaDB(BaseDB):
         )
 
     def link_node_to_rdf(
-        self, node_label: str, mcid: str, bio_qual: str, props: Dict[str, str]
+        self,
+        node_label: str,
+        mcid: str,
+        bio_qual: str,
+        props: Dict[str, Union[str, List[str]]],
     ):
         """See :meth:`.Metacyc._add_sbml_rdf_node` for details."""
         logger.debug(f"{node_label} node {mcid} {bio_qual} RDF")
