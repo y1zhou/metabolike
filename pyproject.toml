@@ -49,4 +49,4 @@ dev = ["black"]
 
 [tool.flit.sdist]
 include = ["doc/"]
-exclude = ["doc/*.html"]
+exclude = ["doc/*.html", "tests/", ".github/", ".readthedocs.yaml"]
