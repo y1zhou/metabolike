@@ -18,6 +18,8 @@ NODE_LABELS = [
     "Taxa",
 ]
 
+COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
+
 
 class MetaDB(BaseDB):
     def use_database(self, db_name: str):
@@ -504,3 +506,42 @@ class MetaDB(BaseDB):
         )
 
         return nodes, edges
+
+    def get_cpd_view_of_pathway(
+        self,
+        pathway_id: str,
+        ignore_cpds: List[str] = COMMON_COMPOUNDS,
+    ):
+        """
+        Get the view of a pathway with primary compounds linked by reactions.
+
+        Args:
+            pathway_id: The pathway mcId or displayName.
+            ignore_cpds: A list of common compound displayNames to ignore.
+        """
+        res = self.read(
+            """
+            MATCH (:Pathway {displayName: $pw_id})-[:hasReaction]->(r:Reaction),
+              (r)-[lr]->(cr:Compound),
+              (r)-[lp]->(cp:Compound)
+            WHERE (
+              ($pw_id IN lr.isPrimaryReactantInPathway) OR
+              (r.reactionDirection = 'reversible')
+            ) AND (
+              ($pw_id IN lp.isPrimaryProductInPathway) OR
+              (r.reactionDirection = 'reversible')
+            ) AND (
+              id(lr) <> id(lp)
+            ) AND (
+              NOT cr.displayName IN $ignore_cpds
+            ) AND (
+              NOT cp.displayName IN $ignore_cpds
+            )
+            RETURN cr, cp,
+              apoc.create.vRelationship(cr, r.displayName, properties(r), cp);
+            """,
+            pw_id=pathway_id,
+            ignore_cpds=ignore_cpds,
+        )
+
+        return res
