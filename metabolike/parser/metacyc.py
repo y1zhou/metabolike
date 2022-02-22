@@ -187,10 +187,6 @@ class Metacyc:
                     self.reaction_to_graph(rxn, rxn_dat)
                     logger.debug(f"Added extra info for reaction {rxn}")
 
-                # Remove additional reactions in the SBML file that have
-                # non-canonical IDs
-                self.db.delete_bad_reaction_nodes()
-
                 # Read pathways file if given
                 if self.input_files["pathways"]:
                     logger.info("Creating pathway links")
@@ -365,12 +361,6 @@ class Metacyc:
             return
         lines = rxn_dat[canonical_id]
         props: Dict[str, Union[str, List[str]]] = {"canonicalId": canonical_id}
-
-        # Don't bother with parsing the other attributes if the canonical ID
-        # is not the displayName (the node will be deleted anyway)
-        if canonical_id != rxn_id:
-            self.db.add_props_to_node("Reaction", "displayName", rxn_id, props)
-            return
 
         for k, v in lines:
             # SYNONYMS is a special case because it is a list
