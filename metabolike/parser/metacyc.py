@@ -210,6 +210,9 @@ class Metacyc:
                     # Correct composite reactions
                     self.db.set_composite_reaction_labels()
 
+                # Fix the direction of reactions
+                self.db.fix_reaction_direction()
+
             # SMILES reactions
             if self.input_files["atom_mapping"]:
                 logger.info("Adding SMILES to reactions")
