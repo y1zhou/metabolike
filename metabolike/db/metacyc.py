@@ -503,7 +503,7 @@ class MetaDB(BaseDB):
              COLLECT(gp.displayName) as symbol, COLLECT(grdf.ncbigene) AS ncbi
         RETURN {
           id: id(r), name: r.displayName, ec: ec, gibbs: r.gibbs0,
-          direction: r.reactionDirection, reversible: r.reversible,
+          direction: r.reactionDirection,
           genes: {symbol: symbol, ncbi: ncbi}
         };
             """,

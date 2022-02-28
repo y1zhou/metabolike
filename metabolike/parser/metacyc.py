@@ -316,7 +316,6 @@ class Metacyc:
             # Basic properties
             props = {
                 "displayName": r.getName(),
-                "reversible": r.getReversible(),
                 "fast": r.getFast(),
             }
             self.db.create_node("Reaction", mcid, props)
