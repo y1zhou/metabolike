@@ -1,27 +1,27 @@
 import re
 from typing import Any, Dict, List, Union
 
-from lark import Token
+from lark.lexer import Token
 from lark.visitors import Transformer
 
 
 class BaseTransformer(Transformer):
-    def NUM_ID(self, num):
+    def NUM_ID(self, num: Token):
         return num.update(value=int(num))
 
-    def TOKEN(self, tok):
+    def TOKEN(self, tok: Token):
         return tok.update(value=tok.strip())
 
-    def protein_id(self, children) -> Token:
-        children = [x.value for x in children]
-        return Token("protein_id", children)
+    def protein_id(self, children: List[Token]) -> Token:
+        v = [x.value for x in children]
+        return Token("protein_id", v)
 
-    def ref_id(self, children) -> Token:
-        children = [x.value for x in children]
-        return Token("ref_id", children)
+    def ref_id(self, children: List[Token]) -> Token:
+        v = [x.value for x in children]
+        return Token("ref_id", v)
 
     @staticmethod
-    def _fix_string(s: str):
+    def _fix_string(s: str) -> str:
         s = re.sub(r"([\[(]) ", r"\1", s)
         s = re.sub(r" ([\])])", r"\1", s)
         s = s.replace("\t", " ")
@@ -34,16 +34,16 @@ class GenericTreeTransformer(BaseTransformer):
     Formats the tree into a dictionary, as described in :meth:`.entry`.
     """
 
-    def description(self, children) -> Token:
+    def description(self, children: List[Token]) -> Token:
         res = " ".join([x.value.strip() for x in children])
         res = self._fix_string(res)
         return Token("description", res)
 
-    def content(self, children) -> Dict[str, Union[str, List[int]]]:
+    def content(self, children: List[Token]) -> Dict[str, Union[str, List[int]]]:
         res = {x.type: x.value for x in children}
         return res
 
-    def commentary(self, children) -> List[Dict[str, Union[str, List[int]]]]:
+    def commentary(self, children: List[Token]) -> Token:
         return Token("commentary", children)
 
     def entry(self, children: List[Token]) -> Dict[str, Any]:
@@ -56,7 +56,7 @@ class ReactionTreeTransformer(GenericTreeTransformer):
     Commentary in ``(...)`` are on substrates, and in ``|...|`` on products.
     """
 
-    def reaction(self, children) -> Token:
+    def reaction(self, children: List[Token]) -> Token:
         """Parse the reaction in the description node.
 
         There should be three parts:
@@ -76,13 +76,13 @@ class ReactionTreeTransformer(GenericTreeTransformer):
         res = {"lhs": lhs, "rhs": rhs}
         return Token("reaction", res)
 
-    def commentary(self, children) -> Token:
+    def commentary(self, children: List[Token]) -> Token:
         return Token("commentary_substrate", children)
 
-    def more_commentary(self, children) -> Token:
+    def more_commentary(self, children: List[Token]) -> Token:
         return Token("commentary_product", children)
 
-    def reversibility(self, children) -> Token:
+    def reversibility(self, children: List[Token]) -> Token:
         """
         ``r`` for reversible, ``ir`` for irreversible, ``?`` for unknown.
         """
@@ -102,20 +102,20 @@ class ReactionTreeTransformer(GenericTreeTransformer):
 
 
 class RefTreeTransformer(BaseTransformer):
-    def ref_id(self, children) -> Token:
+    def ref_id(self, children: List[Token]) -> Token:
         return Token("ref_id", children[0].value)
 
-    def citation(self, children) -> Token:
+    def citation(self, children: List[Token]) -> Token:
         res = " ".join([x.value.strip() for x in children])
         res = self._fix_string(res)
         return Token("citation", res)
 
-    def pubmed(self, children) -> Token:
+    def pubmed(self, children: List[Token]) -> Token:
         res = children[0].value
         res = re.sub(r"\{Pubmed:(\d*)\}", r"\1", res)
         return Token("pubmed", res)
 
-    def paper_stat(self, children) -> Token:
+    def paper_stat(self, children: List[Token]) -> Token:
         res = children[0].split(",")
         return Token("paper_stat", res)
 
@@ -124,13 +124,13 @@ class RefTreeTransformer(BaseTransformer):
 
 
 class SpecificInfoTreeTransformer(GenericTreeTransformer):
-    def substrate(self, children) -> Token:
+    def substrate(self, children: List[Token]) -> Token:
         res = children[0].value.strip()
         return Token("substrate", res)
 
 
 class CommentaryOnlyTreeTransformer(BaseTransformer):
-    def description(self, children) -> Token:
+    def description(self, children: List[Token]) -> Token:
         res = children[0]
         res = self._fix_string(res)
         res = res[1:-1]  # remove the brackets
