@@ -21,6 +21,6 @@ jobs:
       - name: Build and publish
         run: flit publish
         env:
-          FLIT_USERNAME: y1zhou
-          FLIT_PASSWORD: ${{ secrets.TEST_PYPI_KEY }}
+          FLIT_USERNAME: __token__
+          FLIT_PASSWORD: ${{ secrets.TEST_PYPI_TOKEN }}
           FLIT_INDEX_URL: https://test.pypi.org/legacy/
