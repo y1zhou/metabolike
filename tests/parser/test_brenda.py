@@ -3,12 +3,13 @@ from pathlib import Path
 import pandas as pd
 import pandas.testing as pdt
 import pytest
-from metabolike.parser.brenda import get_parser_from_field, read_brenda, text_to_tree
+from metabolike.parser.brenda import (_get_parser_from_field, _read_brenda,
+                                      _text_to_tree)
 
 
 @pytest.fixture
 def brenda_data():
-    df = read_brenda(Path("tests/data/brenda_test.txt"))
+    df = _read_brenda(Path("tests/data/brenda_test.txt"))
     return df
 
 
@@ -33,8 +34,8 @@ def test_text_to_tree_generic(brenda_data):
         .values[0, 0]
     )
 
-    parser = get_parser_from_field("PROTEIN")
-    tree = text_to_tree(text, parser)
+    parser = _get_parser_from_field("PROTEIN")
+    tree = _text_to_tree(text, parser)
     assert isinstance(tree, list)
     assert len(tree) == 164
     assert set(tree[0].keys()) - {"protein_id", "description", "ref_id"} == set()
@@ -50,8 +51,8 @@ def test_text_to_tree_reaction(brenda_data):
         .values[0, 0]
     )
 
-    parser = get_parser_from_field("SUBSTRATE_PRODUCT")
-    tree = text_to_tree(text, parser)
+    parser = _get_parser_from_field("SUBSTRATE_PRODUCT")
+    tree = _text_to_tree(text, parser)
     assert isinstance(tree, list)
     assert len(tree) == 773
     assert set(tree[0].keys()) - {"protein_id", "reaction", "ref_id"} == set()
@@ -68,8 +69,8 @@ def test_text_to_tree_transferred(brenda_data):
         .values[0, 0]
     )
 
-    parser = get_parser_from_field("TRANSFERRED_DELETED")
-    tree = text_to_tree(text, parser)
+    parser = _get_parser_from_field("TRANSFERRED_DELETED")
+    tree = _text_to_tree(text, parser)
     assert isinstance(tree, list)
     assert len(tree) == 1
     assert "description" in tree[0]
@@ -83,8 +84,8 @@ def test_text_to_tree_references(brenda_data):
         .values[0, 0]
     )
 
-    parser = get_parser_from_field("REFERENCE")
-    tree = text_to_tree(text, parser)
+    parser = _get_parser_from_field("REFERENCE")
+    tree = _text_to_tree(text, parser)
     assert isinstance(tree, list)
     assert len(tree) == 285
     assert set(tree[0].keys()) - {"ref_id", "citation", "pubmed", "paper_stat"} == set()
@@ -99,8 +100,8 @@ def test_text_to_tree_specific_info(brenda_data):
         .values[0, 0]
     )
 
-    parser = get_parser_from_field("TURNOVER_NUMBER")
-    tree = text_to_tree(text, parser)
+    parser = _get_parser_from_field("TURNOVER_NUMBER")
+    tree = _text_to_tree(text, parser)
     assert isinstance(tree, list)
     assert len(tree) == 495
     assert "substrate" in tree[0]
@@ -115,8 +116,8 @@ def test_text_to_tree_commentary_only(brenda_data):
         .values[0, 0]
     )
 
-    parser = get_parser_from_field("CLONED")
-    tree = text_to_tree(text, parser)
+    parser = _get_parser_from_field("CLONED")
+    tree = _text_to_tree(text, parser)
     assert isinstance(tree, list)
     assert len(tree) == 85
     assert all(len(x["protein_id"]) == 1 for x in tree)

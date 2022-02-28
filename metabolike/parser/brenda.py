@@ -148,7 +148,7 @@ start: entry+
 """
 
 
-def get_parser_from_field(field: str) -> Optional[Lark]:
+def _get_parser_from_field(field: str) -> Optional[Lark]:
     if field == "TRANSFERRED_DELETED":
         return None
 
@@ -215,7 +215,7 @@ def get_parser_from_field(field: str) -> Optional[Lark]:
     return Lark(grammar, parser="lalr", transformer=t)
 
 
-def text_to_tree(text: str, parser: Optional[Lark]) -> List[Dict]:
+def _text_to_tree(text: str, parser: Optional[Lark]) -> List[Dict]:
     if parser is None:
         # Simply return the text for TRANSFERRED_DELETED fields
         return [{"description": text}]
@@ -225,7 +225,7 @@ def text_to_tree(text: str, parser: Optional[Lark]) -> List[Dict]:
     return tree.children
 
 
-def read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
+def _read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
     """Read brenda file and convert to DataFrame.
 
     Args:
@@ -342,15 +342,15 @@ def parse_brenda(filepath: Union[str, Path], **kwargs) -> pd.DataFrame:
     # Read text file into pandas DataFrame, where the last column contains
     # the text that is to be parsed into trees.
     filepath = Path(filepath).expanduser().resolve()
-    df = read_brenda(filepath, **kwargs)
+    df = _read_brenda(filepath, **kwargs)
 
     # Get parsers for each unique field
     parsers: Dict[str, Optional[Lark]] = {"TRANSFERRED_DELETED": None}
     for field in FIELDS.keys():
-        parsers[field] = get_parser_from_field(field)
+        parsers[field] = _get_parser_from_field(field)
 
     df["description"] = df.apply(
-        lambda row: text_to_tree(row.description, parsers[row.field]),
+        lambda row: _text_to_tree(row.description, parsers[row.field]),
         axis=1,
     )
     return df
