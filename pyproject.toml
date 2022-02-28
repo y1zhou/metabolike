@@ -10,7 +10,7 @@ license = { file = "LICENSE" }
 requires-python = ">=3.6,<4"
 keywords = ["bioinformatics", "metabolic-pathway", "network", "graph-database"]
 dependencies = [
-    "lark>=0.11.3,<1.0.0",
+    "lark>=0.11.3",
     "pandas",
     "pyarrow",
     "numpy",

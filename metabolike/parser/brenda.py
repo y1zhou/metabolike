@@ -212,7 +212,7 @@ def _get_parser_from_field(field: str) -> Optional[Lark]:
         """
         t = GenericTreeTransformer()
 
-    return Lark(grammar, parser="lalr", transformer=t)
+    return Lark(grammar, parser="lalr", transformer=t, maybe_placeholders=False)
 
 
 def _text_to_tree(text: str, parser: Optional[Lark]) -> List[Dict]:
