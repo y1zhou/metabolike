@@ -431,6 +431,27 @@ class MetaDB(BaseDB):
             val=attr_val,
         )
 
+    def fix_reaction_direction(self):
+        """
+        Seems like ``listOfReactants`` in the SBML file are always the true
+        reactants in irreversible reactions, no matter if they are under
+        ``LEFT`` or ``RIGHT`` in the dat file. Since the reaction nodes were all
+        populated using the SBML file, we can say all reactions are either
+        reversible or go from left to right.
+        """
+        self.write(
+            """
+            MATCH (r:Reaction {reactionDirection: 'right_to_left'})
+            SET r.reactionDirection = 'left_to_right'
+            """
+        )
+        self.write(
+            """
+            MATCH (r:Reaction {reactionDirection: 'physiol_right_to_left'})
+            SET r.reactionDirection = 'physiol_left_to_right'
+            """
+        )
+
     def delete_bad_reaction_nodes(self):
         """
         Delete reaction nodes with non-canonical mcIds and all their relationships.
@@ -482,7 +503,7 @@ class MetaDB(BaseDB):
              COLLECT(gp.displayName) as symbol, COLLECT(grdf.ncbigene) AS ncbi
         RETURN {
           id: id(r), name: r.displayName, ec: ec, gibbs: r.gibbs0,
-          direction: r.reactionDirection, reversible: r.reversible,
+          direction: r.reactionDirection,
           genes: {symbol: symbol, ncbi: ncbi}
         };
             """,
