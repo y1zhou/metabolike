@@ -112,7 +112,9 @@ FIELD_COMMENTARY_ONLY = {
 BASE_GRAMMAR = r"""
 %import common.NEWLINE -> _NL
 
-commentary : /\((?=#)/ _separated{content, _COMMENTARY_SEP} /(?<=>)\)/
+_COMMENTARY_L : /\((?=#)/
+_COMMENTARY_R : /(?<=>)\)/
+commentary : _COMMENTARY_L _separated{content, _COMMENTARY_SEP} _COMMENTARY_R
 content    : protein_id description ref_id
 
 !description : TOKENS+
@@ -133,7 +135,6 @@ ARROW          : "<->" | "<-->" | "<-" | "->" | "-->" | "<<" | ">" | /<\t?>/ | /
                | /<(?=[A-Za-z])/  // Comparison of chemicals in commentary
 COMPARE_NUM    : /p\s?<\s?0\.05/i  // p-values
 
-//INLINE_CHEMICAL: /\(+(?!#)/ (CHAR | _WS | COMPARE_NUM | ARROW | "(" | ")")+ ")"
 INLINE_CHEMICAL: /\((?!#\d)/ | /(?<!\d>)\)/
 
 _COMMENTARY_SEP : /;\s*(?=#)/
