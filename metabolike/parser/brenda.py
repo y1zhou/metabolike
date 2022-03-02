@@ -27,13 +27,18 @@ given in the original paper only the organism is given.
 ``///``	indicates the end of an EC-number specific part.
 """
 
+import json
 import logging
+from io import BytesIO
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 import pandas as pd
+import pyarrow.json as pj
+import pyarrow.parquet as pq
 from lark import Lark
 from metabolike.parser.brenda_transformer import *
+from pyarrow.lib import Table
 
 logger = logging.getLogger(__name__)
 
@@ -331,7 +336,7 @@ def parse_brenda(
     filepath: Union[str, Path],
     cache: bool = False,
     ec_nums: Optional[Iterable[str]] = None,
-) -> pd.DataFrame:
+) -> Table:
 
     """Parse the BRENDA text file into a dict.
 
@@ -342,28 +347,30 @@ def parse_brenda(
 
     Args:
         filepath: The path to the BRENDA text file.
-        cache: Whether to cache the parsed data to a pickle file.
+        cache: Whether to cache the parsed data to a parquet file.
         ec_nums: A list of EC numbers to extract.
 
     Returns:
-        A :class:`pandas.DataFrame` with the ``description`` column from
+        A :class:`pyarrow.Table` with the ``description`` column from
         :func:`read_brenda` transformed into lists of dicts.
     """
     filepath = Path(filepath).expanduser().resolve()
 
-    # Use pickled cache if available
-    cache_file = filepath.with_suffix(".pkl")
+    # Use parquet cache if available
+    cache_file = filepath.with_suffix(".parquet")
     if cache_file.exists() and cache:
-        logger.info(f"Loading cached BRENDA data from {cache_file}")
-        df = pd.read_pickle(cache_file)
+        logger.debug(f"Loading cached BRENDA data from {cache_file}")
+        tbl: Table = pq.read_table(cache_file)
+
         if ec_nums:
             logger.warning("Using cached data, some ec_nums may be missing")
-            df = df[df.ID.isin(ec_nums)]
-        return df
+            drop_cols = set(tbl.column_names) - set(ec_nums)
+            tbl = tbl.drop(drop_cols)
+        return tbl
 
     # Read text file into pandas DataFrame, where the last column contains
     # the text that is to be parsed into trees.
-    logger.info(f"Reading BRENDA text data from {filepath}")
+    logger.debug(f"Reading BRENDA text data from {filepath}")
     df = _read_brenda(filepath, cache=cache)
     if ec_nums:
         df = df[df.ID.isin(ec_nums)]
@@ -379,11 +386,20 @@ def parse_brenda(
         axis=1,
     )
 
-    if cache:
-        logger.info(f"Saving parsed BRENDA data to cache {cache_file}")
-        df.to_pickle(str(cache_file))
+    # Transform data frame into a pyarrow table
+    logger.info("Transforming data into pyarrow table")
+    j = {
+        k: v.groupby("field").description.apply(lambda x: list(x)[0]).to_dict()
+        for k, v in df.groupby("ID")
+    }
+    jf = BytesIO(json.dumps(j).encode("utf-8"))
+    tbl: Table = pj.read_json(jf, read_options=pj.ReadOptions(block_size=1 << 28))
 
-    return df
+    if cache:
+        logger.debug(f"Saving parsed BRENDA data to cache {cache_file}")
+        pq.write_table(tbl, cache_file)
+
+    return tbl
 
 
 def _read_brenda_file(filepath: Path) -> List[str]:
