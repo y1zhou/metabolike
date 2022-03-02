@@ -234,6 +234,7 @@ def _read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
 
     Args:
         filepath: Path to the file
+        cache: Whether to cache the cleaned dataframe to a csv file
 
     Returns:
         A :class:`pandas.DataFrame` with columns:
@@ -242,9 +243,9 @@ def _read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
            * field: the content of the information, e.g. protein, localization
            * description: everything else
     """
-    cache_file = filepath.with_suffix(".parquet")
+    cache_file = filepath.with_suffix(".csv")
     if cache_file.exists() and cache:
-        df = pd.read_parquet(cache_file)
+        df = pd.read_csv(cache_file)
         return df
 
     lines = _read_brenda_file(filepath)
@@ -321,7 +322,7 @@ def _read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
     df.reset_index(drop=True, inplace=True)
 
     if cache:
-        df.to_parquet(str(cache_file), index=False)
+        df.to_csv(str(cache_file), index=False)
 
     return df
 
