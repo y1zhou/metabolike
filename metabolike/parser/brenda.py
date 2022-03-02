@@ -27,12 +27,15 @@ given in the original paper only the organism is given.
 ``///``	indicates the end of an EC-number specific part.
 """
 
+import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 import pandas as pd
 from lark import Lark
 from metabolike.parser.brenda_transformer import *
+
+logger = logging.getLogger(__name__)
 
 FIELDS = {
     "ACTIVATING_COMPOUND": "AC",
@@ -323,7 +326,11 @@ def _read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
     return df
 
 
-def parse_brenda(filepath: Union[str, Path], **kwargs) -> pd.DataFrame:
+def parse_brenda(
+    filepath: Union[str, Path],
+    cache: bool = False,
+    ec_nums: Optional[Iterable[str]] = None,
+) -> pd.DataFrame:
 
     """Parse the BRENDA text file into a dict.
 
@@ -334,29 +341,48 @@ def parse_brenda(filepath: Union[str, Path], **kwargs) -> pd.DataFrame:
 
     Args:
         filepath: The path to the BRENDA text file.
-        **kwargs: Additional keyword arguments to pass to :func:`read_brenda`.
+        cache: Whether to cache the parsed data to a pickle file.
+        ec_nums: A list of EC numbers to extract.
 
     Returns:
         A :class:`pandas.DataFrame` with the ``description`` column from
         :func:`read_brenda` transformed into lists of dicts.
     """
+    filepath = Path(filepath).expanduser().resolve()
+
+    # Use pickled cache if available
+    cache_file = filepath.with_suffix(".pkl")
+    if cache_file.exists() and cache:
+        logger.info(f"Loading cached BRENDA data from {cache_file}")
+        df = pd.read_pickle(cache_file)
+        if ec_nums:
+            logger.warning("Using cached data, some ec_nums may be missing")
+            df = df[df.ID.isin(ec_nums)]
+        return df
+
     # Read text file into pandas DataFrame, where the last column contains
     # the text that is to be parsed into trees.
-    filepath = Path(filepath).expanduser().resolve()
-    df = _read_brenda(filepath, **kwargs)
+    logger.info(f"Reading BRENDA text data from {filepath}")
+    df = _read_brenda(filepath, cache=cache)
+    if ec_nums:
+        df = df[df.ID.isin(ec_nums)]
 
     # Get parsers for each unique field
     parsers: Dict[str, Optional[Lark]] = {"TRANSFERRED_DELETED": None}
     for field in FIELDS.keys():
         parsers[field] = _get_parser_from_field(field)
 
+    logger.info("Parsing BRENDA text data")
     df["description"] = df.apply(
         lambda row: _text_to_tree(row.description, parsers[row.field]),
         axis=1,
     )
-    return df
 
-    # TODO: feed the tree into a Neo4j database
+    if cache:
+        logger.info(f"Saving parsed BRENDA data to cache {cache_file}")
+        df.to_pickle(str(cache_file))
+
+    return df
 
 
 def _read_brenda_file(filepath: Path) -> List[str]:
