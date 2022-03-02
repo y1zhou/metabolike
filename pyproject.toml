@@ -12,7 +12,7 @@ keywords = ["bioinformatics", "metabolic-pathway", "network", "graph-database"]
 dependencies = [
     "lark>=0.11.3",
     "pandas",
-    "pyarrow",
+    "orjson",
     "numpy",
     "python-libsbml>=5.19.2",
     "neo4j>=4.0.0",

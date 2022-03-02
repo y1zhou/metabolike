@@ -33,12 +33,10 @@ from io import BytesIO
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
+import orjson
 import pandas as pd
-import pyarrow.json as pj
-import pyarrow.parquet as pq
 from lark import Lark
 from metabolike.parser.brenda_transformer import *
-from pyarrow.lib import Table
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +334,7 @@ def parse_brenda(
     filepath: Union[str, Path],
     cache: bool = False,
     ec_nums: Optional[Iterable[str]] = None,
-) -> Table:
+) -> Dict[str, Any]:
 
     """Parse the BRENDA text file into a dict.
 
@@ -351,22 +349,23 @@ def parse_brenda(
         ec_nums: A list of EC numbers to extract.
 
     Returns:
-        A :class:`pyarrow.Table` with the ``description`` column from
-        :func:`read_brenda` transformed into lists of dicts.
+        A :class:`dict` with the ``description`` column from
+        :func:`read_brenda` transformed into lists of dicts stored as values,
+        and EC numbers as keys.
     """
     filepath = Path(filepath).expanduser().resolve()
 
     # Use parquet cache if available
-    cache_file = filepath.with_suffix(".parquet")
+    cache_file = filepath.with_suffix(".json")
     if cache_file.exists() and cache:
         logger.debug(f"Loading cached BRENDA data from {cache_file}")
-        tbl: Table = pq.read_table(cache_file)
+        with open(cache_file, "rb") as f:
+            j: Dict[str, Any] = orjson.loads(f.read())
 
         if ec_nums:
             logger.warning("Using cached data, some ec_nums may be missing")
-            drop_cols = set(tbl.column_names) - set(ec_nums)
-            tbl = tbl.drop(drop_cols)
-        return tbl
+            j = {k: v for k, v in j.items() if k in ec_nums}
+        return j
 
     # Read text file into pandas DataFrame, where the last column contains
     # the text that is to be parsed into trees.
@@ -386,20 +385,19 @@ def parse_brenda(
         axis=1,
     )
 
-    # Transform data frame into a pyarrow table
-    logger.info("Transforming data into pyarrow table")
+    # Transform data frame into a dict
+    logger.info("Transforming data into dictionary")
     j = {
         k: v.groupby("field").description.apply(lambda x: list(x)[0]).to_dict()
         for k, v in df.groupby("ID")
     }
-    jf = BytesIO(json.dumps(j).encode("utf-8"))
-    tbl: Table = pj.read_json(jf, read_options=pj.ReadOptions(block_size=1 << 28))
 
     if cache:
         logger.debug(f"Saving parsed BRENDA data to cache {cache_file}")
-        pq.write_table(tbl, cache_file)
+        with open(cache_file, "wb") as f:
+            f.write(orjson.dumps(j))
 
-    return tbl
+    return j
 
 
 def _read_brenda_file(filepath: Path) -> List[str]:
