@@ -582,3 +582,42 @@ class MetaDB(BaseDB):
         )
 
         return res
+
+
+    def get_reaction_route_between_compounds(
+        self,
+        c1: str,
+        c2: str,
+        ignore_node_mcids: List[str] = [],
+        num_routes: int = 2,
+        max_hops: int = 20,
+    ):
+        res = self.read(
+            """
+            MATCH (n)
+            WHERE n.mcId IN $ignore_nodes
+            WITH COLLECT(n) AS ns
+            MATCH (r:Reaction)-[:hasRight]->(c2:Compound {mcId: $c2})
+            WITH c2, ns, COLLECT(r) AS rxns
+            MATCH (c1:Compound {mcId: $c1})
+            CALL apoc.path.expandConfig(c1, {
+                relationshipFilter: "<hasLeft|isPrecedingEvent>|isRelatedEvent>",
+                labelFilter: "+Reaction",
+                terminatorNodes: rxns,
+                blacklistNodes: ns,
+                bfs: false,
+                limit: $num_routes,
+                minLevel: 2,
+                maxLevel: $max_hops
+            })
+            YIELD path
+            RETURN c2, path, length(path) AS hops
+            ORDER BY hops;
+            """,
+            ignore_nodes=ignore_node_mcids,
+            c1=c1,
+            c2=c2,
+            num_routes=num_routes,
+            max_hops=max_hops,
+        )
+        return res
