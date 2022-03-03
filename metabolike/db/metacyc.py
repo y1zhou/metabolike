@@ -18,6 +18,7 @@ NODE_LABELS = [
     "Taxa",
 ]
 
+# TODO: refactor this with get_high_degree_compound_nodes()
 COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
 
 
@@ -583,6 +584,27 @@ class MetaDB(BaseDB):
 
         return res
 
+    def get_high_degree_compound_nodes(self, degree: int = 60):
+        """
+        Get all compound nodes with a high degree, i.e. with a lot of edges to
+        ``Reaction`` nodes. Including these nodes in many cases would pollute
+        the graph with too many outgoing relationships.
+
+        Args:
+            degree: The degree threshold.
+
+        Returns:
+            A list of mcID of compound nodes.
+        """
+        return self.read(
+            """
+            MATCH (c:Compound)<-[:hasLeft|hasRight]-(r:Reaction)
+            WITH c.mcId as cpd, COUNT(*) AS cnt
+            WHERE cnt >= $degree
+            RETURN COLLECT(cpd);
+            """,
+            degree=degree,
+        )
 
     def get_reaction_route_between_compounds(
         self,
