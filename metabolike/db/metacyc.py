@@ -588,12 +588,30 @@ class MetaDB(BaseDB):
         self,
         c1: str,
         c2: str,
+        only_pathway_reactions: bool = True,
         ignore_node_mcids: List[str] = [],
         num_routes: int = 2,
-        max_hops: int = 20,
+        max_hops: int = 10,
     ):
-        res = self.read(
-            """
+        """
+        The function has two modes: one for following pre-defined pathways, and
+        one for following any chain of reactions between two compounds.
+
+        Args:
+            c1: The first compound mcId.
+            c2: The second compound mcId.
+            only_pathway_reactions: If True, only follow reactions in pathways.
+            ignore_node_mcids: A list of mcIds to ignore.
+            num_routes: The number of routes to return.
+            max_hops: The maximum number of hops to follow. When argument
+             ``only_pathway_reactions`` is False, this is doubled to account
+             for the extra hops from reaction nodes to compound nodes.
+
+        Returns:
+            A list of possible routes.
+        """
+        if only_pathway_reactions:
+            query = """
             MATCH (n)
             WHERE n.mcId IN $ignore_nodes
             WITH COLLECT(n) AS ns
@@ -613,11 +631,34 @@ class MetaDB(BaseDB):
             YIELD path
             RETURN c2, path, length(path) AS hops
             ORDER BY hops;
-            """,
+            """
+        else:
+            query = """
+            MATCH (n)
+            WHERE n.mcId IN $ignore_nodes
+            WITH COLLECT(n) AS ns
+            MATCH (c1:Compound {mcId: $c1}),
+                  (c2:Compound {mcId: $c2})
+            CALL apoc.path.expandConfig(c1, {
+                relationshipFilter: "<hasLeft,hasRight>",
+                labelFilter: "+Reaction|Compound",
+                terminatorNodes: [c2],
+                blacklistNodes: ns,
+                bfs: true,
+                limit: $num_routes,
+                minLevel: 2,
+                maxLevel: $max_hops
+            })
+            YIELD path
+            RETURN c2, path, length(path) AS hops
+            ORDER BY hops;
+            """
+        res = self.read(
+            query,
             ignore_nodes=ignore_node_mcids,
             c1=c1,
             c2=c2,
             num_routes=num_routes,
-            max_hops=max_hops,
+            max_hops=max_hops * 2,
         )
         return res
