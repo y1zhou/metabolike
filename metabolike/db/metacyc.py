@@ -303,18 +303,34 @@ class MetaDB(BaseDB):
         Connect a ``Pathway`` to a list of other ``Pathway``s. The ``Compound``
         that is involved in both sides of the connection is specified in the
         relationship.
+
+        We also want to link the ``Reaction`` nodes corresponding to the
+        ``Compound`` nodes that are involved in the connection. For example, if
+        reaction ``R1`` produces compound ``C``, and reaction ``R2`` consumes
+        compound ``C``, we want to link ``R1`` and ``R2`` with a ``isRelatedEvent``
+        relationship and add the corresponding pathways as properties.
         """
         if direction == "INCOMING":
-            rel_type = "-[l:hasRelatedPathway]->"
+            pw_rel_type = "-[l:hasRelatedPathway]->"
+            rxn_rel_type = "-[l:isRelatedEvent]->"
+            l1, l2 = "hasRight", "hasLeft"
         else:
-            rel_type = "<-[l:hasRelatedPathway]-"
+            pw_rel_type = "<-[l:hasRelatedPathway]-"
+            rxn_rel_type = "<-[l:isRelatedEvent]-"
+            l1, l2 = "hasLeft", "hasRight"
         self.write(
             f"""
             MATCH (pw1:Pathway {{displayName: $pw_id}})
             MATCH (pw2s:Pathway) WHERE pw2s.displayName IN $pws
             UNWIND pw2s AS pw2
-            MERGE (pw1){rel_type}(pw2)
+            MERGE (pw1){pw_rel_type}(pw2)
                 ON CREATE SET l.hasRelatedCompound = $cpd
+            WITH pw1, pw2
+            MATCH (pw1)-[:hasReaction]->(r1:Reaction)-[:{l1}]->(:Compound)-[:is]->(:RDF {{biocyc: $cpd}})
+            WITH r1, pw2
+            MATCH (pw2)-[:hasReaction]->(r2:Reaction)-[:{l2}]->(:Compound)-[:is]->(:RDF {{biocyc: $cpd}})
+            MERGE (r1){rxn_rel_type}(r2)
+                ON CREATE SET l.fromPathway = $pw_id, l.toPathway = pw2.mcId;
             """,
             pw_id=pw,
             pws=pws,
@@ -565,4 +581,84 @@ class MetaDB(BaseDB):
             ignore_cpds=ignore_cpds,
         )
 
+        return res
+
+
+    def get_reaction_route_between_compounds(
+        self,
+        c1: str,
+        c2: str,
+        only_pathway_reactions: bool = True,
+        ignore_node_mcids: List[str] = [],
+        num_routes: int = 2,
+        max_hops: int = 10,
+    ):
+        """
+        The function has two modes: one for following pre-defined pathways, and
+        one for following any chain of reactions between two compounds.
+
+        Args:
+            c1: The first compound mcId.
+            c2: The second compound mcId.
+            only_pathway_reactions: If True, only follow reactions in pathways.
+            ignore_node_mcids: A list of mcIds to ignore.
+            num_routes: The number of routes to return.
+            max_hops: The maximum number of hops to follow. When argument
+             ``only_pathway_reactions`` is False, this is doubled to account
+             for the extra hops from reaction nodes to compound nodes.
+
+        Returns:
+            A list of possible routes.
+        """
+        if only_pathway_reactions:
+            query = """
+            MATCH (n)
+            WHERE n.mcId IN $ignore_nodes
+            WITH COLLECT(n) AS ns
+            MATCH (r:Reaction)-[:hasRight]->(c2:Compound {mcId: $c2})
+            WITH c2, ns, COLLECT(r) AS rxns
+            MATCH (c1:Compound {mcId: $c1})
+            CALL apoc.path.expandConfig(c1, {
+                relationshipFilter: "<hasLeft|isPrecedingEvent>|isRelatedEvent>",
+                labelFilter: "+Reaction",
+                terminatorNodes: rxns,
+                blacklistNodes: ns,
+                bfs: false,
+                limit: $num_routes,
+                minLevel: 2,
+                maxLevel: $max_hops
+            })
+            YIELD path
+            RETURN c2, path, length(path) AS hops
+            ORDER BY hops;
+            """
+        else:
+            query = """
+            MATCH (n)
+            WHERE n.mcId IN $ignore_nodes
+            WITH COLLECT(n) AS ns
+            MATCH (c1:Compound {mcId: $c1}),
+                  (c2:Compound {mcId: $c2})
+            CALL apoc.path.expandConfig(c1, {
+                relationshipFilter: "<hasLeft,hasRight>",
+                labelFilter: "+Reaction|Compound",
+                terminatorNodes: [c2],
+                blacklistNodes: ns,
+                bfs: true,
+                limit: $num_routes,
+                minLevel: 2,
+                maxLevel: $max_hops
+            })
+            YIELD path
+            RETURN c2, path, length(path) AS hops
+            ORDER BY hops;
+            """
+        res = self.read(
+            query,
+            ignore_nodes=ignore_node_mcids,
+            c1=c1,
+            c2=c2,
+            num_routes=num_routes,
+            max_hops=max_hops * 2,
+        )
         return res
