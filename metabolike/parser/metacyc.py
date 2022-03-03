@@ -187,6 +187,9 @@ class Metacyc:
                     self.reaction_to_graph(rxn, rxn_dat)
                     logger.debug(f"Added extra info for reaction {rxn}")
 
+                # Fix the direction of reactions
+                self.db.fix_reaction_direction()
+
                 # Read pathways file if given
                 if self.input_files["pathways"]:
                     logger.info("Creating pathway links")
@@ -210,7 +213,7 @@ class Metacyc:
                     # Correct composite reactions
                     self.db.set_composite_reaction_labels()
 
-                # Fix the direction of reactions
+                # Fix the direction of newly-added reactions
                 self.db.fix_reaction_direction()
 
             # SMILES reactions

@@ -303,18 +303,34 @@ class MetaDB(BaseDB):
         Connect a ``Pathway`` to a list of other ``Pathway``s. The ``Compound``
         that is involved in both sides of the connection is specified in the
         relationship.
+
+        We also want to link the ``Reaction`` nodes corresponding to the
+        ``Compound`` nodes that are involved in the connection. For example, if
+        reaction ``R1`` produces compound ``C``, and reaction ``R2`` consumes
+        compound ``C``, we want to link ``R1`` and ``R2`` with a ``isRelatedEvent``
+        relationship and add the corresponding pathways as properties.
         """
         if direction == "INCOMING":
-            rel_type = "-[l:hasRelatedPathway]->"
+            pw_rel_type = "-[l:hasRelatedPathway]->"
+            rxn_rel_type = "-[l:isRelatedEvent]->"
+            l1, l2 = "hasRight", "hasLeft"
         else:
-            rel_type = "<-[l:hasRelatedPathway]-"
+            pw_rel_type = "<-[l:hasRelatedPathway]-"
+            rxn_rel_type = "<-[l:isRelatedEvent]-"
+            l1, l2 = "hasLeft", "hasRight"
         self.write(
             f"""
             MATCH (pw1:Pathway {{displayName: $pw_id}})
             MATCH (pw2s:Pathway) WHERE pw2s.displayName IN $pws
             UNWIND pw2s AS pw2
-            MERGE (pw1){rel_type}(pw2)
+            MERGE (pw1){pw_rel_type}(pw2)
                 ON CREATE SET l.hasRelatedCompound = $cpd
+            WITH pw1, pw2
+            MATCH (pw1)-[:hasReaction]->(r1:Reaction)-[:{l1}]->(:Compound)-[:is]->(:RDF {{biocyc: $cpd}})
+            WITH r1, pw2
+            MATCH (pw2)-[:hasReaction]->(r2:Reaction)-[:{l2}]->(:Compound)-[:is]->(:RDF {{biocyc: $cpd}})
+            MERGE (r1){rxn_rel_type}(r2)
+                ON CREATE SET l.fromPathway = $pw_id, l.toPathway = pw2.mcId;
             """,
             pw_id=pw,
             pws=pws,
