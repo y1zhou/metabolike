@@ -27,12 +27,18 @@ given in the original paper only the organism is given.
 ``///``	indicates the end of an EC-number specific part.
 """
 
+import json
+import logging
+from io import BytesIO
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 
+import orjson
 import pandas as pd
 from lark import Lark
 from metabolike.parser.brenda_transformer import *
+
+logger = logging.getLogger(__name__)
 
 FIELDS = {
     "ACTIVATING_COMPOUND": "AC",
@@ -112,7 +118,9 @@ FIELD_COMMENTARY_ONLY = {
 BASE_GRAMMAR = r"""
 %import common.NEWLINE -> _NL
 
-commentary : /\((?=#)/ _separated{content, _COMMENTARY_SEP} /(?<=>)\)/
+_COMMENTARY_L : /\((?=#)/
+_COMMENTARY_R : /(?<=>)\)/
+commentary : _COMMENTARY_L _separated{content, _COMMENTARY_SEP} _COMMENTARY_R
 content    : protein_id description ref_id
 
 !description : TOKENS+
@@ -133,7 +141,6 @@ ARROW          : "<->" | "<-->" | "<-" | "->" | "-->" | "<<" | ">" | /<\t?>/ | /
                | /<(?=[A-Za-z])/  // Comparison of chemicals in commentary
 COMPARE_NUM    : /p\s?<\s?0\.05/i  // p-values
 
-//INLINE_CHEMICAL: /\(+(?!#)/ (CHAR | _WS | COMPARE_NUM | ARROW | "(" | ")")+ ")"
 INLINE_CHEMICAL: /\((?!#\d)/ | /(?<!\d>)\)/
 
 _COMMENTARY_SEP : /;\s*(?=#)/
@@ -148,7 +155,7 @@ start: entry+
 """
 
 
-def get_parser_from_field(field: str) -> Optional[Lark]:
+def _get_parser_from_field(field: str) -> Optional[Lark]:
     if field == "TRANSFERRED_DELETED":
         return None
 
@@ -212,10 +219,10 @@ def get_parser_from_field(field: str) -> Optional[Lark]:
         """
         t = GenericTreeTransformer()
 
-    return Lark(grammar, parser="lalr", transformer=t)
+    return Lark(grammar, parser="lalr", transformer=t, maybe_placeholders=False)
 
 
-def text_to_tree(text: str, parser: Optional[Lark]) -> List[Dict]:
+def _text_to_tree(text: str, parser: Optional[Lark]) -> List[Dict]:
     if parser is None:
         # Simply return the text for TRANSFERRED_DELETED fields
         return [{"description": text}]
@@ -225,11 +232,12 @@ def text_to_tree(text: str, parser: Optional[Lark]) -> List[Dict]:
     return tree.children
 
 
-def read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
+def _read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
     """Read brenda file and convert to DataFrame.
 
     Args:
         filepath: Path to the file
+        cache: Whether to cache the cleaned dataframe to a csv file
 
     Returns:
         A :class:`pandas.DataFrame` with columns:
@@ -238,9 +246,9 @@ def read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
            * field: the content of the information, e.g. protein, localization
            * description: everything else
     """
-    cache_file = filepath.with_suffix(".parquet")
+    cache_file = filepath.with_suffix(".csv")
     if cache_file.exists() and cache:
-        df = pd.read_parquet(cache_file)
+        df = pd.read_csv(cache_file)
         return df
 
     lines = _read_brenda_file(filepath)
@@ -317,12 +325,16 @@ def read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
     df.reset_index(drop=True, inplace=True)
 
     if cache:
-        df.to_parquet(str(cache_file), index=False)
+        df.to_csv(str(cache_file), index=False)
 
     return df
 
 
-def parse_brenda(filepath: Union[str, Path], **kwargs) -> pd.DataFrame:
+def parse_brenda(
+    filepath: Union[str, Path],
+    cache: bool = False,
+    ec_nums: Optional[Iterable[str]] = None,
+) -> Dict[str, Any]:
 
     """Parse the BRENDA text file into a dict.
 
@@ -333,29 +345,59 @@ def parse_brenda(filepath: Union[str, Path], **kwargs) -> pd.DataFrame:
 
     Args:
         filepath: The path to the BRENDA text file.
-        **kwargs: Additional keyword arguments to pass to :func:`read_brenda`.
+        cache: Whether to cache the parsed data to a parquet file.
+        ec_nums: A list of EC numbers to extract.
 
     Returns:
-        A :class:`pandas.DataFrame` with the ``description`` column from
-        :func:`read_brenda` transformed into lists of dicts.
+        A :class:`dict` with the ``description`` column from
+        :func:`read_brenda` transformed into lists of dicts stored as values,
+        and EC numbers as keys.
     """
+    filepath = Path(filepath).expanduser().resolve()
+
+    # Use parquet cache if available
+    cache_file = filepath.with_suffix(".json")
+    if cache_file.exists() and cache:
+        logger.debug(f"Loading cached BRENDA data from {cache_file}")
+        with open(cache_file, "rb") as f:
+            j: Dict[str, Any] = orjson.loads(f.read())
+
+        if ec_nums:
+            logger.warning("Using cached data, some ec_nums may be missing")
+            j = {k: v for k, v in j.items() if k in ec_nums}
+        return j
+
     # Read text file into pandas DataFrame, where the last column contains
     # the text that is to be parsed into trees.
-    filepath = Path(filepath).expanduser().resolve()
-    df = read_brenda(filepath, **kwargs)
+    logger.debug(f"Reading BRENDA text data from {filepath}")
+    df = _read_brenda(filepath, cache=cache)
+    if ec_nums:
+        df = df[df.ID.isin(ec_nums)]
 
     # Get parsers for each unique field
     parsers: Dict[str, Optional[Lark]] = {"TRANSFERRED_DELETED": None}
     for field in FIELDS.keys():
-        parsers[field] = get_parser_from_field(field)
+        parsers[field] = _get_parser_from_field(field)
 
+    logger.info("Parsing BRENDA text data")
     df["description"] = df.apply(
-        lambda row: text_to_tree(row.description, parsers[row.field]),
+        lambda row: _text_to_tree(row.description, parsers[row.field]),
         axis=1,
     )
-    return df
 
-    # TODO: feed the tree into a Neo4j database
+    # Transform data frame into a dict
+    logger.info("Transforming data into dictionary")
+    j = {
+        k: v.groupby("field").description.apply(lambda x: list(x)[0]).to_dict()
+        for k, v in df.groupby("ID")
+    }
+
+    if cache:
+        logger.debug(f"Saving parsed BRENDA data to cache {cache_file}")
+        with open(cache_file, "wb") as f:
+            f.write(orjson.dumps(j))
+
+    return j
 
 
 def _read_brenda_file(filepath: Path) -> List[str]:

@@ -500,6 +500,17 @@ class MetaDB(BaseDB):
             """
         )
 
+    def get_all_ec_numbers(self):
+        ec = self.read(
+            """
+            MATCH (r:Reaction)-[:is]->(rdf:RDF)
+            WHERE rdf.ecCode IS NOT NULL
+            UNWIND rdf.ecCode as ec
+            RETURN collect(ec);
+            """
+        )
+        return set(n["ec"] for n in ec)
+
     def get_view_of_pathway(self, pathway_id: str):
         """
         Get the view of a pathway.

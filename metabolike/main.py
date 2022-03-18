@@ -47,6 +47,9 @@ def setup(
     drop_if_exists: bool = typer.Option(
         False, "--drop-if-exists", "-f", help="Drop the database if it already exists."
     ),
+    use_cache: bool = typer.Option(
+        True, help="Use cache for parsing BRENDA text file if it exists."
+    ),
 ):
     conf = load_config(config_file)
 
@@ -59,7 +62,8 @@ def setup(
 
     if conf.brenda:
         logger.info("Reading BRENDA text file")
-        brenda = parse_brenda(conf.brenda.brenda_file)
+        all_ecs = db.get_all_ec_numbers()
+        brenda = parse_brenda(conf.brenda.brenda_file, ec_nums=all_ecs, cache=use_cache)
 
     meta.db.close()
 
