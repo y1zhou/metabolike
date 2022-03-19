@@ -66,7 +66,7 @@ class BaseDB:
         """
         return self.session.write_transaction(lambda tx: tx.run(cypher, **kwargs))
 
-    def read(self, cypher: str, **kwargs) -> Result:
+    def read(self, cypher: str, **kwargs) -> List[Any]:
         """Helper function to read from the database.
 
         Args:

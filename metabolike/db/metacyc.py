@@ -1,7 +1,10 @@
 import logging
 from typing import Any, Dict, List, Tuple, Union
 
+import numpy as np
+import pandas as pd
 from metabolike.db.base import BaseDB
+from metabolike.utils import generate_gene_reaction_rule
 
 logger = logging.getLogger(__name__)
 
@@ -555,6 +558,115 @@ class MetaDB(BaseDB):
         )
 
         return nodes, edges
+
+    def get_fba_info_of_pathway(self, pathway_ids: List[str]):
+        """
+        Retrieve the information of a pathway relevant to flux balance analysis.
+        """
+        q = self.read(
+            """
+            MATCH (p:Pathway)-[:hasReaction]->(r:Reaction)-[l:hasLeft|hasRight]->(c:Compound)-[:hasCompartment]->(cpt:Compartment)
+            WHERE p.mcId IN $pw_ids
+            WITH r, l, c, cpt
+            OPTIONAL MATCH (r)-[:is]->(rdf:RDF)
+            RETURN
+              r.mcId, r.displayName, r.synonyms, r.reactionDirection, r.gibbs0,
+              rdf.ecCode,
+              type(l), l.stoichiometry,
+              c.mcId, c.displayName, c.chemicalFormula, c.gibbs0,
+              cpt.mcId;
+            """,
+            pw_ids=pathway_ids,
+        )
+
+        # Use dataframe for easier manipulation
+        df = pd.DataFrame(q)
+        df.columns = [
+            "reaction_id",
+            "reaction_name",
+            "reaction_synonyms",
+            "reaction_direction",
+            "reaction_gibbs0",
+            "reaction_ec_enzymes",
+            "side",
+            "stoichiometry",
+            "compound_id",
+            "compound_name",
+            "compound_formula",
+            "compound_formation_gibbs0",
+            "compound_compartment",
+        ]
+        all_rxns = df.reaction_id.unique()  # used for getting genes later
+
+        # Fix stoichiometry so that side can be dropped
+        df.stoichiometry = np.where(
+            df.side == "hasLeft", -df.stoichiometry, df.stoichiometry
+        )
+
+        # Fix missing values
+        df.reaction_id = df.reaction_name
+        df.reaction_name = df.apply(
+            lambda x: "|".join(x["reaction_synonyms"])
+            if isinstance(x["reaction_synonyms"], list)
+            else x["reaction_name"],
+            axis=1,
+        )
+        df.fillna(
+            {
+                "reaction_gibbs0": pd.NA,
+                "compound_formation_gibbs0": pd.NA,
+                "reaction_ec_enzymes": pd.NA,
+            },
+            inplace=True,
+        )
+        df.drop(columns=["side", "reaction_synonyms"], inplace=True)
+
+        # Get gene associations
+        rxn_genes = {}
+        for rxn in all_rxns:
+            genes = self.get_genes_of_reaction(rxn)
+            if genes:
+                rxn_genes[rxn] = generate_gene_reaction_rule(genes)
+
+        return df, rxn_genes
+
+    def get_genes_of_reaction(self, reaction_id: str):
+        """
+        Given a reaction mcId, return the gene products associated with it in
+        the form of a list of (source, target) nodes. This is because certain
+        reactions are associated with ``EntitySet`` or ``Complex`` nodes, which
+        represent ``OR`` and ``AND`` relationships, respectively.
+
+        Note that ``EntitySet`` could contain nested ``Complex`` nodes.
+        """
+        return self.read(
+            """
+            MATCH (r:Reaction {mcId: $rxn})
+            WITH r
+            CALL apoc.path.expandConfig(r, {
+                labelFilter: "EntitySet|Complex|/GeneProduct",
+                minLevel: 1,
+                maxLevel: 3
+            })
+            YIELD path
+            WITH apoc.path.elements(path) AS elements
+            UNWIND range(0, size(elements)-2) AS index
+            WITH elements, index
+            WHERE index % 2 = 0
+            RETURN DISTINCT
+              {
+                label: labels(elements[index])[0],
+                mcId: elements[index].mcId,
+                name: elements[index].displayName
+              } AS source_node,
+              {
+                label: labels(elements[index+2])[0],
+                mcId: elements[index+2].mcId,
+                name: elements[index+2].displayName
+              } AS target_node;
+            """,
+            rxn=reaction_id,
+        )
 
     def get_cpd_view_of_pathway(
         self,
