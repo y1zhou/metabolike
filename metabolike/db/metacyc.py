@@ -559,7 +559,7 @@ class MetaDB(BaseDB):
 
         return nodes, edges
 
-    def get_fba_info_of_pathway(self, pathway_ids: List[str]):
+    def get_fba_info_of_pathways(self, pathway_ids: List[str]):
         """
         Retrieve the information of a pathway relevant to flux balance analysis.
         """
