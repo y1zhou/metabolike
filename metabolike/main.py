@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 import logging
-from pathlib import Path
 from typing import Optional
 
 import typer
 import uvicorn
-import yaml
 
-from metabolike.config import Config
+from metabolike.config import load_config
 from metabolike.db.metacyc import MetaDB
 from metabolike.parser.brenda import parse_brenda
 from metabolike.parser.metacyc import Metacyc
@@ -19,17 +17,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = typer.Typer()
-
-
-def load_config(config_file: str) -> Config:
-    logger.info(f"Parsing config file {config_file}")
-    conf_file = Path(config_file).expanduser().resolve()
-    with conf_file.open("r") as f:
-        conf_data = yaml.safe_load(f)
-
-    # Validate config file using pydantic schema
-    conf = Config(**conf_data)
-    return conf
 
 
 @app.command()
@@ -63,7 +50,7 @@ def setup(
     if conf.brenda:
         logger.info("Reading BRENDA text file")
         all_ecs = db.get_all_ec_numbers()
-        brenda = parse_brenda(conf.brenda.brenda_file, ec_nums=all_ecs, cache=use_cache)
+        # brenda = parse_brenda(conf.brenda.brenda_file, ec_nums=all_ecs, cache=use_cache)
 
     meta.db.close()
 
