@@ -349,7 +349,7 @@ class Metacyc:
             ).getGeneProductAssociation()
             if gpa is not None:
                 node = gpa.getAssociation()
-            self._add_sbml_gene_product_association_node(node, mcid)
+                self._add_sbml_gene_product_association_node(node, mcid)
 
     def reaction_to_graph(self, rxn_id: str, rxn_dat: Dict[str, List[List[str]]]):
         """
