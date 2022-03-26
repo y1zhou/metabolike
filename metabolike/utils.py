@@ -1,7 +1,7 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 
-def generate_gene_reaction_rule(genes: List[List[Dict[str, str]]]):
+def generate_gene_reaction_rule(genes: List[Tuple[Dict[str, str], Dict[str, str]]]):
     # Return directly if it's just one gene
     if len(genes) == 1:
         return genes[0][1]["name"]

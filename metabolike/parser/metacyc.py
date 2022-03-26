@@ -61,8 +61,6 @@ class Metacyc:
         classes: The path to the ``class.dat`` file. If given, the file
             will be parsed and annotations on ``Compartment``, ``Taxa``,
             and ``Compound`` nodes will be added.
-        db_name: The name of the database to create. If None, the ``metaid``
-            attribute of the SBML file is used.
 
     Attributes:
         db: A :class:`.MetaDB` instance. In :meth:`.setup`, this is connected
@@ -85,12 +83,9 @@ class Metacyc:
         compounds: Optional[Union[str, Path]] = None,
         publications: Optional[Union[str, Path]] = None,
         classes: Optional[Union[str, Path]] = None,
-        db_name: Optional[str] = None,
     ):
         # Neo4j driver
         self.db = neo4j
-        if db_name:
-            self.db.use_database(db_name)
 
         # File paths
         self.input_files = {
@@ -167,11 +162,8 @@ class Metacyc:
         # Read SBML file and set default database name
         doc = self._read_sbml(self.input_files["sbml"])
         model: libsbml.Model = doc.getModel()
-        if not self.db.db_name:
-            self.db.db_name = model.getMetaId().lower()
 
         # Setup Neo4j database and populate it with data
-        self.db.use_database(self.db.db_name)
         self.db.setup_graph_db(create_db=create_db, **kwargs)
         self.sbml_to_graph(model)
 

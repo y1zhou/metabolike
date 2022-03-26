@@ -3,15 +3,16 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 
 logger = logging.getLogger(__name__)
 
 
-class DatabaseConfig(BaseModel):
+class Neo4jConfig(BaseModel):
     uri: str
-    neo4j_user: str
-    neo4j_password: str
+    user: str
+    password: SecretStr
+    database: str = "neo4j"
 
 
 class MetacycConfig(BaseModel):
@@ -30,7 +31,7 @@ class BrendaConfig(BaseModel):
 
 
 class Config(BaseModel):
-    database: DatabaseConfig
+    neo4j: Neo4jConfig
     metacyc: MetacycConfig
     brenda: Optional[BrendaConfig]
 

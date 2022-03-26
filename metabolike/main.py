@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import logging
-from typing import Optional
 
 import typer
 import uvicorn
@@ -24,25 +23,22 @@ def setup(
     config_file: str = typer.Option(
         ..., "--config", "-c", help="Path to the configuration file."
     ),
-    database: Optional[str] = typer.Option(
-        None,
-        help="Name of the database. Use MetaID from SBML file if not given.",
-    ),
     create_db: bool = typer.Option(
         True, help="When database creation is not allowed, set this to False."
     ),
     drop_if_exists: bool = typer.Option(
         False, "--drop-if-exists", "-f", help="Drop the database if it already exists."
     ),
-    use_cache: bool = typer.Option(
-        True, help="Use cache for parsing BRENDA text file if it exists."
-    ),
 ):
     conf = load_config(config_file)
 
     logger.info("Connecting to neo4j database")
-    db = MetaDB(**conf.database.dict())
-    meta = Metacyc(db, **conf.metacyc.dict(), db_name=database)
+    db = MetaDB(
+        **conf.neo4j.dict(include={"uri", "database"}),
+        neo4j_user=conf.neo4j.user,
+        neo4j_password=conf.neo4j.password.get_secret_value()
+    )
+    meta = Metacyc(db, **conf.metacyc.dict())
 
     logger.info("Setting up database using MetaCyc data")
     meta.setup(create_db=create_db, force=drop_if_exists)
@@ -52,7 +48,7 @@ def setup(
         all_ecs = db.get_all_ec_numbers()
         # brenda = parse_brenda(conf.brenda.brenda_file, ec_nums=all_ecs, cache=use_cache)
 
-    meta.db.close()
+    db.close()
 
 
 @app.command()

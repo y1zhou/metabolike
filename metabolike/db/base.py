@@ -1,18 +1,19 @@
 import logging
-from typing import Any, List, Union
+from typing import Any, Callable, Dict, List, Union
 
-from neo4j import BoltDriver, GraphDatabase, Neo4jDriver, Session, Transaction
+from neo4j import BoltDriver, GraphDatabase, Neo4jDriver
 from neo4j.work.result import Result
 
 logger = logging.getLogger(__name__)
 
 
-class BaseDB:
+class Neo4jDB:
     def __init__(
         self,
         uri: str = "neo4j://localhost:7687",
         neo4j_user: str = "neo4j",
         neo4j_password: str = "neo4j",
+        database: str = "neo4j",
     ):
         """setup Neo4j driver.
 
@@ -21,72 +22,66 @@ class BaseDB:
             For more details, see :class:`neo4j.driver.Driver`.
             neo4j_user: Neo4j user. Defaults to "neo4j".
             neo4j_password: Neo4j password. Defaults to "neo4j".
+            database: Name of the database. Defaults to "neo4j".
 
         Attributes:
             driver: :class:`neo4j.Neo4jDriver` or :class:`neo4j.BoltDriver`.
-            session: :class:`neo4j.Session`.
+            database: str, name of the database to use.
         """
         self.driver: Union[Neo4jDriver, BoltDriver] = GraphDatabase.driver(
             uri, auth=(neo4j_user, neo4j_password)
         )
+        self.database = database
         # logger.debug(self.driver.verify_connectivity())
 
     def close(self):
-        self.session.close()
         self.driver.close()
 
-    def create(self, db_name: str, force: bool = False):
+    def create(self, force: bool = False):
         """Helper function to create a database.
 
         Args:
-            db_name: Name of the database to create.
             force: If True, the database will be dropped if it already exists.
         """
-        if not db_name:
-            raise ValueError("db_name must be specified")
         if force:
-            query = f"""CREATE OR REPLACE DATABASE {db_name}"""
+            query = f"""CREATE OR REPLACE DATABASE {self.database}"""
         else:
-            query = f"""CREATE DATABASE {db_name} IF NOT EXISTS"""
+            query = f"""CREATE DATABASE {self.database} IF NOT EXISTS"""
+
+        logger.debug(f"Creating database {self.database}")
         with self.driver.session() as ss:
             res = ss.run(query).data()
 
         if res:
-            raise RuntimeError(f"Could not create database {db_name}: {res}")
+            raise RuntimeError(f"Could not create database {self.database}: {res}")
 
-    def start_session(self, **kwargs):
-        self.session: Session = self.driver.session(**kwargs)
-
-    def write(self, cypher: str, **kwargs) -> Result:
-        """Helper function to write to the database.
+    def write(self, cypher: str, **kwargs):
+        """Helper function to write to the database. Ignores returned output.
 
         Args:
             query: Query to write to the database.
             **kwargs: Keyword arguments to pass to :meth:`BaseDB.run`.
         """
-        return self.session.write_transaction(lambda tx: tx.run(cypher, **kwargs))
+        with self.driver.session(database=self.database) as ss:
+            ss.write_transaction(lambda tx: tx.run(cypher, **kwargs))
 
-    def read(self, cypher: str, **kwargs) -> List[Any]:
-        """Helper function to read from the database.
+    def read(self, cypher: str, **kwargs) -> List[Dict[str, Any]]:
+        """Helper function to read from the database. Streams all records in the
+        query into a list of dictionaries.
 
         Args:
             query: Query to read from the database.
             **kwargs: Keyword arguments to pass to :meth:`BaseDB.run`.
         """
-        return self.session.read_transaction(self._read_tx_func, cypher, **kwargs)
+        with self.driver.session(database=self.database) as ss:
+            return ss.read_transaction(lambda tx: tx.run(cypher, **kwargs).data())
 
-    @staticmethod
-    def _read_tx_func(tx: Transaction, cypher: str, **kwargs) -> List[Any]:
-        """Helper function to run a query.
+    def read_tx(self, tx_func: Callable, **kwargs) -> List[Any]:
+        """Helper function to read from the database.
 
         Args:
-            tx: Neo4j transaction function.
-            cypher: Cypher query.
-            **kwargs: Keyword arguments to pass to the cypher query.
-
-        Returns:
-            The result of Cypher query execution.
-            For more details, see :class:`neo4j.work.result.Result`.
+            tx_func: A transaction function to run.
+            **kwargs: Keyword arguments to pass to :meth:`BaseDB.run`.
         """
-        res = tx.run(cypher, **kwargs)
-        return [x for x in res]
+        with self.driver.session(database=self.database) as ss:
+            return ss.read_transaction(tx_func, **kwargs)

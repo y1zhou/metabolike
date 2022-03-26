@@ -16,7 +16,7 @@ def read_root():
 @app.get("/pathway/{pathway_id}")
 def get_pathway(pathway_id: str):
     nodes, edges = db.get_view_of_pathway(pathway_id)
-    return {"nodes": [x[0] for x in nodes], "edges": [x[0] for x in edges]}
+    return {"nodes": nodes, "edges": edges}
 
 
 @app.post("/pathways/reactions/")

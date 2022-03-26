@@ -3,8 +3,9 @@ from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from metabolike.db.base import BaseDB
 from metabolike.utils import generate_gene_reaction_rule
+
+from .base import Neo4jDB
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +26,7 @@ NODE_LABELS = [
 COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
 
 
-class MetaDB(BaseDB):
-    def use_database(self, db_name: str):
-        """Set the name of the database to use."""
-        self.db_name = db_name
-        self.start_session(database=self.db_name)
-
+class MetaDB(Neo4jDB):
     def setup_graph_db(self, create_db: bool = True, **kwargs):
         """
         Create Neo4j database and set proper constraints. ``Reaction`` nodes are
@@ -44,27 +40,23 @@ class MetaDB(BaseDB):
         """
         # Create database
         if create_db:
-            self.create(self.db_name, **kwargs)
+            self.create(**kwargs)
 
         # Set constraints
         logger.debug("Creating constraint for RDF nodes")
-        r = self.write(
-            """CREATE CONSTRAINT IF NOT EXISTS
-                 ON (r:RDF) ASSERT r.uri IS UNIQUE;""",
-        ).data()
-        if r:
-            logger.warning(f"Could not create constraint for RDF nodes: {r}")
+        self.write(
+            """CREATE CONSTRAINT IF NOT EXISTS ON (r:RDF)
+               ASSERT r.uri IS UNIQUE;""",
+        )
 
         # Constraints automatically create indexes, so we don't need to
         # create them manually.
         for label in NODE_LABELS:
             logger.debug(f"Creating constraint for node: {label}")
-            r = self.write(
-                f"""CREATE CONSTRAINT IF NOT EXISTS
-                    ON (n:{label}) ASSERT n.mcId IS UNIQUE;""",
-            ).data()
-            if r:
-                logger.warning(f"Could not create constraint for node {label}: {r}")
+            self.write(
+                f"""CREATE CONSTRAINT IF NOT EXISTS ON (n:{label})
+                    ASSERT n.mcId IS UNIQUE;""",
+            )
 
     def create_node(self, node_label: str, mcid: str, props: Dict[str, str]):
         """Create a node with the given label and properties.
@@ -440,7 +432,7 @@ class MetaDB(BaseDB):
             n2_attr: The attribute of the second node for filtering.
             attr_val: The value of the attributes for filtering.
         """
-        _ = self.write(
+        self.write(
             f"""
             MATCH (n1:{n1_label} {{{n1_attr}: $val}}),
                   (n2:{n2_label} {{{n2_attr}: $val}})
@@ -536,7 +528,7 @@ class MetaDB(BaseDB):
           id: id(r), name: r.displayName, ec: ec, gibbs: r.gibbs0,
           direction: r.reactionDirection,
           genes: {symbol: symbol, ncbi: ncbi}
-        };
+        } AS node;
             """,
             pw_id=pathway_id,
         )
@@ -552,12 +544,12 @@ class MetaDB(BaseDB):
         UNWIND relationships(p) AS edge
         RETURN {
             id: id(edge), source: id(startNode(edge)), target: id(endNode(edge))
-        };
+        } AS edge;
             """,
             pw_id=pathway_id,
         )
 
-        return nodes, edges
+        return [x["node"] for x in nodes], [x["edge"] for x in edges]
 
     def get_fba_info_of_pathways(self, pathway_ids: List[str]):
         """
@@ -630,7 +622,9 @@ class MetaDB(BaseDB):
 
         return df, rxn_genes
 
-    def get_genes_of_reaction(self, reaction_id: str):
+    def get_genes_of_reaction(
+        self, reaction_id: str
+    ) -> List[Tuple[Dict[str, str], Dict[str, str]]]:
         """
         Given a reaction mcId, return the gene products associated with it in
         the form of a list of (source, target) nodes. This is because certain
@@ -639,7 +633,7 @@ class MetaDB(BaseDB):
 
         Note that ``EntitySet`` could contain nested ``Complex`` nodes.
         """
-        return self.read(
+        res = self.read(
             """
             MATCH (r:Reaction {mcId: $rxn})
             WITH r
@@ -667,6 +661,7 @@ class MetaDB(BaseDB):
             """,
             rxn=reaction_id,
         )
+        return [(x["source_node"], x["target_node"]) for x in res]
 
     def get_cpd_view_of_pathway(
         self,
