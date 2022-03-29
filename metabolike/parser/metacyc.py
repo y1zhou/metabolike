@@ -710,11 +710,15 @@ class Metacyc(SBMLParser):
             # Directed pathway links wrapped in parentheses
             if s[0] == "(":
                 m = directed_pw_rgx.match(s)
+                if not m:
+                    raise ValueError(f"Invalid pathway links string: {s}")
                 pathways.append(m.group(1))
                 direction = m.group(2)
             # Regular pathway links separated by spaces
             else:
                 m = pw_rgx.match(s)
+                if not m:
+                    raise ValueError(f"Invalid pathway links string: {s}")
                 pathways.append(m.group(0))
             s = s[m.end() :].strip()
 
