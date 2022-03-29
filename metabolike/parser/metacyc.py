@@ -190,13 +190,13 @@ class Metacyc(SBMLParser):
             # SMILES reactions
             if self.input_files["atom_mapping"]:
                 logger.info("Adding SMILES to reactions")
-                smiles = pd.read_table(
+                smiles_df = pd.read_table(
                     self.input_files["atom_mapping"],
                     sep="\t",
                     header=None,
                     names=["rxn", "smiles"],
                 )
-                smiles: Dict[str, str] = smiles.set_index("rxn").to_dict()["smiles"]
+                smiles: Dict[str, str] = smiles_df.set_index("rxn").to_dict()["smiles"]
                 for rxn in tqdm(all_rxns, desc="atom_mapping.dat file"):
                     self.atom_mapping_to_graph(rxn, smiles)
 
