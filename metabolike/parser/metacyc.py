@@ -4,34 +4,17 @@ from itertools import groupby
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
-import libsbml
 import pandas as pd
 from metabolike.db.metacyc import MetaDB
+from metabolike.utils import add_kv_to_dict, snake_to_camel, validate_path
 from tqdm import tqdm
+
+from .sbml import SBMLParser
 
 logger = logging.getLogger(__name__)
 
-# MIRIAM qualifiers (https://co.mbine.org/standards/qualifiers)
-# libsbml.BiolQualifierType_toString
-BIO_QUALIFIERS = {
-    0: "is",
-    1: "hasPart",
-    2: "isPartOf",
-    3: "isVersionOf",
-    4: "hasVersion",
-    5: "isHomologTo",
-    6: "isDescribedBy",
-    7: "isEncodedBy",
-    8: "encodes",
-    9: "occursIn",
-    10: "hasProperty",
-    11: "isPropertyOf",
-    12: "hasTaxon",
-    13: "unknown",
-}
 
-
-class Metacyc:
+class Metacyc(SBMLParser):
     """
     Converting MetaCyc files to a Neo4j database.
     Documentation on the MetaCyc files and format FAQs can be found at:
@@ -40,9 +23,9 @@ class Metacyc:
     * MetaCyc file formats: http://bioinformatics.ai.sri.com/ptools/flatfile-format.html
     * SBML FAQ: https://synonym.caltech.edu/documents/faq
 
+    See :class:`.sbml.SBMLParser` for more information on SBML parsing.
+
     Args:
-        neo4j: A :class:`.MetaDB` instance.
-        sbml: The path to the MetaCyc SBML file to convert.
         reactions: The path to the ``reaction.dat`` file. If given,
             the file will be parsed and extra annotation on ``Reaction``
             nodes will be added.
@@ -63,9 +46,9 @@ class Metacyc:
             and ``Compound`` nodes will be added.
 
     Attributes:
-        db: A :class:`.MetaDB` instance. In :meth:`.setup`, this is connected
-            to neo4j and used to perform all database operations. Should be
-            closed after use.
+        db: A :class:`.MetaDB` instance. This is connected to neo4j and used to
+        perform all database operations. Should be closed after use.
+        sbml_file: Filepath to the input SBML file.
         input_files: A dictionary of the paths to the input ``.dat`` files.
         missing_ids: A dictionary of sets of IDs that were not found in the
             input files. This is helpful for collecting IDs that appear to be
@@ -77,6 +60,8 @@ class Metacyc:
         self,
         neo4j: MetaDB,
         sbml: Union[str, Path],
+        create_db: bool = True,
+        drop_if_exists: bool = False,
         reactions: Optional[Union[str, Path]] = None,
         atom_mapping: Optional[Union[str, Path]] = None,
         pathways: Optional[Union[str, Path]] = None,
@@ -84,12 +69,11 @@ class Metacyc:
         publications: Optional[Union[str, Path]] = None,
         classes: Optional[Union[str, Path]] = None,
     ):
-        # Neo4j driver
-        self.db = neo4j
+        # Neo4j driver and SBML file path
+        super().__init__(neo4j, sbml, create_db, drop_if_exists)
 
         # File paths
         self.input_files = {
-            "sbml": validate_path(sbml),
             "reactions": validate_path(reactions),
             "atom_mapping": validate_path(atom_mapping),
             "pathways": validate_path(pathways),
@@ -110,7 +94,7 @@ class Metacyc:
             "taxon": set(),
         }
 
-    def setup(self, create_db: bool = True, **kwargs):
+    def setup(self):
         """Enterpoint for setting up the database.
 
         The process is as follows:
@@ -159,13 +143,8 @@ class Metacyc:
 
         .. _SMILES: https://en.wikipedia.org/wiki/SMILES
         """
-        # Read SBML file and set default database name
-        doc = self._read_sbml(self.input_files["sbml"])
-        model: libsbml.Model = doc.getModel()
-
-        # Setup Neo4j database and populate it with data
-        self.db.setup_graph_db(create_db=create_db, **kwargs)
-        self.sbml_to_graph(model)
+        # Populate Neo4j database with data from SBML file
+        self.sbml_to_graph()
 
         # Add additional information of reactions to the graph if given
         if self.input_files["reactions"] or self.input_files["atom_mapping"]:
@@ -249,100 +228,6 @@ class Metacyc:
 
         self._report_missing_ids()
 
-    def sbml_to_graph(self, model: libsbml.Model):
-        """
-        Populate Neo4j database with SBML data.
-
-        Nodes are created for each SBML element using ``MERGE`` statements:
-        https://neo4j.com/docs/cypher-manual/current/clauses/merge/#merge-merge-with-on-create
-        """
-        # Compartments
-        logger.info("Creating Compartment nodes")
-        for c in model.getListOfCompartments():
-            c: libsbml.Compartment
-            props = {"displayName": c.getName()}
-            self.db.create_node("Compartment", c.getMetaId(), props)
-
-        # Compounds, i.e. metabolites, species
-        logger.info("Creating Compound nodes")
-        for s in tqdm(model.getListOfSpecies(), desc="Compounds"):
-            s: libsbml.Species
-            # Basic properties
-            mcid: str = s.getMetaId()
-            props = {
-                "displayName": s.getName(),
-                "charge": s.getCharge(),
-                "chemicalFormula": s.getPlugin("fbc").getChemicalFormula(),
-                "boundaryCondition": s.getBoundaryCondition(),  # unchanged by reactions
-                "hasOnlySubstanceUnits": s.getHasOnlySubstanceUnits(),
-                "constant": s.getConstant(),
-            }
-            self.db.create_compound_node(s.getCompartment(), mcid, props)
-
-            # Add RDF annotations
-            logger.debug(f"Adding RDF nodes for Compound {mcid}")
-            cvterms: List[libsbml.CVTerm] = s.getCVTerms()
-            for cvterm in cvterms:
-                self._add_sbml_rdf_node("Compound", mcid, cvterm)
-
-        # Gene products
-        logger.info("Creating GeneProduct nodes")
-        fbc: libsbml.FbcModelPlugin = model.getPlugin("fbc")
-        for gp in tqdm(fbc.getListOfGeneProducts(), desc="GeneProducts"):
-            gp: libsbml.GeneProduct
-            mcid = gp.getMetaId()
-            props = {
-                "displayName": gp.getName(),
-                "label": gp.getLabel(),
-            }
-            self.db.create_node("GeneProduct", mcid, props)
-
-            logger.debug(f"Adding RDF nodes for GeneProduct {mcid}")
-            cvterms: List[libsbml.CVTerm] = gp.getCVTerms()
-            for cvterm in cvterms:
-                self._add_sbml_rdf_node("GeneProduct", mcid, cvterm)
-
-        # Reactions
-        logger.info("Creating Reaction nodes")
-        for r in tqdm(model.getListOfReactions(), desc="Reactions"):
-            r: libsbml.Reaction
-            mcid = r.getMetaId()
-
-            # Basic properties
-            props = {
-                "displayName": r.getName(),
-                "fast": r.getFast(),
-            }
-            self.db.create_node("Reaction", mcid, props)
-
-            # Add RDF nodes
-            logger.debug(f"Adding RDF nodes for Reaction {mcid}")
-            cvterms: List[libsbml.CVTerm] = r.getCVTerms()
-            for cvterm in cvterms:
-                self._add_sbml_rdf_node("Reaction", mcid, cvterm)
-
-            # Add reactants and products
-            logger.debug(f"Adding reactants for Reaction {mcid}")
-            reactants = r.getListOfReactants()
-            self._link_reaction_to_compound(mcid, reactants, "Left")
-
-            logger.debug(f"Adding products for Reaction {mcid}")
-            products = r.getListOfProducts()
-            self._link_reaction_to_compound(mcid, products, "Right")
-
-            # Add associated gene products
-            # This could be complicated where the child nodes could be:
-            # 1. GeneProductRef
-            # 2. fbc:or -> GeneProductRef
-            # 3. fbc:and -> GeneProductRef
-            # 4. Arbitrarily nested fbc:or / fbc:and within cases 2 and 3
-            gpa: libsbml.GeneProductAssociation = r.getPlugin(
-                "fbc"
-            ).getGeneProductAssociation()
-            if gpa is not None:
-                node = gpa.getAssociation()
-                self._add_sbml_gene_product_association_node(node, mcid)
-
     def reaction_to_graph(self, rxn_id: str, rxn_dat: Dict[str, List[List[str]]]):
         """
         Parse one entry from the reaction attribute-value file, and add relevant
@@ -362,7 +247,7 @@ class Metacyc:
         for k, v in lines:
             # SYNONYMS is a special case because it is a list
             if k in {"SYNONYMS", "TYPES"}:
-                _add_kv_to_dict(props, k, v, as_list=True)
+                add_kv_to_dict(props, k, v, as_list=True)
             elif k in {
                 "GIBBS-0",
                 "STD-REDUCTION-POTENTIAL",
@@ -371,7 +256,7 @@ class Metacyc:
                 "SYSTEMATIC-NAME",
                 "COMMENT",  # TODO: link to other nodes
             }:
-                _add_kv_to_dict(props, k, v, as_list=False)
+                add_kv_to_dict(props, k, v, as_list=False)
             elif k == "IN-PATHWAY":
                 self.db.link_reaction_to_pathway(rxn_id, v)
             elif k == "RXN-LOCATIONS":
@@ -383,10 +268,10 @@ class Metacyc:
         props = self._clean_props(
             props,
             num_fields=[
-                _snake_to_camel(x) for x in ["GIBBS-0", "STD-REDUCTION-POTENTIAL"]
+                snake_to_camel(x) for x in ["GIBBS-0", "STD-REDUCTION-POTENTIAL"]
             ],
             enum_fields=[
-                _snake_to_camel(x)
+                snake_to_camel(x)
                 for x in ["REACTION-BALANCE-STATUS", "REACTION-DIRECTION"]
             ],
         )
@@ -438,9 +323,9 @@ class Metacyc:
         for k, v in lines:
             # Pathway node properties
             if k in {"SYNONYMS", "TYPES"}:
-                _add_kv_to_dict(props, k, v, as_list=True)
+                add_kv_to_dict(props, k, v, as_list=True)
             elif k in {"COMMENT", "COMMON-NAME"}:
-                _add_kv_to_dict(props, k, v, as_list=False)
+                add_kv_to_dict(props, k, v, as_list=False)
 
             # Relationship with other nodes
             elif k in {"IN-PATHWAY", "SUPER-PATHWAYS"}:
@@ -511,11 +396,11 @@ class Metacyc:
                 "PKA3",
                 "COMMENT",
             }:
-                _add_kv_to_dict(c_props, k, v, as_list=False)
+                add_kv_to_dict(c_props, k, v, as_list=False)
             elif k == "SYNONYMS":
-                _add_kv_to_dict(c_props, k, v, as_list=True)
+                add_kv_to_dict(c_props, k, v, as_list=True)
             elif k in {"SMILES", "INCHI"}:
-                _add_kv_to_dict(rdf_props, k, v, as_list=False)
+                add_kv_to_dict(rdf_props, k, v, as_list=False)
             elif k == "DBLINKS":
                 pass  # TODO: parse DBLINKS
             elif k == "CITATIONS":
@@ -524,7 +409,7 @@ class Metacyc:
         c_props = self._clean_props(
             c_props,
             num_fields=[
-                _snake_to_camel(x)
+                snake_to_camel(x)
                 for x in [
                     "GIBBS-0",
                     "LOGP",
@@ -574,7 +459,7 @@ class Metacyc:
         for k, v in lines:
             # Pathway node properties
             if k == "AUTHORS":
-                _add_kv_to_dict(props, k, v, as_list=True)
+                add_kv_to_dict(props, k, v, as_list=True)
             elif k in {
                 "DOI-ID",
                 "PUBMED-ID",
@@ -585,7 +470,7 @@ class Metacyc:
                 "URL",
                 "REFERENT-FRAME",
             }:
-                _add_kv_to_dict(props, k, v, as_list=False)
+                add_kv_to_dict(props, k, v, as_list=False)
 
         self.db.add_props_to_node("Citation", "mcId", cit_id, props)
 
@@ -607,9 +492,9 @@ class Metacyc:
             props: Dict[str, Union[str, List[str]]] = {}
             for k, v in class_dat[cco]:
                 if k == "COMMON-NAME":
-                    _add_kv_to_dict(props, k, v, as_list=False)
+                    add_kv_to_dict(props, k, v, as_list=False)
                 elif k == "SYNONYMS":
-                    _add_kv_to_dict(props, k, v, as_list=True)
+                    add_kv_to_dict(props, k, v, as_list=True)
 
             self.db.add_props_to_node("Compartment", "displayName", cco, props)
 
@@ -622,172 +507,14 @@ class Metacyc:
             props: Dict[str, Union[str, List[str]]] = {}
             for k, v in class_dat[taxa]:
                 if k in {"COMMON-NAME", "STRAIN-NAME", "COMMENT"}:
-                    _add_kv_to_dict(props, k, v, as_list=False)
+                    add_kv_to_dict(props, k, v, as_list=False)
                 elif k == "SYNONYMS":
-                    _add_kv_to_dict(props, k, v, as_list=True)
+                    add_kv_to_dict(props, k, v, as_list=True)
                 # TODO: TYPES links the taxon
 
             self.db.add_props_to_node("Taxa", "mcId", taxa, props)
 
         # TODO: Evidence code in citations are in the `Evidence` attr
-
-    @staticmethod
-    def _read_sbml(sbml_file: Path) -> libsbml.SBMLDocument:
-        reader = libsbml.SBMLReader()
-        metacyc = reader.readSBMLFromFile(sbml_file)
-        logger.info("Finished reading SBML file")
-
-        for i in range(metacyc.getNumErrors()):
-            err = metacyc.getError(i)
-            logger.warning(
-                "SBML reader raised %s during parsing at line %d, column %d: %s",
-                err.getSeverityAsString(),
-                err.getLine(),
-                err.getColumn(),
-                err.getMessage().replace("\n", " "),
-            )
-
-        return metacyc
-
-    def _add_sbml_rdf_node(self, node_label: str, mcid: str, cvterm: libsbml.CVTerm):
-        """Create RDF node and link it to the given SBML node.
-
-        RDF in Annotation are in the form of triples:
-        the model component to annotate (subject), the relationship between
-        the model component and the annotation (predicate), and a term
-        describing the component (object).
-
-        Args:
-            node_label: The label of the SBML node to annotate. Should be one
-                of the labels defined in ``NODE_LABELS``.
-            mcid: The MetaCyc ID of the SBML node to annotate.
-            cvterm: The CVTerm that contains information to add to the RDF node.
-        """
-        # Get the biological qualifier type of the terms
-        bio_qual = BIO_QUALIFIERS[cvterm.getBiologicalQualifierType()]
-        # Get the content of each RDF term
-        uris = [
-            self._split_uri(cvterm.getResourceURI(i))
-            for i in range(cvterm.getNumResources())
-        ]
-
-        props: Dict[str, Union[str, List[str]]] = {}
-        for resource, identifier in uris:
-            is_list_resource = resource == "ec-code"
-            _add_kv_to_dict(props, resource, identifier, as_list=is_list_resource)
-
-        self.db.link_node_to_rdf(node_label, mcid, bio_qual, props)
-
-    def _link_reaction_to_compound(
-        self,
-        reaction_id: str,
-        compounds: List[libsbml.SpeciesReference],
-        compound_type: str,
-    ):
-        """Link reactants or products to a reaction.
-
-        Args:
-            reaction_id: The MetaCyc ID of the reaction.
-            compounds: The list of compounds to link to the reaction.
-            compound_type: The type of compound to link to the reaction. Should
-                be one of "Left" or "Right".
-        """
-        if compound_type not in ["Left", "Right"]:
-            raise ValueError(f"Invalid compound type: {compound_type}")
-        for cpd in compounds:
-            props = {
-                "stoichiometry": cpd.getStoichiometry(),
-                "constant": cpd.getConstant(),
-            }
-            self.db.link_reaction_to_compound(
-                reaction_id, cpd.getSpecies(), compound_type, props
-            )
-
-    def _add_sbml_gene_product_association_node(
-        self,
-        node: Union[libsbml.GeneProductRef, libsbml.FbcAnd, libsbml.FbcOr],
-        source_id: str,
-        source_label: str = "Reaction",
-        edge_type: str = "hasGeneProduct",
-        node_index: int = 0,
-    ):
-        """
-        Add gene products to a reaction. When the added node is FbcAnd or FbcOr,
-        recursively add the children. This means a custom ``mcId`` is constructed
-        for the ``Complex`` and ``EntitySet`` nodes corresponding to the ``FbcAnd``
-        and ``FbcOr`` nodes, respectively.
-
-        Args:
-            node: The GeneProductAssociation child node to add.
-            source_id: The MetaCyc ID of the source node. This should be the
-                MetaCyc ID of the ``Reaction`` node
-            source_label: The label of the source node.
-            edge_type: The type of edge to add. Should be one of ``hasGeneProduct``,
-                ``hasComponent``, or ``hasMember``.
-            node_index: The index of the current node. This is used to construct
-                the ``mcId`` of the ``Complex`` and ``EntitySet`` nodes.
-        """
-        # If there's no nested association, add the node directly
-        if isinstance(node, libsbml.GeneProductRef):
-            self.db.link_node_to_gene(
-                source_label, source_id, node.getGeneProduct(), "GeneProduct", edge_type
-            )
-
-        # For nested associations, first add a `Complex` or `EntitySet` node,
-        # then recursively add the children
-        elif isinstance(node, libsbml.FbcAnd):
-            complex_id = f"{source_id}_complex{node_index}"
-            self.db.link_node_to_gene(
-                source_label, source_id, complex_id, "Complex", edge_type
-            )
-
-            for i in range(node.getNumAssociations()):
-                self._add_sbml_gene_product_association_node(
-                    node.getAssociation(i),
-                    complex_id,
-                    "Complex",
-                    "hasComponent",
-                    i,
-                )
-        elif isinstance(node, libsbml.FbcOr):
-            eset_id = f"{source_id}_entityset{node_index}"
-            self.db.link_node_to_gene(
-                source_label, source_id, eset_id, "EntitySet", edge_type
-            )
-
-            for i in range(node.getNumAssociations()):
-                self._add_sbml_gene_product_association_node(
-                    node.getAssociation(i),
-                    eset_id,
-                    "EntitySet",
-                    "hasMember",
-                    i,
-                )
-        else:
-            logging.error(f"Unhandled GeneProductAssociation type {type(node)}")
-            raise ValueError
-
-    @staticmethod
-    def _split_uri(uri: str) -> Tuple[str, str]:
-        """Split a URI into a namespace and an annotation term.
-
-        Args:
-            uri: URI to split.
-
-        Returns:
-            Tuple of namespace and annotation term.
-        """
-        # First three elements are from http://identifiers.org/
-        res = uri.split("/")[3:]
-        resource, identifier = res[0], res[1:]
-        resource = resource.replace(".", "-")  # Ec-code
-        identifier = "".join(identifier)
-
-        # In some cases the identifier in the RDF nodes of the SBML file has a
-        # prefix, e.g. META: or HUMAN: for BioCyc IDs. We don't want these as
-        # they make later queries difficult.
-        identifier = re.sub(r"^[A-Z]+:", "", identifier)
-        return resource, identifier
 
     @staticmethod
     def _read_dat_file(filepath: Union[str, Path]) -> Dict[str, List[List[str]]]:
@@ -1003,52 +730,3 @@ class Metacyc:
         for datfile, ids in self.missing_ids.items():
             if ids:
                 logger.warning(f"The following IDs were not found in {datfile}: {ids}")
-
-
-def validate_path(filepath: Optional[Union[str, Path]]) -> Optional[Path]:
-    if not filepath:
-        return None
-    f = Path(filepath).expanduser().resolve()
-    if not f.is_file():
-        logger.error(f"File does not exist: {f}")
-        raise FileNotFoundError(str(f))
-
-    return f
-
-
-def _snake_to_camel(s: str, sep: str = "-") -> str:
-    """Convert snake_case to CamelCase.
-
-    Args:
-        s: String to convert.
-        sep: Separator to use.
-
-    Returns:
-        camelCase string.
-    """
-    s_camel = [x.capitalize() for x in s.split(sep)]
-    s_camel[0] = s_camel[0].lower()
-    return "".join(s_camel)
-
-
-def _add_kv_to_dict(
-    d: Dict[str, Any], k: str, v: Any, as_list: bool = False
-) -> Dict[str, Any]:
-    """Add a key-value pair to a dictionary.
-
-    Args:
-        d: Dictionary to add the key-value pair to.
-        k: Key to add.
-        v: Value to add.
-
-    Returns:
-        Dictionary with the key-value pair added. If the key already exists,
-        the value is saved as a list.
-    """
-    k_camel = _snake_to_camel(k)
-    if as_list:
-        d.setdefault(k_camel, []).append(v)
-    else:
-        d[k_camel] = v
-
-    return d

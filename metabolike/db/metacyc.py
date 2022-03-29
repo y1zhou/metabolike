@@ -27,7 +27,7 @@ COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
 
 
 class MetaDB(Neo4jDB):
-    def setup_graph_db(self, create_db: bool = True, **kwargs):
+    def setup_graph_db(self, create_db: bool = True, drop_if_exists: bool = False):
         """
         Create Neo4j database and set proper constraints. ``Reaction`` nodes are
         central in the schema.
@@ -36,11 +36,11 @@ class MetaDB(Neo4jDB):
             session: :class:`neo4j.Session` object.
             create_db: If False, does not create the database. This is useful
                 for running on neo4j AuraDB when database creation is not allowed.
-            **kwargs: Keyword arguments to pass to :meth:`.create`.
+            drop_if_exists: See :meth:`.create`.
         """
         # Create database
         if create_db:
-            self.create(**kwargs)
+            self.create(force=drop_if_exists)
 
         # Set constraints
         logger.debug("Creating constraint for RDF nodes")

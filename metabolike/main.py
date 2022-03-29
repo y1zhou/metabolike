@@ -38,10 +38,12 @@ def setup(
         neo4j_user=conf.neo4j.user,
         neo4j_password=conf.neo4j.password.get_secret_value()
     )
-    meta = Metacyc(db, **conf.metacyc.dict())
+    meta = Metacyc(
+        db, **conf.metacyc.dict(), create_db=create_db, drop_if_exists=drop_if_exists
+    )
 
     logger.info("Setting up database using MetaCyc data")
-    meta.setup(create_db=create_db, force=drop_if_exists)
+    meta.setup()
 
     if conf.brenda:
         logger.info("Reading BRENDA text file")
