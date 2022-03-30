@@ -1,139 +1,39 @@
 import logging
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple
 
-from metabolike.db.base import BaseDB
+import numpy as np
+import pandas as pd
+from metabolike.utils import generate_gene_reaction_rule
+
+from .sbml import SBMLClient
 
 logger = logging.getLogger(__name__)
 
-NODE_LABELS = [
-    "Pathway",
-    "Compartment",
-    "Reaction",
-    "Compound",
-    "GeneProduct",
-    "RDF",
-    "Complex",
-    "EntitySet",
-    "Citation",
-    "Taxa",
-]
 
 # TODO: refactor this with get_high_degree_compound_nodes()
 COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
 
 
-class MetaDB(BaseDB):
-    def use_database(self, db_name: str):
-        """Set the name of the database to use."""
-        self.db_name = db_name
-        self.start_session(database=self.db_name)
-
-    def setup_graph_db(self, create_db: bool = True, **kwargs):
-        """
-        Create Neo4j database and set proper constraints. ``Reaction`` nodes are
-        central in the schema.
-
-        Args:
-            session: :class:`neo4j.Session` object.
-            create_db: If False, does not create the database. This is useful
-                for running on neo4j AuraDB when database creation is not allowed.
-            **kwargs: Keyword arguments to pass to :meth:`.create`.
-        """
-        # Create database
-        if create_db:
-            self.create(self.db_name, **kwargs)
-
-        # Set constraints
-        logger.debug("Creating constraint for RDF nodes")
-        r = self.write(
-            """CREATE CONSTRAINT IF NOT EXISTS
-                 ON (r:RDF) ASSERT r.uri IS UNIQUE;""",
-        ).data()
-        if r:
-            logger.warning(f"Could not create constraint for RDF nodes: {r}")
-
-        # Constraints automatically create indexes, so we don't need to
-        # create them manually.
-        for label in NODE_LABELS:
-            logger.debug(f"Creating constraint for node: {label}")
-            r = self.write(
-                f"""CREATE CONSTRAINT IF NOT EXISTS
-                    ON (n:{label}) ASSERT n.mcId IS UNIQUE;""",
-            ).data()
-            if r:
-                logger.warning(f"Could not create constraint for node {label}: {r}")
-
-    def create_node(self, node_label: str, mcid: str, props: Dict[str, str]):
-        """Create a node with the given label and properties.
-
-        See :meth:`.Metacyc.sbml_to_graph` for details.
-
-        Args:
-            node_label: Label of the node.
-            mcid: ``mcId`` of the node.
-            props: Properties of the node.
-        """
-        logger.debug(f"Creating {node_label} node: {mcid}")
-        self.write(
-            f"""
-            MERGE (n:{node_label} {{mcId: $mcId}})
-            ON CREATE SET n += $props;
-            """,
-            mcId=mcid,
-            props=props,
-        )
-
-    def create_compound_node(self, compartment: str, mcid: str, props: Dict[str, str]):
-        """See :meth:`.Metacyc.sbml_to_graph` for details."""
-        logger.debug(f"Creating Compound node: {mcid}")
-        self.write(
-            """
-            MATCH (cpt:Compartment {mcId: $compartment})
-            MERGE (c:Compound {mcId: $mcId})-[:hasCompartment]->(cpt)
-            ON CREATE SET c += $props;
-            """,
-            compartment=compartment,
-            mcId=mcid,
-            props=props,
-        )
-
-    def link_node_to_rdf(
+class MetacycClient(SBMLClient):
+    def __init__(
         self,
-        node_label: str,
-        mcid: str,
-        bio_qual: str,
-        props: Dict[str, Union[str, List[str]]],
+        uri: str = "neo4j://localhost:7687",
+        neo4j_user: str = "neo4j",
+        neo4j_password: str = "neo4j",
+        database: str = "neo4j",
     ):
-        """See :meth:`.Metacyc._add_sbml_rdf_node` for details."""
-        logger.debug(f"{node_label} node {mcid} {bio_qual} RDF")
-        self.write(
-            f"""
-                MATCH (c:{node_label} {{mcId: $mcId}})
-                MERGE (n:RDF)<-[:{bio_qual}]-(c)
-                ON CREATE SET n += $props;
-                """,
-            mcId=mcid,
-            props=props,
-        )
-
-    def link_reaction_to_compound(
-        self,
-        reaction_id: str,
-        compound_id: str,
-        compound_type: str,
-        props: Dict[str, str],
-    ):
-        logger.debug(f"Adding {compound_type} {compound_id} to Reaction {reaction_id}")
-        self.write(
-            f"""
-            MATCH (r:Reaction {{mcId: $reaction}}),
-                  (c:Compound {{mcId: $compound}})
-            MERGE (r)-[l:has{compound_type}]->(c)
-            ON CREATE SET l += $props;
-            """,
-            reaction=reaction_id,
-            compound=compound_id,
-            props=props,
+        super().__init__(uri, neo4j_user, neo4j_password, database)
+        self.available_node_labels = (
+            "Pathway",
+            "Compartment",
+            "Reaction",
+            "Compound",
+            "GeneProduct",
+            "RDF",
+            "GeneProductComplex",
+            "GeneProductSet",
+            "Citation",
+            "Taxa",
         )
 
     def link_reaction_to_compartment(self, reaction_id: str, compartment_name: str):
@@ -147,44 +47,9 @@ class MetaDB(BaseDB):
             compartment=compartment_name,
         )
 
-    def link_node_to_gene(
-        self,
-        node_label: str,
-        node_id: str,
-        group_id: str,
-        group_label: str,
-        edge_type: str,
-    ):
-        """
-        See :meth:`.Metacyc._add_sbml_gene_product_association_node` for details.
-
-        Link a node to a ``GeneProduct``, ``Complex``, or ``EntitySet`` node.
-
-        Args:
-            node_label: Label of the node.
-            node_id: ``mcId`` of the node.
-            group_id: ``mcId`` of the ``GeneProduct``, ``Complex`` or ``EntitySet``.
-            group_label: ``Complex`` or ``EntitySet``.
-            edge_type: Type of the edge.
-        """
-        if group_label not in ["GeneProduct", "Complex", "EntitySet"]:
-            raise ValueError(f"Invalid group_type: {group_label}")
-        logger.debug(
-            f"{node_label} node {node_id} {edge_type} {group_label} {group_id}"
-        )
-        self.write(
-            f"""
-            MATCH (n:{node_label} {{mcId: $node_id}})
-            MERGE (g:{group_label} {{mcId: $group_id}})
-            MERGE (g)<-[l:{edge_type}]-(n)
-            """,
-            node_id=node_id,
-            group_id=group_id,
-        )
-
     def get_all_nodes(self, label: str, prop: str) -> List[str]:
         """Fetch an property of nodes with a certain label."""
-        if label not in NODE_LABELS:
+        if label not in self.available_node_labels:
             raise ValueError(f"Invalid label: {label}")
         # TODO: check for valid properties
         res = self.read(
@@ -245,7 +110,7 @@ class MetaDB(BaseDB):
             node_prop_val: Property value of the node used to filter ``node_prop_key``.
             props: Properties to add to the node.
         """
-        if node_label not in NODE_LABELS:
+        if node_label not in self.available_node_labels:
             raise ValueError(f"Invalid label: {node_label}")
         # TODO: check for valid properties
         self.write(
@@ -437,7 +302,7 @@ class MetaDB(BaseDB):
             n2_attr: The attribute of the second node for filtering.
             attr_val: The value of the attributes for filtering.
         """
-        _ = self.write(
+        self.write(
             f"""
             MATCH (n1:{n1_label} {{{n1_attr}: $val}}),
                   (n2:{n2_label} {{{n2_attr}: $val}})
@@ -533,7 +398,7 @@ class MetaDB(BaseDB):
           id: id(r), name: r.displayName, ec: ec, gibbs: r.gibbs0,
           direction: r.reactionDirection,
           genes: {symbol: symbol, ncbi: ncbi}
-        };
+        } AS node;
             """,
             pw_id=pathway_id,
         )
@@ -549,12 +414,126 @@ class MetaDB(BaseDB):
         UNWIND relationships(p) AS edge
         RETURN {
             id: id(edge), source: id(startNode(edge)), target: id(endNode(edge))
-        };
+        } AS edge;
             """,
             pw_id=pathway_id,
         )
 
-        return nodes, edges
+        return [x["node"] for x in nodes], [x["edge"] for x in edges]
+
+    def get_fba_info_of_pathways(self, pathway_ids: List[str]):
+        """
+        Retrieve the information of a pathway relevant to flux balance analysis.
+        """
+        q = self.read(
+            """
+            MATCH (p:Pathway)-[:hasReaction]->(r:Reaction)-[l:hasLeft|hasRight]->(c:Compound)-[:hasCompartment]->(cpt:Compartment)
+            WHERE p.mcId IN $pw_ids
+            WITH r, l, c, cpt
+            OPTIONAL MATCH (r)-[:is]->(rdf:RDF)
+            RETURN
+              r.mcId, r.displayName, r.synonyms, r.reactionDirection, r.gibbs0,
+              rdf.ecCode,
+              type(l), l.stoichiometry,
+              c.mcId, c.displayName, c.chemicalFormula, c.gibbs0,
+              cpt.mcId;
+            """,
+            pw_ids=pathway_ids,
+        )
+
+        # Use dataframe for easier manipulation
+        df = pd.DataFrame(q)
+        df.columns = [
+            "reaction_id",
+            "reaction_name",
+            "reaction_synonyms",
+            "reaction_direction",
+            "reaction_gibbs0",
+            "reaction_ec_enzymes",
+            "side",
+            "stoichiometry",
+            "compound_id",
+            "compound_name",
+            "compound_formula",
+            "compound_formation_gibbs0",
+            "compound_compartment",
+        ]
+        all_rxns = df.reaction_id.unique()  # used for getting genes later
+
+        # Fix stoichiometry so that side can be dropped
+        df.stoichiometry = np.where(
+            df.side == "hasLeft", -df.stoichiometry, df.stoichiometry
+        )
+
+        # Fix missing values
+        df.reaction_id = df.reaction_name
+        df.reaction_name = df.apply(
+            lambda x: "|".join(x["reaction_synonyms"])
+            if isinstance(x["reaction_synonyms"], list)
+            else x["reaction_name"],
+            axis=1,
+        )
+        df.fillna(
+            {
+                "reaction_gibbs0": pd.NA,
+                "compound_formation_gibbs0": pd.NA,
+                "reaction_ec_enzymes": pd.NA,
+            },
+            inplace=True,
+        )
+        df.drop(columns=["side", "reaction_synonyms"], inplace=True)
+
+        # Get gene associations
+        rxn_genes = {}
+        for rxn in all_rxns:
+            genes = self.get_genes_of_reaction(rxn)
+            if genes:
+                rxn_genes[rxn] = generate_gene_reaction_rule(genes)
+
+        return df, rxn_genes
+
+    def get_genes_of_reaction(
+        self, reaction_id: str
+    ) -> List[Tuple[Dict[str, str], Dict[str, str]]]:
+        """
+        Given a reaction mcId, return the gene products associated with it in
+        the form of a list of (source, target) nodes. This is because certain
+        reactions are associated with ``GeneProductSet`` or
+        ``GeneProductComplex`` nodes, which represent ``OR`` and ``AND``
+        relationships, respectively.
+
+        Note that ``GeneProductSet`` could contain nested ``GeneProductComplex``
+        nodes.
+        """
+        res = self.read(
+            """
+            MATCH (r:Reaction {mcId: $rxn})
+            WITH r
+            CALL apoc.path.expandConfig(r, {
+                labelFilter: "GeneProductSet|GeneProductComplex|/GeneProduct",
+                minLevel: 1,
+                maxLevel: 3
+            })
+            YIELD path
+            WITH apoc.path.elements(path) AS elements
+            UNWIND range(0, size(elements)-2) AS index
+            WITH elements, index
+            WHERE index % 2 = 0
+            RETURN DISTINCT
+              {
+                label: labels(elements[index])[0],
+                mcId: elements[index].mcId,
+                name: elements[index].displayName
+              } AS source_node,
+              {
+                label: labels(elements[index+2])[0],
+                mcId: elements[index+2].mcId,
+                name: elements[index+2].displayName
+              } AS target_node;
+            """,
+            rxn=reaction_id,
+        )
+        return [(x["source_node"], x["target_node"]) for x in res]
 
     def get_cpd_view_of_pathway(
         self,

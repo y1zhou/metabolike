@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(".."))
 from metabolike import __version__
 
 project = "metabolike"
-copyright = "2021, Yi Zhou"
+copyright = "2021–2022, Yi Zhou"
 author = "Yi Zhou"
 
 # The short X.Y version.

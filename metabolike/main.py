@@ -1,16 +1,13 @@
 #!/usr/bin/env python
 import logging
-from pathlib import Path
-from typing import Optional
 
 import typer
 import uvicorn
-import yaml
 
-from metabolike.config import Config
-from metabolike.db.metacyc import MetaDB
-from metabolike.parser.brenda import parse_brenda
-from metabolike.parser.metacyc import Metacyc
+from .config import load_config
+from .db import MetacycClient
+from .parser import MetacycParser
+from .parser.brenda import parse_brenda
 
 logging.basicConfig(
     format="[%(levelname)s] %(asctime)s - %(name)s:%(lineno)s:%(funcName)s - %(message)s",
@@ -21,25 +18,10 @@ logger = logging.getLogger(__name__)
 app = typer.Typer()
 
 
-def load_config(config_file: str) -> Config:
-    logger.info(f"Parsing config file {config_file}")
-    conf_file = Path(config_file).expanduser().resolve()
-    with conf_file.open("r") as f:
-        conf_data = yaml.safe_load(f)
-
-    # Validate config file using pydantic schema
-    conf = Config(**conf_data)
-    return conf
-
-
 @app.command()
 def setup(
     config_file: str = typer.Option(
         ..., "--config", "-c", help="Path to the configuration file."
-    ),
-    database: Optional[str] = typer.Option(
-        None,
-        help="Name of the database. Use MetaID from SBML file if not given.",
     ),
     create_db: bool = typer.Option(
         True, help="When database creation is not allowed, set this to False."
@@ -47,25 +29,28 @@ def setup(
     drop_if_exists: bool = typer.Option(
         False, "--drop-if-exists", "-f", help="Drop the database if it already exists."
     ),
-    use_cache: bool = typer.Option(
-        True, help="Use cache for parsing BRENDA text file if it exists."
-    ),
 ):
     conf = load_config(config_file)
 
     logger.info("Connecting to neo4j database")
-    db = MetaDB(**conf.database.dict())
-    meta = Metacyc(db, **conf.metacyc.dict(), db_name=database)
+    db = MetacycClient(
+        **conf.neo4j.dict(include={"uri", "database"}),
+        neo4j_user=conf.neo4j.user,
+        neo4j_password=conf.neo4j.password.get_secret_value()
+    )
+    meta = MetacycParser(
+        db, **conf.metacyc.dict(), create_db=create_db, drop_if_exists=drop_if_exists
+    )
 
     logger.info("Setting up database using MetaCyc data")
-    meta.setup(create_db=create_db, force=drop_if_exists)
+    meta.setup()
 
-    if conf.brenda:
-        logger.info("Reading BRENDA text file")
-        all_ecs = db.get_all_ec_numbers()
-        brenda = parse_brenda(conf.brenda.brenda_file, ec_nums=all_ecs, cache=use_cache)
+    # if conf.brenda:
+    #     logger.info("Reading BRENDA text file")
+    #     all_ecs = db.get_all_ec_numbers()
+    # brenda = parse_brenda(conf.brenda.brenda_file, ec_nums=all_ecs, cache=use_cache)
 
-    meta.db.close()
+    db.close()
 
 
 @app.command()

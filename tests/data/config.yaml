@@ -2,6 +2,7 @@ database:
   uri: "neo4j://localhost:7687"
   neo4j_user: neo4j
   neo4j_password: neo4j
+  database: neo4j
 
 metacyc:
   sbml: tests/data/metabolic-reactions.sbml

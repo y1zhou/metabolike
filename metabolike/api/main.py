@@ -1,19 +1,11 @@
-import atexit
 import logging
 
 from fastapi import FastAPI
-from metabolike.api.config import db_conf
-from metabolike.db.metacyc import MetaDB
+
+from .core.db import db
 
 logger = logging.getLogger(__name__)
 app = FastAPI()
-
-db = MetaDB(
-    db_conf.metabolike_db_uri,
-    db_conf.metabolike_db_user,
-    db_conf.metabolike_db_password,
-)
-db.use_database(db_conf.metabolike_db_name)
 
 
 @app.get("/")
@@ -24,11 +16,17 @@ def read_root():
 @app.get("/pathway/{pathway_id}")
 def get_pathway(pathway_id: str):
     nodes, edges = db.get_view_of_pathway(pathway_id)
-    return {"nodes": [x[0] for x in nodes], "edges": [x[0] for x in edges]}
+    return {"nodes": nodes, "edges": edges}
 
 
-def exit_application():
+@app.post("/pathways/reactions/")
+async def get_pathway_reactions(pw: Pathways):
+    logger.debug(f"Request for reactions in pathways: {pw.pathway_ids}")
+    df, rxn_genes = db.get_fba_info_of_pathways(pw.pathway_ids)
+    return {"reactions": df.to_dict(), "genes": rxn_genes}
+
+
+# Shutdown event handler
+@app.on_event("shutdown")
+def shutdown():
     db.close()
-
-
-atexit.register(exit_application)

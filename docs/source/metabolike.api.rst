@@ -1,16 +1,17 @@
 metabolike.api package
 ======================
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   metabolike.api.core
+   metabolike.api.routers
+
 Submodules
 ----------
-
-metabolike.api.config module
-----------------------------
-
-.. automodule:: metabolike.api.config
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 metabolike.api.main module
 --------------------------
