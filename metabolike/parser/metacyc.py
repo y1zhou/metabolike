@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import pandas as pd
-from metabolike.db.metacyc import MetaDB
+from metabolike.db.metacyc import MetacycClient
 from metabolike.utils import add_kv_to_dict, snake_to_camel, validate_path
 from tqdm import tqdm
 
@@ -14,7 +14,7 @@ from .sbml import SBMLParser
 logger = logging.getLogger(__name__)
 
 
-class Metacyc(SBMLParser):
+class MetacycParser(SBMLParser):
     """
     Converting MetaCyc files to a Neo4j database.
     Documentation on the MetaCyc files and format FAQs can be found at:
@@ -58,7 +58,7 @@ class Metacyc(SBMLParser):
 
     def __init__(
         self,
-        neo4j: MetaDB,
+        neo4j: MetacycClient,
         sbml: Union[str, Path],
         create_db: bool = True,
         drop_if_exists: bool = False,
@@ -71,6 +71,7 @@ class Metacyc(SBMLParser):
     ):
         # Neo4j driver and SBML file path
         super().__init__(neo4j, sbml, create_db, drop_if_exists)
+        self.db = neo4j
 
         # File paths
         self.input_files = {

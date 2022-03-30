@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
 import libsbml
-from metabolike.db.metacyc import MetaDB
+from metabolike.db import SBMLClient
 from metabolike.utils import add_kv_to_dict, validate_path
 from tqdm import tqdm
 
@@ -34,7 +34,7 @@ class SBMLParser:
 
     def __init__(
         self,
-        neo4j: MetaDB,
+        neo4j: SBMLClient,
         sbml: Union[str, Path],
         create_db: bool = True,
         drop_if_exists: bool = False,

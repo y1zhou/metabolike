@@ -2,12 +2,11 @@ import logging
 from typing import Any, Callable, Dict, List, Union
 
 from neo4j import BoltDriver, GraphDatabase, Neo4jDriver
-from neo4j.work.result import Result
 
 logger = logging.getLogger(__name__)
 
 
-class Neo4jDB:
+class Neo4jClient:
     def __init__(
         self,
         uri: str = "neo4j://localhost:7687",
@@ -28,9 +27,10 @@ class Neo4jDB:
             driver: :class:`neo4j.Neo4jDriver` or :class:`neo4j.BoltDriver`.
             database: str, name of the database to use.
         """
-        self.driver: Union[Neo4jDriver, BoltDriver] = GraphDatabase.driver(
-            uri, auth=(neo4j_user, neo4j_password)
-        )
+        driver = GraphDatabase.driver(uri, auth=(neo4j_user, neo4j_password))
+        if not driver:
+            raise RuntimeError("Could not connect to Neo4j")
+        self.driver: Union[Neo4jDriver, BoltDriver] = driver
         self.database = database
         # logger.debug(self.driver.verify_connectivity())
 

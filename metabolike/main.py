@@ -4,10 +4,10 @@ import logging
 import typer
 import uvicorn
 
-from metabolike.config import load_config
-from metabolike.db.metacyc import MetaDB
-from metabolike.parser.brenda import parse_brenda
-from metabolike.parser.metacyc import Metacyc
+from .config import load_config
+from .db.metacyc import MetacycClient
+from .parser.brenda import parse_brenda
+from .parser.metacyc import MetacycParser
 
 logging.basicConfig(
     format="[%(levelname)s] %(asctime)s - %(name)s:%(lineno)s:%(funcName)s - %(message)s",
@@ -33,12 +33,12 @@ def setup(
     conf = load_config(config_file)
 
     logger.info("Connecting to neo4j database")
-    db = MetaDB(
+    db = MetacycClient(
         **conf.neo4j.dict(include={"uri", "database"}),
         neo4j_user=conf.neo4j.user,
         neo4j_password=conf.neo4j.password.get_secret_value()
     )
-    meta = Metacyc(
+    meta = MetacycParser(
         db, **conf.metacyc.dict(), create_db=create_db, drop_if_exists=drop_if_exists
     )
 
