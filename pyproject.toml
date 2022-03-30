@@ -7,7 +7,7 @@ name = "metabolike"
 authors = [{ name = "Yi Zhou", email = "metabolike@y1zhou.com" }]
 readme = "README.rst"
 license = { file = "LICENSE" }
-requires-python = ">=3.6,<4"
+requires-python = ">=3.8,<4"
 keywords = ["bioinformatics", "metabolic-pathway", "network", "graph-database"]
 dependencies = [
     "lark>=0.11.3",
