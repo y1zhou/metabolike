@@ -498,17 +498,19 @@ class MetacycClient(SBMLClient):
         """
         Given a reaction mcId, return the gene products associated with it in
         the form of a list of (source, target) nodes. This is because certain
-        reactions are associated with ``EntitySet`` or ``Complex`` nodes, which
-        represent ``OR`` and ``AND`` relationships, respectively.
+        reactions are associated with ``GeneProductSet`` or
+        ``GeneProductComplex`` nodes, which represent ``OR`` and ``AND``
+        relationships, respectively.
 
-        Note that ``EntitySet`` could contain nested ``Complex`` nodes.
+        Note that ``GeneProductSet`` could contain nested ``GeneProductComplex``
+        nodes.
         """
         res = self.read(
             """
             MATCH (r:Reaction {mcId: $rxn})
             WITH r
             CALL apoc.path.expandConfig(r, {
-                labelFilter: "EntitySet|Complex|/GeneProduct",
+                labelFilter: "GeneProductSet|GeneProductComplex|/GeneProduct",
                 minLevel: 1,
                 maxLevel: 3
             })

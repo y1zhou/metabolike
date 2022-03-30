@@ -30,6 +30,14 @@ metabolike.main module
    :undoc-members:
    :show-inheritance:
 
+metabolike.utils module
+-----------------------
+
+.. automodule:: metabolike.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

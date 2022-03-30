@@ -5,9 +5,9 @@ import typer
 import uvicorn
 
 from .config import load_config
-from .db.metacyc import MetacycClient
+from .db import MetacycClient
+from .parser import MetacycParser
 from .parser.brenda import parse_brenda
-from .parser.metacyc import MetacycParser
 
 logging.basicConfig(
     format="[%(levelname)s] %(asctime)s - %(name)s:%(lineno)s:%(funcName)s - %(message)s",
@@ -45,10 +45,10 @@ def setup(
     logger.info("Setting up database using MetaCyc data")
     meta.setup()
 
-    if conf.brenda:
-        logger.info("Reading BRENDA text file")
-        all_ecs = db.get_all_ec_numbers()
-        # brenda = parse_brenda(conf.brenda.brenda_file, ec_nums=all_ecs, cache=use_cache)
+    # if conf.brenda:
+    #     logger.info("Reading BRENDA text file")
+    #     all_ecs = db.get_all_ec_numbers()
+    # brenda = parse_brenda(conf.brenda.brenda_file, ec_nums=all_ecs, cache=use_cache)
 
     db.close()
 

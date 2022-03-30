@@ -21,14 +21,15 @@ class SBMLParser:
     * SBML FAQ: https://synonym.caltech.edu/documents/faq
 
     Args:
-        neo4j: A :class:`.MetaDB` instance.
+        neo4j: A :class:`.SBMLClient` instance.
         sbml: The path to the MetaCyc SBML file to convert.
-        create_db: Whether to create the database. See :meth:`.MetaDB.setup_graph_db`.
+        create_db: Whether to create the database. See
+         :meth:`.SBMLClient.setup_graph_db`.
         drop_if_exists: Whether to drop the database if it already exists.
 
     Attributes:
-        db: A :class:`.MetaDB` instance. This is connected to neo4j and used to
-        perform all database operations. Should be closed after use.
+        db: A :class:`.SBMLClient` instance. This is connected to neo4j and used
+        to perform all database operations. Should be closed after use.
         sbml_file: Filepath to the input SBML file.
     """
 
@@ -72,7 +73,7 @@ class SBMLParser:
         #. Create the database and constraints.
         #. Feed the SBML file into the database. This will populate
            ``Compartment``, ``Reaction``, ``Compound``, ``GeneProduct``,
-           ``EntitySet``, ``Complex``, and ``RDF`` nodes.
+           ``GeneProductSet``, ``GeneProductComplex``, and ``RDF`` nodes.
 
         Nodes are created for each SBML element using ``MERGE`` statements:
         https://neo4j.com/docs/cypher-manual/current/clauses/merge/#merge-merge-with-on-create
@@ -250,19 +251,20 @@ class SBMLParser:
     ):
         """
         Add gene products to a reaction. When the added node is FbcAnd or FbcOr,
-        recursively add the children. This means a custom ``mcId`` is constructed
-        for the ``Complex`` and ``EntitySet`` nodes corresponding to the ``FbcAnd``
-        and ``FbcOr`` nodes, respectively.
+        recursively add the children. This means a custom ``mcId`` is
+        constructed for the ``GeneProductComplex`` and ``GeneProductSet`` nodes
+        corresponding to the ``FbcAnd`` and ``FbcOr`` nodes, respectively.
 
         Args:
             node: The GeneProductAssociation child node to add.
             source_id: The MetaCyc ID of the source node. This should be the
                 MetaCyc ID of the ``Reaction`` node
             source_label: The label of the source node.
-            edge_type: The type of edge to add. Should be one of ``hasGeneProduct``,
-                ``hasComponent``, or ``hasMember``.
+            edge_type: The type of edge to add. Should be one of
+                ``hasGeneProduct``, ``hasComponent``, or ``hasMember``.
             node_index: The index of the current node. This is used to construct
-                the ``mcId`` of the ``Complex`` and ``EntitySet`` nodes.
+                the ``mcId`` of the ``GeneProductComplex`` and
+                ``GeneProductSet`` nodes.
         """
         # If there's no nested association, add the node directly
         if isinstance(node, libsbml.GeneProductRef):
@@ -270,33 +272,33 @@ class SBMLParser:
                 source_label, source_id, node.getGeneProduct(), "GeneProduct", edge_type
             )
 
-        # For nested associations, first add a `Complex` or `EntitySet` node,
-        # then recursively add the children
+        # For nested associations, first add a `GeneProductComplex` or
+        # `GeneProductSet` node, then recursively add the children
         elif isinstance(node, libsbml.FbcAnd):
             complex_id = f"{source_id}_complex{node_index}"
             self.db.link_node_to_gene(
-                source_label, source_id, complex_id, "Complex", edge_type
+                source_label, source_id, complex_id, "GeneProductComplex", edge_type
             )
 
             for i in range(node.getNumAssociations()):
                 self._add_sbml_gene_product_association_node(
                     node.getAssociation(i),
                     complex_id,
-                    "Complex",
+                    "GeneProductComplex",
                     "hasComponent",
                     i,
                 )
         elif isinstance(node, libsbml.FbcOr):
             eset_id = f"{source_id}_entityset{node_index}"
             self.db.link_node_to_gene(
-                source_label, source_id, eset_id, "EntitySet", edge_type
+                source_label, source_id, eset_id, "GeneProductSet", edge_type
             )
 
             for i in range(node.getNumAssociations()):
                 self._add_sbml_gene_product_association_node(
                     node.getAssociation(i),
                     eset_id,
-                    "EntitySet",
+                    "GeneProductSet",
                     "hasMember",
                     i,
                 )

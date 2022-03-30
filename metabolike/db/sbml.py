@@ -7,6 +7,24 @@ logger = logging.getLogger(__name__)
 
 
 class SBMLClient(Neo4jClient):
+    """In addition to the Neo4j driver, this class also includes a set of
+    helper methods for creating nodes and relationships in the graph with data
+    from the SBML file.
+
+    Args:
+        uri: URI of the Neo4j server. Defaults to ``neo4j://localhost:7687``.
+         For more details, see :class:`neo4j.driver.Driver`.
+        neo4j_user: Neo4j user. Defaults to ``neo4j``.
+        neo4j_password: Neo4j password. Defaults to ``neo4j``.
+        database: Name of the database. Defaults to ``neo4j``.
+
+    Attributes:
+        driver: :class:`neo4j.Neo4jDriver` or :class:`neo4j.BoltDriver`.
+        database: str, name of the database to use.
+        available_node_labels: tuple of strings indicating the possible node
+         labels in the graph.
+    """
+
     def __init__(
         self,
         uri: str = "neo4j://localhost:7687",
@@ -34,7 +52,7 @@ class SBMLClient(Neo4jClient):
         Args:
             session: :class:`neo4j.Session` object.
             create_db: If False, does not create the database. This is useful
-                for running on neo4j AuraDB when database creation is not allowed.
+             for running on neo4j AuraDB when database creation is not allowed.
             drop_if_exists: See :meth:`.create`.
         """
         # Create database
@@ -60,7 +78,7 @@ class SBMLClient(Neo4jClient):
     def create_node(self, node_label: str, mcid: str, props: Dict[str, str]):
         """Create a node with the given label and properties.
 
-        See :meth:`.Metacyc.sbml_to_graph` for details.
+        See :meth:`.SBMLParser.sbml_to_graph` for details.
 
         Args:
             node_label: Label of the node.
@@ -78,7 +96,7 @@ class SBMLClient(Neo4jClient):
         )
 
     def create_compound_node(self, compartment: str, mcid: str, props: Dict[str, str]):
-        """See :meth:`.Metacyc.sbml_to_graph` for details."""
+        """See :meth:`.SBMLParser.sbml_to_graph` for details."""
         logger.debug(f"Creating Compound node: {mcid}")
         self.write(
             """
@@ -98,7 +116,7 @@ class SBMLClient(Neo4jClient):
         bio_qual: str,
         props: Dict[str, Union[str, List[str]]],
     ):
-        """See :meth:`.Metacyc._add_sbml_rdf_node` for details."""
+        """See :meth:`.SBMLParser._add_sbml_rdf_node` for details."""
         logger.debug(f"{node_label} node {mcid} {bio_qual} RDF")
         self.write(
             f"""
@@ -139,18 +157,21 @@ class SBMLClient(Neo4jClient):
         edge_type: str,
     ):
         """
-        See :meth:`.Metacyc._add_sbml_gene_product_association_node` for details.
+        See :meth:`.SBMLParser._add_sbml_gene_product_association_node` for
+        details.
 
-        Link a node to a ``GeneProduct``, ``Complex``, or ``EntitySet`` node.
+        Link a node to a ``GeneProduct``, ``GeneProductComplex``, or
+        ``GeneProductSet`` node.
 
         Args:
             node_label: Label of the node.
             node_id: ``mcId`` of the node.
-            group_id: ``mcId`` of the ``GeneProduct``, ``Complex`` or ``EntitySet``.
-            group_label: ``Complex`` or ``EntitySet``.
+            group_id: ``mcId`` of the ``GeneProduct``, ``GeneProductComplex`` or
+             ``GeneProductSet``.
+            group_label: ``GeneProductComplex`` or ``GeneProductSet``.
             edge_type: Type of the edge.
         """
-        if group_label not in ["GeneProduct", "Complex", "EntitySet"]:
+        if group_label not in {"GeneProduct", "GeneProductComplex", "GeneProductSet"}:
             raise ValueError(f"Invalid group_type: {group_label}")
         logger.debug(
             f"{node_label} node {node_id} {edge_type} {group_label} {group_id}"

@@ -27,33 +27,30 @@ class MetacycParser(SBMLParser):
 
     Args:
         reactions: The path to the ``reaction.dat`` file. If given,
-            the file will be parsed and extra annotation on ``Reaction``
-            nodes will be added.
+         the file will be parsed and extra annotation on ``Reaction`` nodes will
+         be added.
         atom_mapping: The path to the ``atom-mappings-smiles.dat`` file. If
-            given, the file will be parsed and chemical reactions in the ``SMILES``
-            format will be added to the ``Reaction`` nodes.
-        pathways: The path to the ``pathway.dat`` file. If given,
-            the file will be parsed and pathway links will be added to the
-            ``Reaction`` nodes.
-        compounds: The path to the ``compound.dat`` file. If given, the
-            file will be parsed and annotations on ``Compound`` nodes will
-            be added.
-        publications: The path to the ``publication.dat`` file. If given,
-            the file will be parsed and annotations on ``Citation`` nodes
-            will be added.
-        classes: The path to the ``class.dat`` file. If given, the file
-            will be parsed and annotations on ``Compartment``, ``Taxa``,
-            and ``Compound`` nodes will be added.
+         given, the file will be parsed and chemical reactions in the ``SMILES``
+         format will be added to the ``Reaction`` nodes.
+        pathways: The path to the ``pathway.dat`` file. If given, the file will
+         be parsed and pathway links will be added to the ``Reaction`` nodes.
+        compounds: The path to the ``compound.dat`` file. If given, the file
+         will be parsed and annotations on ``Compound`` nodes will be added.
+        publications: The path to the ``publication.dat`` file. If given, the
+         file will be parsed and annotations on ``Citation`` nodes will be added.
+        classes: The path to the ``class.dat`` file. If given, the file will be
+         parsed and annotations on ``Compartment``, ``Taxa``, and ``Compound``
+         nodes will be added.
 
     Attributes:
-        db: A :class:`.MetaDB` instance. This is connected to neo4j and used to
-        perform all database operations. Should be closed after use.
+        db: A :class:`.MetacycClient` instance. This is connected to neo4j and
+         used to perform all database operations. Should be closed after use.
         sbml_file: Filepath to the input SBML file.
         input_files: A dictionary of the paths to the input ``.dat`` files.
         missing_ids: A dictionary of sets of IDs that were not found in the
-            input files. This is helpful for collecting IDs that appear to be
-            in one class but are actually in another.
-            :meth:`._report_missing_ids` can be used to print them out.
+         input files. This is helpful for collecting IDs that appear to be in
+         one class but are actually in another. :meth:`._report_missing_ids` can
+         be used to print them out.
     """
 
     def __init__(
@@ -106,7 +103,7 @@ class MetacycParser(SBMLParser):
         #. Create the database and constraints.
         #. Feed the SBML file into the database. This will populate
            ``Compartment``, ``Reaction``, ``Compound``, ``GeneProduct``,
-           ``EntitySet``, ``Complex``, and ``RDF`` nodes.
+           ``GeneProductSet``, ``GeneProductComplex``, and ``RDF`` nodes.
         #. If ``reactions.dat`` is given, parse the file and add standard Gibbs
            free energy, standard reduction potential, reaction direction,
            reaction balance status, systematic name, comment attributes to
@@ -305,8 +302,8 @@ class MetacycParser(SBMLParser):
             pw_id: The pathway ID from the graph database.
             pw_dat: The pathways.dat file as an attribute-value list.
             rxn_dat: The reactions.dat file as an attribute-value list. This is
-                used to find the annotation data for composite reactions marked
-                as pathways.
+             used to find the annotation data for composite reactions marked as
+             pathways.
         """
         if (pw_id not in pw_dat) and (pw_id not in rxn_dat):
             self.missing_ids["pathways"].add(pw_id)

@@ -36,6 +36,14 @@ metabolike.parser.metacyc module
    :undoc-members:
    :show-inheritance:
 
+metabolike.parser.sbml module
+-----------------------------
+
+.. automodule:: metabolike.parser.sbml
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

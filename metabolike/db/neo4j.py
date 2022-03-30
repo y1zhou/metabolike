@@ -7,6 +7,20 @@ logger = logging.getLogger(__name__)
 
 
 class Neo4jClient:
+    """setup Neo4j driver.
+
+    Args:
+        uri: URI of the Neo4j server. Defaults to ``neo4j://localhost:7687``.
+         For more details, see :class:`neo4j.driver.Driver`.
+        neo4j_user: Neo4j user. Defaults to "neo4j".
+        neo4j_password: Neo4j password. Defaults to "neo4j".
+        database: Name of the database. Defaults to "neo4j".
+
+    Attributes:
+        driver: :class:`neo4j.Neo4jDriver` or :class:`neo4j.BoltDriver`.
+        database: str, name of the database to use.
+    """
+
     def __init__(
         self,
         uri: str = "neo4j://localhost:7687",
@@ -14,19 +28,6 @@ class Neo4jClient:
         neo4j_password: str = "neo4j",
         database: str = "neo4j",
     ):
-        """setup Neo4j driver.
-
-        Args:
-            uri: URI of the Neo4j server. Defaults to ``neo4j://localhost:7687``.
-            For more details, see :class:`neo4j.driver.Driver`.
-            neo4j_user: Neo4j user. Defaults to "neo4j".
-            neo4j_password: Neo4j password. Defaults to "neo4j".
-            database: Name of the database. Defaults to "neo4j".
-
-        Attributes:
-            driver: :class:`neo4j.Neo4jDriver` or :class:`neo4j.BoltDriver`.
-            database: str, name of the database to use.
-        """
         driver = GraphDatabase.driver(uri, auth=(neo4j_user, neo4j_password))
         if not driver:
             raise RuntimeError("Could not connect to Neo4j")
@@ -71,7 +72,7 @@ class Neo4jClient:
 
         Args:
             query: Query to read from the database.
-            **kwargs: Keyword arguments to pass to :meth:`BaseDB.run`.
+            **kwargs: Parameters to pass to the Cypher query.
         """
         with self.driver.session(database=self.database) as ss:
             return ss.read_transaction(lambda tx: tx.run(cypher, **kwargs).data())
@@ -81,7 +82,8 @@ class Neo4jClient:
 
         Args:
             tx_func: A transaction function to run.
-            **kwargs: Keyword arguments to pass to :meth:`BaseDB.run`.
+            **kwargs: Keyword arguments to pass to ``tx_func`` or parameters for
+             the Cypher query.
         """
         with self.driver.session(database=self.database) as ss:
             return ss.read_transaction(tx_func, **kwargs)
