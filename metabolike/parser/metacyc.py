@@ -627,8 +627,7 @@ class MetacycParser(SBMLParser):
             r"\(:DIRECTION :(L2R|R2L)\) "  # reaction direction
             r"\(:RIGHT-PRIMARIES ([^\)]+)\)\)"
         )
-        res = m.fullmatch(s)
-        if not res:
+        if not (res := m.fullmatch(s)):
             # Sometimes there's no left/right primaries and only a direction
             # when the rxn_id is actually a pathway ID
             return "", {}
@@ -690,8 +689,7 @@ class MetacycParser(SBMLParser):
         """
         # Extract the compound ID at the beginning of the string
         cpd_id_rgx = re.compile(r"^\(([^\s]+) ")
-        res = cpd_id_rgx.match(s)
-        if not res:
+        if not (res := cpd_id_rgx.match(s)):
             logging.warning(f"Pathway links string doesn't have a compound: {s}")
             return "", [], ""
         cpd = res.group(1)
@@ -707,15 +705,13 @@ class MetacycParser(SBMLParser):
         while s:
             # Directed pathway links wrapped in parentheses
             if s[0] == "(":
-                m = directed_pw_rgx.match(s)
-                if not m:
+                if not (m := directed_pw_rgx.match(s)):
                     raise ValueError(f"Invalid pathway links string: {s}")
                 pathways.append(m.group(1))
                 direction = m.group(2)
             # Regular pathway links separated by spaces
             else:
-                m = pw_rgx.match(s)
-                if not m:
+                if not (m := pw_rgx.match(s)):
                     raise ValueError(f"Invalid pathway links string: {s}")
                 pathways.append(m.group(0))
             s = s[m.end() :].strip()
