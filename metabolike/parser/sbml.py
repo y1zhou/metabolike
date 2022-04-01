@@ -86,7 +86,7 @@ class SBMLParser:
         logger.info("Creating Compartment nodes")
         for c in model.getListOfCompartments():
             c: libsbml.Compartment
-            props = {"displayName": c.getName()}
+            props = {"name": c.getName()}
             self.db.create_node("Compartment", c.getMetaId(), props)
 
         # Compounds, i.e. metabolites, species
@@ -96,7 +96,7 @@ class SBMLParser:
             # Basic properties
             mcid: str = s.getMetaId()
             props = {
-                "displayName": s.getName(),
+                "name": s.getName(),
                 "charge": s.getCharge(),
                 "chemicalFormula": s.getPlugin("fbc").getChemicalFormula(),
                 "boundaryCondition": s.getBoundaryCondition(),  # unchanged by reactions
@@ -118,7 +118,7 @@ class SBMLParser:
             gp: libsbml.GeneProduct
             mcid = gp.getMetaId()
             props = {
-                "displayName": gp.getName(),
+                "name": gp.getName(),
                 "label": gp.getLabel(),
             }
             self.db.create_node("GeneProduct", mcid, props)
@@ -136,7 +136,7 @@ class SBMLParser:
 
             # Basic properties
             props = {
-                "displayName": r.getName(),
+                "name": r.getName(),
                 "fast": r.getFast(),
             }
             self.db.create_node("Reaction", mcid, props)
@@ -251,7 +251,7 @@ class SBMLParser:
     ):
         """
         Add gene products to a reaction. When the added node is FbcAnd or FbcOr,
-        recursively add the children. This means a custom ``mcId`` is
+        recursively add the children. This means a custom ``metaId`` is
         constructed for the ``GeneProductComplex`` and ``GeneProductSet`` nodes
         corresponding to the ``FbcAnd`` and ``FbcOr`` nodes, respectively.
 
@@ -263,7 +263,7 @@ class SBMLParser:
             edge_type: The type of edge to add. Should be one of
                 ``hasGeneProduct``, ``hasComponent``, or ``hasMember``.
             node_index: The index of the current node. This is used to construct
-                the ``mcId`` of the ``GeneProductComplex`` and
+                the ``metaId`` of the ``GeneProductComplex`` and
                 ``GeneProductSet`` nodes.
         """
         # If there's no nested association, add the node directly

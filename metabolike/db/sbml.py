@@ -72,26 +72,26 @@ class SBMLClient(Neo4jClient):
             logger.debug(f"Creating constraint for node: {label}")
             self.write(
                 f"""CREATE CONSTRAINT IF NOT EXISTS ON (n:{label})
-                    ASSERT n.mcId IS UNIQUE;""",
+                    ASSERT n.metaId IS UNIQUE;""",
             )
 
-    def create_node(self, node_label: str, mcid: str, props: Dict[str, str]):
+    def create_node(self, node_label: str, metaid: str, props: Dict[str, str]):
         """Create a node with the given label and properties.
 
         See :meth:`.SBMLParser.sbml_to_graph` for details.
 
         Args:
             node_label: Label of the node.
-            mcid: ``mcId`` of the node.
+            metaid: ``metaId`` of the node.
             props: Properties of the node.
         """
-        logger.debug(f"Creating {node_label} node: {mcid}")
+        logger.debug(f"Creating {node_label} node: {metaid}")
         self.write(
             f"""
-            MERGE (n:{node_label} {{mcId: $mcId}})
+            MERGE (n:{node_label} {{metaId: $metaId}})
             ON CREATE SET n += $props;
             """,
-            mcId=mcid,
+            metaId=metaid,
             props=props,
         )
 
@@ -100,12 +100,12 @@ class SBMLClient(Neo4jClient):
         logger.debug(f"Creating Compound node: {mcid}")
         self.write(
             """
-            MATCH (cpt:Compartment {mcId: $compartment})
-            MERGE (c:Compound {mcId: $mcId})-[:hasCompartment]->(cpt)
+            MATCH (cpt:Compartment {metaId: $compartment})
+            MERGE (c:Compound {metaId: $metaId})-[:hasCompartment]->(cpt)
             ON CREATE SET c += $props;
             """,
             compartment=compartment,
-            mcId=mcid,
+            metaId=mcid,
             props=props,
         )
 
@@ -120,11 +120,11 @@ class SBMLClient(Neo4jClient):
         logger.debug(f"{node_label} node {mcid} {bio_qual} RDF")
         self.write(
             f"""
-                MATCH (c:{node_label} {{mcId: $mcId}})
+                MATCH (c:{node_label} {{metaId: $metaId}})
                 MERGE (n:RDF)<-[:{bio_qual}]-(c)
                 ON CREATE SET n += $props;
                 """,
-            mcId=mcid,
+            metaId=mcid,
             props=props,
         )
 
@@ -138,8 +138,8 @@ class SBMLClient(Neo4jClient):
         logger.debug(f"Adding {compound_type} {compound_id} to Reaction {reaction_id}")
         self.write(
             f"""
-            MATCH (r:Reaction {{mcId: $reaction}}),
-                  (c:Compound {{mcId: $compound}})
+            MATCH (r:Reaction {{metaId: $reaction}}),
+                  (c:Compound {{metaId: $compound}})
             MERGE (r)-[l:has{compound_type}]->(c)
             ON CREATE SET l += $props;
             """,
@@ -165,8 +165,8 @@ class SBMLClient(Neo4jClient):
 
         Args:
             node_label: Label of the node.
-            node_id: ``mcId`` of the node.
-            group_id: ``mcId`` of the ``GeneProduct``, ``GeneProductComplex`` or
+            node_id: ``metaId`` of the node.
+            group_id: ``metaId`` of the ``GeneProduct``, ``GeneProductComplex`` or
              ``GeneProductSet``.
             group_label: ``GeneProductComplex`` or ``GeneProductSet``.
             edge_type: Type of the edge.
@@ -178,8 +178,8 @@ class SBMLClient(Neo4jClient):
         )
         self.write(
             f"""
-            MATCH (n:{node_label} {{mcId: $node_id}})
-            MERGE (g:{group_label} {{mcId: $group_id}})
+            MATCH (n:{node_label} {{metaId: $node_id}})
+            MERGE (g:{group_label} {{metaId: $group_id}})
             MERGE (g)<-[l:{edge_type}]-(n)
             """,
             node_id=node_id,

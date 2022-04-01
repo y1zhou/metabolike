@@ -83,10 +83,10 @@ def generate_gene_reaction_rule(genes: List[Tuple[Dict[str, str], Dict[str, str]
                 res_genes.append(r["name"])
             # GeneProductSet -> GeneProductComplex
             else:
-                res_complex[r["mcId"]] = []
+                res_complex[r["metaId"]] = []
         else:
             # GeneProductSet -> GeneProductComplex -> GeneProduct
-            res_complex[l["mcId"]].append(r["name"])
+            res_complex[l["metaId"]].append(r["name"])
 
     res_complex = {k: " and ".join(v) for k, v in res_complex.items()}
     rule_complex = [f"( {v} )" for v in res_complex.values()]

@@ -146,7 +146,7 @@ class MetacycParser(SBMLParser):
 
         # Add additional information of reactions to the graph if given
         if self.input_files["reactions"] or self.input_files["atom_mapping"]:
-            all_rxns = self.db.get_all_nodes("Reaction", "displayName")
+            all_rxns = self.db.get_all_nodes("Reaction", "name")
 
             if self.input_files["reactions"]:
                 logger.info("Adding additional reaction information to the graph")
@@ -164,7 +164,7 @@ class MetacycParser(SBMLParser):
                     logger.info("Creating pathway links")
                     pw_dat = self._read_dat_file(self.input_files["pathways"])
 
-                    all_pws = self.db.get_all_nodes("Pathway", "mcId")
+                    all_pws = self.db.get_all_nodes("Pathway", "metaId")
                     self.super_pathways = set()
                     for pw in tqdm(all_pws, desc="pathways.dat file"):
                         self.pathway_to_graph(pw, pw_dat, rxn_dat)
@@ -213,7 +213,7 @@ class MetacycParser(SBMLParser):
             logger.info("Annotating publications")
             pub_dat = self._read_dat_file(self.input_files["publications"])
 
-            all_cits = self.db.get_all_nodes("Citation", "mcId")
+            all_cits = self.db.get_all_nodes("Citation", "metaId")
             for cit in tqdm(all_cits, desc="pubs.dat file"):
                 self.citation_to_graph(cit, pub_dat)
                 logger.debug(f"Added annotation for citation {cit}")
@@ -273,7 +273,7 @@ class MetacycParser(SBMLParser):
                 for x in ["REACTION-BALANCE-STATUS", "REACTION-DIRECTION"]
             ],
         )
-        self.db.add_props_to_node("Reaction", "displayName", rxn_id, props)
+        self.db.add_props_to_node("Reaction", "name", rxn_id, props)
 
     def atom_mapping_to_graph(self, rxn_id: str, smiles: Dict[str, str]):
         """
@@ -286,7 +286,7 @@ class MetacycParser(SBMLParser):
             self.missing_ids["atom_mappings"].add(canonical_id)
             return
         props = {"smiles_atom_mapping": smiles[canonical_id]}
-        self.db.add_props_to_node("Reaction", "displayName", rxn_id, props)
+        self.db.add_props_to_node("Reaction", "name", rxn_id, props)
 
     def pathway_to_graph(
         self,
@@ -313,11 +313,11 @@ class MetacycParser(SBMLParser):
         if pw_id in rxn_dat:
             self.reaction_to_graph(pw_id, rxn_dat)
             # Merge the Reaction node with the Pathway node under the same ID
-            self.db.merge_nodes("Pathway", "Reaction", "mcId", "displayName", pw_id)
+            self.db.merge_nodes("Pathway", "Reaction", "metaId", "name", pw_id)
             return
 
         lines = pw_dat[pw_id]
-        props: Dict[str, Union[str, List[str]]] = {"displayName": pw_id}
+        props: Dict[str, Union[str, List[str]]] = {"name": pw_id}
         for k, v in lines:
             # Pathway node properties
             if k in {"SYNONYMS", "TYPES"}:
@@ -359,7 +359,7 @@ class MetacycParser(SBMLParser):
                     self.db.link_pathway_to_pathway(pw_id, pw_ids, direction, cpd_id)
 
         # Write Pathway node properties
-        self.db.add_props_to_node("Pathway", "mcId", pw_id, props)
+        self.db.add_props_to_node("Pathway", "metaId", pw_id, props)
 
     def compounds_to_graph(
         self,
@@ -370,7 +370,7 @@ class MetacycParser(SBMLParser):
         """Annotate a compound node with data from the compound.dat file.
 
         Args:
-            cpd: The ``displayName`` of the compound.
+            cpd: The ``name`` of the compound.
             biocyc: The biocyc id of the compound.
             cpd_dat: The compound.dat data.
             session: The neo4j session.
@@ -436,7 +436,7 @@ class MetacycParser(SBMLParser):
         or some dashes within author names, e.g. ``PUB-CHIH-CHING95``.
 
         Args:
-            cit_id: The citation ``mcId`` property.
+            cit_id: The citation ``metaId`` property.
             pub_dat: The publication.dat data.
         """
         # TODO: deal with evidence frames. Evidence frames are in the form of
@@ -470,7 +470,7 @@ class MetacycParser(SBMLParser):
             }:
                 add_kv_to_dict(props, k, v, as_list=False)
 
-        self.db.add_props_to_node("Citation", "mcId", cit_id, props)
+        self.db.add_props_to_node("Citation", "metaId", cit_id, props)
 
     def classes_to_graph(self, class_dat: Dict[str, List[List[str]]]):
         """Parse the classes.dat file.
@@ -482,7 +482,7 @@ class MetacycParser(SBMLParser):
             class_dat: The classes.dat data.
         """
         # Common names for cell components
-        all_cco = self.db.get_all_nodes("Compartment", "displayName")
+        all_cco = self.db.get_all_nodes("Compartment", "name")
         for cco in all_cco:
             if cco not in class_dat:
                 self.missing_ids["compartments"].add(cco)
@@ -494,10 +494,10 @@ class MetacycParser(SBMLParser):
                 elif k == "SYNONYMS":
                     add_kv_to_dict(props, k, v, as_list=True)
 
-            self.db.add_props_to_node("Compartment", "displayName", cco, props)
+            self.db.add_props_to_node("Compartment", "name", cco, props)
 
         # Common names and synonyms for organisms. Some also have strain names
-        all_taxon = self.db.get_all_nodes("Taxa", "mcId")
+        all_taxon = self.db.get_all_nodes("Taxa", "metaId")
         for taxa in tqdm(all_taxon, desc="Taxon in classes.dat"):
             if taxa not in class_dat:
                 self.missing_ids["taxon"].add(taxa)
@@ -510,7 +510,7 @@ class MetacycParser(SBMLParser):
                     add_kv_to_dict(props, k, v, as_list=True)
                 # TODO: TYPES links the taxon
 
-            self.db.add_props_to_node("Taxa", "mcId", taxa, props)
+            self.db.add_props_to_node("Taxa", "metaId", taxa, props)
 
         # TODO: Evidence code in citations are in the `Evidence` attr
 
