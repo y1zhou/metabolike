@@ -21,6 +21,8 @@ class MetacycClient(SBMLClient):
         neo4j_user: str = "neo4j",
         neo4j_password: str = "neo4j",
         database: str = "neo4j",
+        create_db: bool = True,
+        drop_if_exists: bool = False,
     ):
         super().__init__(uri, neo4j_user, neo4j_password, database)
         self.available_node_labels = (
@@ -35,6 +37,7 @@ class MetacycClient(SBMLClient):
             "Citation",
             "Taxa",
         )
+        self.setup_graph_db(create_db=create_db, drop_if_exists=drop_if_exists)
 
     def link_reaction_to_compartment(self, reaction_id: str, compartment_name: str):
         self.write(

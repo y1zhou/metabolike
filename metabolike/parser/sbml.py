@@ -23,9 +23,6 @@ class SBMLParser:
     Args:
         neo4j: A :class:`.SBMLClient` instance.
         sbml: The path to the MetaCyc SBML file to convert.
-        create_db: Whether to create the database. See
-         :meth:`.SBMLClient.setup_graph_db`.
-        drop_if_exists: Whether to drop the database if it already exists.
 
     Attributes:
         db: A :class:`.SBMLClient` instance. This is connected to neo4j and used
@@ -37,8 +34,6 @@ class SBMLParser:
         self,
         neo4j: SBMLClient,
         sbml: Union[str, Path],
-        create_db: bool = True,
-        drop_if_exists: bool = False,
     ):
         self.db = neo4j  # Neo4j driver
         self.sbml_file = validate_path(sbml)
@@ -62,8 +57,6 @@ class SBMLParser:
             12: "hasTaxon",
             13: "unknown",
         }
-
-        self.db.setup_graph_db(create_db=create_db, drop_if_exists=drop_if_exists)
 
     def sbml_to_graph(self):
         """

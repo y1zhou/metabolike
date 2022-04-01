@@ -26,6 +26,8 @@ class MetacycParser(SBMLParser):
     See :class:`.sbml.SBMLParser` for more information on SBML parsing.
 
     Args:
+        neo4j: Database client object.
+        sbml: The path to the SBML file.
         reactions: The path to the ``reaction.dat`` file. If given,
          the file will be parsed and extra annotation on ``Reaction`` nodes will
          be added.
@@ -57,8 +59,6 @@ class MetacycParser(SBMLParser):
         self,
         neo4j: MetacycClient,
         sbml: Union[str, Path],
-        create_db: bool = True,
-        drop_if_exists: bool = False,
         reactions: Optional[Union[str, Path]] = None,
         atom_mapping: Optional[Union[str, Path]] = None,
         pathways: Optional[Union[str, Path]] = None,
@@ -67,7 +67,7 @@ class MetacycParser(SBMLParser):
         classes: Optional[Union[str, Path]] = None,
     ):
         # Neo4j driver and SBML file path
-        super().__init__(neo4j, sbml, create_db, drop_if_exists)
+        super().__init__(neo4j, sbml)
         self.db = neo4j
 
         # File paths

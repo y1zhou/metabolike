@@ -17,6 +17,8 @@ class SBMLClient(Neo4jClient):
         neo4j_user: Neo4j user. Defaults to ``neo4j``.
         neo4j_password: Neo4j password. Defaults to ``neo4j``.
         database: Name of the database. Defaults to ``neo4j``.
+        create_db: Whether to create the database. See :meth:`.setup_graph_db`.
+        drop_if_exists: Whether to drop the database if it already exists.
 
     Attributes:
         driver: :class:`neo4j.Neo4jDriver` or :class:`neo4j.BoltDriver`.
@@ -31,6 +33,8 @@ class SBMLClient(Neo4jClient):
         neo4j_user: str = "neo4j",
         neo4j_password: str = "neo4j",
         database: str = "neo4j",
+        create_db: bool = True,
+        drop_if_exists: bool = False,
     ):
         super().__init__(uri, neo4j_user, neo4j_password, database)
         self.available_node_labels = (
@@ -43,6 +47,7 @@ class SBMLClient(Neo4jClient):
             "GeneProductComplex",
             "GeneProductSet",
         )
+        self.setup_graph_db(create_db=create_db, drop_if_exists=drop_if_exists)
 
     def setup_graph_db(self, create_db: bool = True, drop_if_exists: bool = False):
         """
