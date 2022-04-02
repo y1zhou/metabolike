@@ -1,5 +1,7 @@
 import logging
-from typing import Dict, List, Union
+from typing import Any, Dict, List
+
+from metabolike.utils import chunk
 
 from .neo4j import Neo4jClient
 
@@ -80,78 +82,85 @@ class SBMLClient(Neo4jClient):
                     ASSERT n.metaId IS UNIQUE;""",
             )
 
-    def create_node(self, node_label: str, metaid: str, props: Dict[str, str]):
-        """Create a node with the given label and properties.
+    def create_nodes(
+        self, node_label: str, nodes: List[Dict[str, Any]], batch_size: int = 1000
+    ):
+        """Create nodes in batches with the given label and properties.
 
-        See :meth:`.SBMLParser.sbml_to_graph` for details.
+        For ``Compartment`` nodes, simply create them with given properties.
+
+        Each ``compound`` node is linked to its ``Compartment`` node. If it
+        has related ``RDF`` nodes, these are also created and linked to the
+        ``Compound`` node.
+
+        ``GeneProduct`` nodes don't have relationships to ``Compartment``
+        nodes, but they are linked to corresponding ``RDF`` nodes.
 
         Args:
             node_label: Label of the node.
-            metaid: ``metaId`` of the node.
-            props: Properties of the node.
+            nodes: List of properties of the node.
+            batch_size: Number of nodes to create in each batch.
         """
-        logger.debug(f"Creating {node_label} node: {metaid}")
-        self.write(
-            f"""
-            MERGE (n:{node_label} {{metaId: $metaId}})
-            ON CREATE SET n += $props;
-            """,
-            metaId=metaid,
-            props=props,
-        )
+        logger.info(f"Creating {len(nodes)} {node_label} nodes")
 
-    def create_compound_node(self, compartment: str, mcid: str, props: Dict[str, str]):
-        """See :meth:`.SBMLParser.sbml_to_graph` for details."""
-        logger.debug(f"Creating Compound node: {mcid}")
-        self.write(
+        if node_label == "Compartment":
+            query = """
+            UNWIND $batch_nodes AS n
+                MERGE (x:Compartment {metaId: n.metaId})
+                  ON CREATE SET x += n.props;
             """
-            MATCH (cpt:Compartment {metaId: $compartment})
-            MERGE (c:Compound {metaId: $metaId})-[:hasCompartment]->(cpt)
-            ON CREATE SET c += $props;
-            """,
-            compartment=compartment,
-            metaId=mcid,
-            props=props,
-        )
+        elif node_label == "Compound":
+            query = """
+            UNWIND $batch_nodes AS n
+              MATCH (cpt:Compartment {metaId: n.compartment})
+              MERGE (c:Compound {metaId: n.metaId})-[:hasCompartment]->(cpt)
+                ON CREATE SET c += n.props
+              FOREACH (rdf IN n.rdf |
+                CREATE (r:RDF)
+                SET r = rdf.rdf
+                MERGE (r)<-[rel:hasRDF]-(c)
+                  ON CREATE SET rel.bioQualifier = rdf.bioQual
+              );
+            """
+        elif node_label == "GeneProduct":
+            query = """
+            UNWIND $batch_nodes AS n
+              MERGE (gp:GeneProduct {metaId: n.metaId})
+                ON CREATE SET gp += n.props
+              FOREACH (rdf IN n.rdf |
+                CREATE (r:RDF)
+                SET r = rdf.rdf
+                MERGE (r)<-[rel:hasRDF]-(c)
+                  ON CREATE SET rel.bioQualifier = rdf.bioQual
+              );
+            """
+        elif node_label == "Reaction":
+            query = """
+            UNWIND $batch_nodes AS n
+              MERGE (r:Reaction {metaId: n.metaId})
+                ON CREATE SET r += n.props
+              FOREACH (rdf IN n.rdf |
+                CREATE (x:RDF)
+                SET x = rdf.rdf
+                MERGE (x)<-[rel:hasRDF]-(r)
+                  ON CREATE SET rel.bioQualifier = rdf.bioQual
+              )
+              FOREACH (reactant IN n.reactants |
+                MERGE (c:Compound {metaId: reactant.cpdId})  // can't MATCH here
+                MERGE (r)-[rel:hasLeft]->(c)
+                  ON CREATE SET rel = reactant.props
+              )
+              FOREACH (product IN n.products |
+                MERGE (c:Compound {metaId: product.cpdId})
+                MERGE (r)-[rel:hasRight]->(c)
+                  ON CREATE SET rel = product.props
+              );
+            """
+        else:
+            raise ValueError(f"Unknown node label: {node_label}")
 
-    def link_node_to_rdf(
-        self,
-        node_label: str,
-        mcid: str,
-        bio_qual: str,
-        props: Dict[str, Union[str, List[str]]],
-    ):
-        """See :meth:`.SBMLParser._add_sbml_rdf_node` for details."""
-        logger.debug(f"{node_label} node {mcid} {bio_qual} RDF")
-        self.write(
-            f"""
-                MATCH (c:{node_label} {{metaId: $metaId}})
-                MERGE (n:RDF)<-[:{bio_qual}]-(c)
-                ON CREATE SET n += $props;
-                """,
-            metaId=mcid,
-            props=props,
-        )
-
-    def link_reaction_to_compound(
-        self,
-        reaction_id: str,
-        compound_id: str,
-        compound_type: str,
-        props: Dict[str, str],
-    ):
-        logger.debug(f"Adding {compound_type} {compound_id} to Reaction {reaction_id}")
-        self.write(
-            f"""
-            MATCH (r:Reaction {{metaId: $reaction}}),
-                  (c:Compound {{metaId: $compound}})
-            MERGE (r)-[l:has{compound_type}]->(c)
-            ON CREATE SET l += $props;
-            """,
-            reaction=reaction_id,
-            compound=compound_id,
-            props=props,
-        )
+        for batch in chunk(nodes, batch_size):
+            self.write(query, batch_nodes=batch)
 
     def link_node_to_gene(
         self,
