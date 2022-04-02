@@ -66,13 +66,6 @@ class SBMLClient(Neo4jClient):
         if create_db:
             self.create(force=drop_if_exists)
 
-        # Set constraints
-        logger.debug("Creating constraint for RDF nodes")
-        self.write(
-            """CREATE CONSTRAINT IF NOT EXISTS ON (r:RDF)
-               ASSERT r.uri IS UNIQUE;""",
-        )
-
         # Constraints automatically create indexes, so we don't need to
         # create them manually.
         for label in self.available_node_labels:
