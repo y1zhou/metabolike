@@ -29,6 +29,24 @@ class SBMLParser:
         to perform all database operations. Should be closed after use.
         sbml_file: Filepath to the input SBML file.
     """
+    # MIRIAM qualifiers (https://co.mbine.org/standards/qualifiers)
+    # libsbml.BiolQualifierType_toString
+    _bio_qualifiers = {
+        0: "is",
+        1: "hasPart",
+        2: "isPartOf",
+        3: "isVersionOf",
+        4: "hasVersion",
+        5: "isHomologTo",
+        6: "isDescribedBy",
+        7: "isEncodedBy",
+        8: "encodes",
+        9: "occursIn",
+        10: "hasProperty",
+        11: "isPropertyOf",
+        12: "hasTaxon",
+        13: "unknown",
+    }
 
     def __init__(
         self,
@@ -39,24 +57,7 @@ class SBMLParser:
         self.sbml_file = validate_path(sbml)
         if not self.sbml_file:
             raise ValueError("Missing SBML file path.")
-        # MIRIAM qualifiers (https://co.mbine.org/standards/qualifiers)
-        # libsbml.BiolQualifierType_toString
-        self._bio_qualifiers = {
-            0: "is",
-            1: "hasPart",
-            2: "isPartOf",
-            3: "isVersionOf",
-            4: "hasVersion",
-            5: "isHomologTo",
-            6: "isDescribedBy",
-            7: "isEncodedBy",
-            8: "encodes",
-            9: "occursIn",
-            10: "hasProperty",
-            11: "isPropertyOf",
-            12: "hasTaxon",
-            13: "unknown",
-        }
+
 
     def sbml_to_graph(self):
         """

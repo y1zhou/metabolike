@@ -15,6 +15,19 @@ COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
 
 
 class MetacycClient(SBMLClient):
+    available_node_labels = (
+        "Pathway",
+        "Compartment",
+        "Reaction",
+        "Compound",
+        "GeneProduct",
+        "RDF",
+        "GeneProductComplex",
+        "GeneProductSet",
+        "Citation",
+        "Taxa",
+    )
+
     def __init__(
         self,
         uri: str = "neo4j://localhost:7687",
@@ -25,18 +38,6 @@ class MetacycClient(SBMLClient):
         drop_if_exists: bool = False,
     ):
         super().__init__(uri, neo4j_user, neo4j_password, database)
-        self.available_node_labels = (
-            "Pathway",
-            "Compartment",
-            "Reaction",
-            "Compound",
-            "GeneProduct",
-            "RDF",
-            "GeneProductComplex",
-            "GeneProductSet",
-            "Citation",
-            "Taxa",
-        )
         self.setup_graph_db(create_db=create_db, drop_if_exists=drop_if_exists)
 
     def link_reaction_to_compartment(self, reaction_id: str, compartment_name: str):

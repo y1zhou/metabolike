@@ -29,6 +29,17 @@ class SBMLClient(Neo4jClient):
          labels in the graph.
     """
 
+    available_node_labels = (
+        "Pathway",
+        "Compartment",
+        "Reaction",
+        "Compound",
+        "GeneProduct",
+        "RDF",
+        "GeneProductComplex",
+        "GeneProductSet",
+    )
+
     def __init__(
         self,
         uri: str = "neo4j://localhost:7687",
@@ -39,16 +50,6 @@ class SBMLClient(Neo4jClient):
         drop_if_exists: bool = False,
     ):
         super().__init__(uri, neo4j_user, neo4j_password, database)
-        self.available_node_labels = (
-            "Pathway",
-            "Compartment",
-            "Reaction",
-            "Compound",
-            "GeneProduct",
-            "RDF",
-            "GeneProductComplex",
-            "GeneProductSet",
-        )
         self.setup_graph_db(create_db=create_db, drop_if_exists=drop_if_exists)
 
     def setup_graph_db(self, create_db: bool = True, drop_if_exists: bool = False):
