@@ -95,7 +95,7 @@ class SBMLClient(Neo4jClient):
             nodes: List of properties of the node.
             batch_size: Number of nodes to create in each batch.
         """
-        logger.info(f"Creating {len(nodes)} {node_label} nodes")
+        logger.info(f"Creating {node_label} nodes")
 
         if node_label == "Compartment":
             query = """
@@ -155,6 +155,8 @@ class SBMLClient(Neo4jClient):
 
         for batch in chunk(nodes, batch_size):
             self.write(query, batch_nodes=batch)
+
+        logger.info(f"Created {len(nodes)} {node_label} nodes")
 
     def link_node_to_gene(
         self,
