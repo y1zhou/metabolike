@@ -13,6 +13,35 @@ logger = logging.getLogger(__name__)
 # TODO: refactor this with get_high_degree_compound_nodes()
 COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
 
+_reactions_dat_cypher = """
+UNWIND $batch_nodes AS n
+  MATCH (r:Reaction {name: n.rxnId})
+    SET r += n.props
+  FOREACH (pw IN n.inPathway |
+    MERGE (p:Pathway {metaId: pw})
+      ON CREATE SET p.name = pw
+    MERGE (p)-[:hasReaction]->(r)
+  )
+  FOREACH (cpt IN n.rxnLocations |
+    MERGE (c:Compartment {metaId: cpt})
+    MERGE (r)-[:hasCompartment]->(c)
+  )
+  FOREACH (cit IN n.citations |
+    MERGE (c:Citation {metaId: cit})
+    MERGE (r)-[:hasCitation]->(c)
+  )
+"""
+
+_compounds_dat_cypher = """
+UNWIND $batch_nodes AS n
+  MATCH (c:Compound {name: n.name})
+    SET c += n.props
+  FOREACH (cit IN n.citations |
+    MERGE (c:Citation {metaId: cit})
+    MERGE (n)-[:hasCitation]->(c)
+  );
+"""
+
 
 class MetacycClient(SBMLClient):
     available_node_labels = (
@@ -28,6 +57,11 @@ class MetacycClient(SBMLClient):
         "Taxa",
     )
 
+    metacyc_default_cyphers = {
+        "reactions": _reactions_dat_cypher,
+        "compounds": _compounds_dat_cypher,
+    }
+
     def __init__(
         self,
         uri: str = "neo4j://localhost:7687",
@@ -39,17 +73,6 @@ class MetacycClient(SBMLClient):
     ):
         super().__init__(uri, neo4j_user, neo4j_password, database)
         self.setup_graph_db(create_db=create_db, drop_if_exists=drop_if_exists)
-
-    def link_reaction_to_compartment(self, reaction_id: str, compartment_name: str):
-        self.write(
-            """
-            MATCH (r:Reaction {name: $reaction}),
-                  (c:Compartment {name: $compartment})
-            MERGE (r)-[:hasCompartment]->(c);
-            """,
-            reaction=reaction_id,
-            compartment=compartment_name,
-        )
 
     def get_all_nodes(self, label: str, prop: str) -> List[str]:
         """Fetch an property of nodes with a certain label."""
@@ -99,32 +122,32 @@ class MetacycClient(SBMLClient):
             citation=citation_id,
         )
 
-    def add_props_to_node(
+    def add_props_to_nodes(
         self,
         node_label: str,
         node_prop_key: str,
-        node_prop_val: str,
-        props: Dict[str, Any],
+        nodes: List[Dict[str, Any]],
     ):
-        """Add properties to a node.
+        """Add properties to a list of nodes.
 
         Args:
             node_label: Label of the node.
             node_prop_key: Property key of the node used to locate the node.
-            node_prop_val: Property value of the node used to filter ``node_prop_key``.
             props: Properties to add to the node.
         """
         if node_label not in self.available_node_labels:
             raise ValueError(f"Invalid label: {node_label}")
         # TODO: check for valid properties
+
         self.write(
             f"""
-            MATCH (n:{node_label} {{{node_prop_key}: $val}})
-            SET n += $props;
+            UNWIND $batch_nodes AS n
+              MATCH (x:{node_label} {{{node_prop_key}: n.{node_prop_key}}})
+              SET x += n.props;
             """,
-            val=node_prop_val,
-            props=props,
+            batch_nodes=nodes,
         )
+        logger.info(f"Annotated {len(nodes)} {node_label} nodes")
 
     def add_props_to_compound(
         self, compound_id: str, c_props: Dict[str, Any], rdf_props: Dict[str, Any]
@@ -137,19 +160,6 @@ class MetacycClient(SBMLClient):
             cpd_id=compound_id,
             c_props=c_props,
             rdf_props=rdf_props,
-        )
-
-    def link_reaction_to_pathway(self, reaction_id: str, pathway_id: str):
-        logger.debug(f"Reaction {reaction_id} is in Pathway {pathway_id}")
-        self.write(
-            """
-            MATCH (r:Reaction {name: $reaction})
-            MERGE (pw:Pathway {metaId: $pathway})
-                ON CREATE SET pw.name = $pathway
-            MERGE (pw)-[:hasReaction]->(r)
-            """,
-            reaction=reaction_id,
-            pathway=pathway_id,
         )
 
     def link_pathway_to_superpathway(self, pathway_id: str, superpathway_id: str):
