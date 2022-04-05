@@ -29,6 +29,7 @@ class SBMLParser:
         to perform all database operations. Should be closed after use.
         sbml_file: Filepath to the input SBML file.
     """
+
     # MIRIAM qualifiers (https://co.mbine.org/standards/qualifiers)
     # libsbml.BiolQualifierType_toString
     _bio_qualifiers = {
@@ -58,7 +59,6 @@ class SBMLParser:
         if not self.sbml_file:
             raise ValueError("Missing SBML file path.")
 
-
     def sbml_to_graph(self):
         """
         Populate Neo4j database with SBML data. The process is as follows:
@@ -78,22 +78,26 @@ class SBMLParser:
 
         # Compartments
         compartments = self._collect_compartments(model.getListOfCompartments())
-        self.db.create_nodes("Compartment", compartments)
+        self.db.create_nodes(
+            "Compartment", compartments, self.db.default_cyphers["Compartment"]
+        )
 
         # Compounds, i.e. metabolites, species
         compounds = self._collect_compounds(model.getListOfSpecies())
-        self.db.create_nodes("Compound", compounds)
+        self.db.create_nodes("Compound", compounds, self.db.default_cyphers["Compound"])
 
         # Gene products
         fbc: libsbml.FbcModelPlugin = model.getPlugin("fbc")
         gene_prods = self._collect_gene_products(fbc.getListOfGeneProducts())
-        self.db.create_nodes("GeneProduct", gene_prods)
+        self.db.create_nodes(
+            "GeneProduct", gene_prods, self.db.default_cyphers["GeneProduct"]
+        )
 
         # Reactions
         rxns = model.getListOfReactions()
         reactions = self._collect_reactions(rxns)
-        self.db.create_nodes("Reaction", reactions)
-        for r in tqdm(rxns, desc="Reaction-Compound"):
+        self.db.create_nodes("Reaction", reactions, self.db.default_cyphers["Reaction"])
+        for r in tqdm(rxns, desc="Reaction-GeneProduct"):
             # Add associated gene products
             # This could be complicated where the child nodes could be:
             # 1. GeneProductRef

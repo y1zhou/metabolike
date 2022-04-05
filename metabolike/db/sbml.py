@@ -7,6 +7,59 @@ from .neo4j import Neo4jClient
 
 logger = logging.getLogger(__name__)
 
+_compartment_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (x:Compartment {metaId: n.metaId})
+    ON CREATE SET x += n.props;
+"""
+
+_compound_cypher = """
+UNWIND $batch_nodes AS n
+  MATCH (cpt:Compartment {metaId: n.compartment})
+  MERGE (c:Compound {metaId: n.metaId})-[:hasCompartment]->(cpt)
+    ON CREATE SET c += n.props
+  FOREACH (rdf IN n.rdf |
+    CREATE (r:RDF)
+    SET r = rdf.rdf
+    MERGE (r)<-[rel:hasRDF]-(c)
+      ON CREATE SET rel.bioQualifier = rdf.bioQual
+  );
+"""
+
+_gene_product_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (gp:GeneProduct {metaId: n.metaId})
+    ON CREATE SET gp += n.props
+  FOREACH (rdf IN n.rdf |
+    CREATE (r:RDF)
+    SET r = rdf.rdf
+    MERGE (r)<-[rel:hasRDF]-(c)
+      ON CREATE SET rel.bioQualifier = rdf.bioQual
+  );
+"""
+
+_reaction_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (r:Reaction {metaId: n.metaId})
+    ON CREATE SET r += n.props
+  FOREACH (rdf IN n.rdf |
+    CREATE (x:RDF)
+    SET x = rdf.rdf
+    MERGE (x)<-[rel:hasRDF]-(r)
+      ON CREATE SET rel.bioQualifier = rdf.bioQual
+  )
+  FOREACH (reactant IN n.reactants |
+    MERGE (c:Compound {metaId: reactant.cpdId})  // can't MATCH here
+    MERGE (r)-[rel:hasLeft]->(c)
+      ON CREATE SET rel = reactant.props
+  )
+  FOREACH (product IN n.products |
+    MERGE (c:Compound {metaId: product.cpdId})
+    MERGE (r)-[rel:hasRight]->(c)
+      ON CREATE SET rel = product.props
+  );
+"""
+
 
 class SBMLClient(Neo4jClient):
     """In addition to the Neo4j driver, this class also includes a set of
@@ -39,6 +92,13 @@ class SBMLClient(Neo4jClient):
         "GeneProductComplex",
         "GeneProductSet",
     )
+
+    default_cyphers = {
+        "Compartment": _compartment_cypher,
+        "Compound": _compound_cypher,
+        "GeneProduct": _gene_product_cypher,
+        "Reaction": _reaction_cypher,
+    }
 
     def __init__(
         self,
@@ -77,7 +137,11 @@ class SBMLClient(Neo4jClient):
             )
 
     def create_nodes(
-        self, node_label: str, nodes: List[Dict[str, Any]], batch_size: int = 1000
+        self,
+        node_label: str,
+        nodes: List[Dict[str, Any]],
+        query: str,
+        batch_size: int = 1000,
     ):
         """Create nodes in batches with the given label and properties.
 
@@ -92,66 +156,11 @@ class SBMLClient(Neo4jClient):
 
         Args:
             node_label: Label of the node.
-            nodes: List of properties of the node.
+            nodes: List of properties of the nodes.
+            query: Cypher query to create the nodes.
             batch_size: Number of nodes to create in each batch.
         """
         logger.info(f"Creating {node_label} nodes")
-
-        if node_label == "Compartment":
-            query = """
-            UNWIND $batch_nodes AS n
-                MERGE (x:Compartment {metaId: n.metaId})
-                  ON CREATE SET x += n.props;
-            """
-        elif node_label == "Compound":
-            query = """
-            UNWIND $batch_nodes AS n
-              MATCH (cpt:Compartment {metaId: n.compartment})
-              MERGE (c:Compound {metaId: n.metaId})-[:hasCompartment]->(cpt)
-                ON CREATE SET c += n.props
-              FOREACH (rdf IN n.rdf |
-                CREATE (r:RDF)
-                SET r = rdf.rdf
-                MERGE (r)<-[rel:hasRDF]-(c)
-                  ON CREATE SET rel.bioQualifier = rdf.bioQual
-              );
-            """
-        elif node_label == "GeneProduct":
-            query = """
-            UNWIND $batch_nodes AS n
-              MERGE (gp:GeneProduct {metaId: n.metaId})
-                ON CREATE SET gp += n.props
-              FOREACH (rdf IN n.rdf |
-                CREATE (r:RDF)
-                SET r = rdf.rdf
-                MERGE (r)<-[rel:hasRDF]-(c)
-                  ON CREATE SET rel.bioQualifier = rdf.bioQual
-              );
-            """
-        elif node_label == "Reaction":
-            query = """
-            UNWIND $batch_nodes AS n
-              MERGE (r:Reaction {metaId: n.metaId})
-                ON CREATE SET r += n.props
-              FOREACH (rdf IN n.rdf |
-                CREATE (x:RDF)
-                SET x = rdf.rdf
-                MERGE (x)<-[rel:hasRDF]-(r)
-                  ON CREATE SET rel.bioQualifier = rdf.bioQual
-              )
-              FOREACH (reactant IN n.reactants |
-                MERGE (c:Compound {metaId: reactant.cpdId})  // can't MATCH here
-                MERGE (r)-[rel:hasLeft]->(c)
-                  ON CREATE SET rel = reactant.props
-              )
-              FOREACH (product IN n.products |
-                MERGE (c:Compound {metaId: product.cpdId})
-                MERGE (r)-[rel:hasRight]->(c)
-                  ON CREATE SET rel = product.props
-              );
-            """
-        else:
-            raise ValueError(f"Unknown node label: {node_label}")
 
         for batch in chunk(nodes, batch_size):
             self.write(query, batch_nodes=batch)
