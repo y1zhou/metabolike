@@ -93,7 +93,7 @@ class MetacycClient(SBMLClient):
         """
         res = self.read(
             """
-            MATCH (c:Compound)-[:is]->(r:RDF)
+            MATCH (c:Compound)-[:hasRDF {bioQualifier: 'is'}]->(r:RDF)
             RETURN DISTINCT c.name, r.biocyc;
             """
         )  # TODO: 38 POLYMER nodes don't have BioCyc IDs
@@ -206,9 +206,9 @@ class MetacycClient(SBMLClient):
             MERGE (pw1){pw_rel_type}(pw2)
                 ON CREATE SET l.hasRelatedCompound = $cpd
             WITH pw1, pw2
-            MATCH (pw1)-[:hasReaction]->(r1:Reaction)-[:{l1}]->(:Compound)-[:is]->(:RDF {{biocyc: $cpd}})
+            MATCH (pw1)-[:hasReaction]->(r1:Reaction)-[:{l1}]->(:Compound)-[:hasRDF {{bioQualifier: 'is'}}]->(:RDF {{biocyc: $cpd}})
             WITH r1, pw2
-            MATCH (pw2)-[:hasReaction]->(r2:Reaction)-[:{l2}]->(:Compound)-[:is]->(:RDF {{biocyc: $cpd}})
+            MATCH (pw2)-[:hasReaction]->(r2:Reaction)-[:{l2}]->(:Compound)-[:hasRDF {{bioQualifier: 'is'}}]->(:RDF {{biocyc: $cpd}})
             MERGE (r1){rxn_rel_type}(r2)
                 ON CREATE SET l.fromPathway = $pw_id, l.toPathway = pw2.metaId;
             """,
@@ -286,7 +286,7 @@ class MetacycClient(SBMLClient):
         self.write(
             f"""
             MATCH (r:Reaction {{canonicalId: $rxn_id}}),
-                  (cpds:Compound)-[:is]->(rdf:RDF)
+                  (cpds:Compound)-[:hasRDF {{bioQualifier: 'is'}}]->(rdf:RDF)
             WHERE rdf.biocyc IN $compound_ids
             UNWIND cpds AS cpd
             MATCH (r)-[l:hasLeft|hasRight]->(cpd)
@@ -382,7 +382,7 @@ class MetacycClient(SBMLClient):
     def get_all_ec_numbers(self):
         ec = self.read(
             """
-            MATCH (r:Reaction)-[:is]->(rdf:RDF)
+            MATCH (r:Reaction)-[:hasRDF {bioQualifier: 'is'}]->(rdf:RDF)
             WHERE rdf.ecCode IS NOT NULL
             UNWIND rdf.ecCode as ec
             RETURN collect(ec);
@@ -404,8 +404,8 @@ class MetacycClient(SBMLClient):
             """
         MATCH (:Pathway {metaId: $pw_id})-[l:hasReaction]->(r:Reaction)
         WITH r
-        MATCH (r)-[:is]->(rrdf:RDF),
-              (r)-[:hasGeneProduct|hasComponent|hasMember*]->(gp:GeneProduct)-[:isEncodedBy]->(grdf:RDF)
+        MATCH (r)-[:hasRDF {bioQualifier: 'is'}]->(rrdf:RDF),
+              (r)-[:hasGeneProduct|hasComponent|hasMember*]->(gp:GeneProduct)-[:hasRDF {bioQualifier: 'isEncodedBy'}]->(grdf:RDF)
         WITH r, rrdf.ecCode AS ec,
              COLLECT(gp.name) as symbol, COLLECT(grdf.ncbigene) AS ncbi
         RETURN {
@@ -444,7 +444,7 @@ class MetacycClient(SBMLClient):
             MATCH (p:Pathway)-[:hasReaction]->(r:Reaction)-[l:hasLeft|hasRight]->(c:Compound)-[:hasCompartment]->(cpt:Compartment)
             WHERE p.metaId IN $pw_ids
             WITH r, l, c, cpt
-            OPTIONAL MATCH (r)-[:is]->(rdf:RDF)
+            OPTIONAL MATCH (r)-[:hasRDF {bioQualifier: 'is'}]->(rdf:RDF)
             RETURN
               r.metaId, r.name, r.synonyms, r.reactionDirection, r.gibbs0,
               rdf.ecCode,
