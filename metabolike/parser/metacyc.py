@@ -186,149 +186,6 @@ class MetacycParser(SBMLParser):
         self.db.fix_reaction_direction()
         return rxn_dat
 
-    def pathways_to_graph(self, rxn_dat: Dict[str, List[List[str]]]):
-        """Parse the ``pathways.dat`` file.
-
-        For details, see :meth:`setup`.
-        """
-        if not self.input_files["pathways"]:
-            logger.warning("No pathways.dat file given")
-            return
-
-        # TODO: refactor to process in batches
-        logger.info(f"Parsing {self.input_files['pathways']}")
-        pw_dat = self._read_dat_file(self.input_files["pathways"])
-
-        all_pws = self.db.get_all_nodes("Pathway", "metaId")
-        self.super_pathways = set()
-        for pw in tqdm(all_pws, desc="pathways.dat file"):
-            self.pathway_to_graph(pw, pw_dat, rxn_dat)
-            logger.debug(f"Added pathway annotation for {pw}")
-
-        # Annotate the super-pathways
-        self.super_pathways = self.super_pathways - set(all_pws)
-        while self.super_pathways:
-            spw = self.super_pathways.pop()
-            self.pathway_to_graph(spw, pw_dat, rxn_dat)
-            logger.debug(f"Added pathway annotation for {spw}")
-
-        del self.super_pathways
-
-        # Correct composite reactions
-        self.db.set_composite_reaction_labels()
-
-        # Fix the direction of newly-added reactions
-        self.db.fix_reaction_direction()
-
-    def smiles_dat_to_graph(self):
-        """Parse the ``atom-mappings-smiles.dat`` file.
-
-        For details, see :meth:`setup`.
-        """
-        if not self.input_files["atom_mapping"]:
-            logger.warning("No atom-mappings-smiles.dat file given")
-            return
-
-        logger.info(f"Adding SMILES with {self.input_files['atom_mapping']}")
-        smiles_df = pd.read_table(
-            self.input_files["atom_mapping"],
-            sep="\t",
-            header=None,
-            names=["rxn", "smiles"],
-        )
-        smiles: Dict[str, str] = smiles_df.set_index("rxn").to_dict()["smiles"]
-        all_rxns = self.db.get_all_nodes("Reaction", "name")
-        rxn_smiles = self._collect_atom_mapping_dat_nodes(all_rxns, smiles)
-        self.db.add_props_to_nodes("Reaction", "name", rxn_smiles)
-
-    def compounds_dat_to_graph(self):
-        """Annotate compound nodes with the ``compounds.dat`` file.
-
-        For details, see :meth:`setup`.
-        """
-        if not self.input_files["compounds"]:
-            logger.warning("No compounds.dat file given")
-            return
-
-        logger.info(f"Parsing {self.input_files['compounds']}")
-        cpd_dat = self._read_dat_file(self.input_files["compounds"])
-        all_cpds = self.db.get_all_compounds()
-        cpd_nodes = self._collect_compounds_dat_nodes(all_cpds, cpd_dat)
-        self.db.create_nodes(
-            "Compound", cpd_nodes, self.db.metacyc_default_cyphers["compounds"]
-        )
-
-    def citations_dat_to_graph(self):
-        """Annotate citation nodes with the ``pubs.dat`` file.
-
-        For details, see :meth:`setup`.
-        """
-        if not self.input_files["publications"]:
-            logger.warning("No pubs.dat file given")
-            return
-        logger.info(f"Annotating publications with {self.input_files['publications']}")
-        pub_dat = self._read_dat_file(self.input_files["publications"])
-
-        all_cits = self.db.get_all_nodes("Citation", "metaId")
-        cit_nodes = self._collect_citation_dat_nodes(all_cits, pub_dat)
-        self.db.add_props_to_nodes("Citation", "metaId", cit_nodes)
-
-    def classes_dat_to_graph(self):
-        """Parse the ``classes.dat`` file.
-
-        Add common name and synonyms to ``Compartment`` nodes.
-        Add common name, strain name, comment, and synonyms to ``Taxa`` nodes.
-        """
-        if not self.input_files["classes"]:
-            logger.warning("No classes.dat file given")
-            return
-
-        logger.info(f"Annotating with {self.input_files['classes']}")
-        cls_dat = self._read_dat_file(self.input_files["classes"])
-        cco_nodes, taxa_nodes = self._collect_classes_dat_nodes(cls_dat)
-        self.db.add_props_to_nodes("Compartment", "name", cco_nodes)
-        self.db.add_props_to_nodes("Taxa", "metaId", taxa_nodes)
-
-    def _collect_classes_dat_nodes(self, class_dat: Dict[str, List[List[str]]]):
-        cco_nodes = []
-        # Common names for cell components
-        all_cco = self.db.get_all_nodes("Compartment", "name")
-        for cco in all_cco:
-            if cco not in class_dat:
-                self.missing_ids["compartments"].add(cco)
-                continue
-            node = {"name": cco}
-            props: Dict[str, Union[str, List[str]]] = {}
-            node = self._dat_entry_to_node(
-                node,
-                class_dat[cco],
-                props_str_keys={"COMMON-NAME"},
-                props_list_keys={"SYNONYMS"},
-            )
-            cco_nodes.append(node)
-
-        # Common names and synonyms for organisms. Some also have strain names
-        taxa_nodes = []
-        all_taxon = self.db.get_all_nodes("Taxa", "metaId")
-        for taxa in tqdm(all_taxon, desc="Taxon in classes.dat"):
-            if taxa not in class_dat:
-                self.missing_ids["taxon"].add(taxa)
-                continue
-
-            node = {"metaId": taxa}
-            node = self._dat_entry_to_node(
-                node,
-                class_dat[taxa],
-                props_str_keys={"COMMON-NAME", "STRAIN-NAME", "COMMENT"},
-                props_list_keys={"SYNONYMS"},
-                # TODO: TYPES links the taxon
-            )
-
-            taxa_nodes.append(node)
-
-        # TODO: Evidence code in citations are in the `Evidence` attr
-        return cco_nodes, taxa_nodes
-
     def _collect_reactions_dat_nodes(
         self, rxn_ids: Iterable[str], rxn_dat: Dict[str, List[List[str]]]
     ):
@@ -374,134 +231,39 @@ class MetacycParser(SBMLParser):
 
         return nodes
 
-    def _collect_pathways_dat_nodes(
-        self,
-        all_pws: Iterable[str],
-        pw_dat: Dict[str, List[List[str]]],
-        rxn_dat: Dict[str, List[List[str]]],
-    ):
-        raise NotImplementedError
+    def pathways_to_graph(self, rxn_dat: Dict[str, List[List[str]]]):
+        """Parse the ``pathways.dat`` file.
 
-    def _collect_atom_mapping_dat_nodes(
-        self, rxn_ids: Iterable[str], smiles: Dict[str, str]
-    ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
+        For details, see :meth:`setup`.
         """
-        Args:
-            rxn_ids: The reaction name from the graph database.
-            smiles: The reaction ID -> SMILES dictionary from the atom
-             mapping file.
-        """
-        nodes = []
-        for rxn_id in tqdm(rxn_ids, desc="atom_mapping.dat file"):
-            canonical_id = self._find_rxn_canonical_id(rxn_id, smiles.keys())
-            if canonical_id not in smiles:
-                self.missing_ids["atom_mappings"].add(canonical_id)
-                continue
-            node = {
-                "name": rxn_id,
-                "props": {"smilesAtomMapping": smiles[canonical_id]},
-            }
-            nodes.append(node)
+        if not self.input_files["pathways"]:
+            logger.warning("No pathways.dat file given")
+            return
 
-        return nodes
+        # TODO: refactor to process in batches
+        logger.info(f"Parsing {self.input_files['pathways']}")
+        pw_dat = self._read_dat_file(self.input_files["pathways"])
 
-    def _collect_compounds_dat_nodes(
-        self, all_cpds: List[Tuple[str, str]], cpd_dat: Dict[str, List[List[str]]]
-    ):
-        nodes = []
-        for cpd, biocyc in tqdm(all_cpds, desc="compounds.dat file"):
-            # self.compounds_to_graph(cpd, biocyc, cpd_dat)
-            if biocyc not in cpd_dat:
-                self.missing_ids["compounds"].add(biocyc)
-                continue
-            lines = cpd_dat[biocyc]
-            node = {"name": cpd}
-            node = self._dat_entry_to_node(
-                node,
-                lines,
-                props_str_keys={
-                    "COMMON-NAME",
-                    "GIBBS-0",
-                    "LOGP",
-                    "MOLECULAR-WEIGHT",
-                    "MONOISOTOPIC-MW",
-                    "POLAR-SURFACE-AREA",
-                    "PKA1",
-                    "PKA2",
-                    "PKA3",
-                    "COMMENT",
-                    # "DBLINKS",  # TODO: parse DBLINKS
-                },
-                props_list_keys={"SYNONYMS", "SMILES", "INCHI"},
-                node_list_keys={"CITATIONS"},
-                prop_num_keys=[
-                    "GIBBS-0",
-                    "LOGP",
-                    "MOLECULAR-WEIGHT",
-                    "MONOISOTOPIC-MW",
-                    "POLAR-SURFACE-AREA",
-                    "PKA1",
-                    "PKA2",
-                    "PKA3",
-                ],
-            )
-            nodes.append(node)
+        all_pws = self.db.get_all_nodes("Pathway", "metaId")
+        self.super_pathways = set()
+        for pw in tqdm(all_pws, desc="pathways.dat file"):
+            self.pathway_to_graph(pw, pw_dat, rxn_dat)
+            logger.debug(f"Added pathway annotation for {pw}")
 
-        return nodes
+        # Annotate the super-pathways
+        self.super_pathways = self.super_pathways - set(all_pws)
+        while self.super_pathways:
+            spw = self.super_pathways.pop()
+            self.pathway_to_graph(spw, pw_dat, rxn_dat)
+            logger.debug(f"Added pathway annotation for {spw}")
 
-    def _collect_citation_dat_nodes(
-        self, cit_ids: Iterable[str], pub_dat: Dict[str, List[List[str]]]
-    ):
-        """Annotate a citation node with data from the publication.dat file.
+        del self.super_pathways
 
-        If there are multiple fields in the given ``cit_id``, then the fields are
-        separated by colons. The first field is the citation ID, the second is the
-        evidence type (in classes.dat), the third is not documented, and the
-        fourth is the curator's name.
+        # Correct composite reactions
+        self.db.set_composite_reaction_labels()
 
-        In most cases the citation ID should match: ``PUB-[A-Z0-9]+$``,
-        with a few exceptions containing double dashes, e.g. ``PUB--8``,
-        or some dashes within author names, e.g. ``PUB-CHIH-CHING95``.
-
-        Args:
-            cit_id: The citation ``metaId`` property.
-            pub_dat: The publication.dat data.
-        """
-        # TODO: deal with evidence frames. Evidence frames are in the form of
-        # 10066805:EV-EXP-IDA:3354997111:hartmut
-        nodes = []
-        for cit_id in tqdm(cit_ids, desc="pubs.dat file"):
-            pub_dat_id = re.sub(r"[\[\]\s,']", "", cit_id.split(":")[0].upper())
-            pub_dat_id = re.sub(r"-(\d+)", r"\1", pub_dat_id)
-            if pub_dat_id == "BOREJSZA-WYSOCKI94":
-                pub_dat_id = "BOREJSZAWYSOCKI94"  # only exception with dash removed
-            if not pub_dat_id:
-                continue
-            pub_dat_id = "PUB-" + pub_dat_id
-            if pub_dat_id not in pub_dat:
-                self.missing_ids["publications"].add(pub_dat_id)
-                continue
-
-            lines = pub_dat[pub_dat_id]
-            node = {"metaId": cit_id, "props": {"citationId": pub_dat_id}}
-            node = self._dat_entry_to_node(
-                node,
-                lines,
-                props_str_keys={
-                    "DOI-ID",
-                    "PUBMED-ID",
-                    "MEDLINE-ID",
-                    "TITLE",
-                    "SOURCE",
-                    "YEAR",
-                    "URL",
-                    "REFERENT-FRAME",
-                },
-                props_list_keys={"AUTHORS"},
-            )
-            nodes.append(node)
-
-        return nodes
+        # Fix the direction of newly-added reactions
+        self.db.fix_reaction_direction()
 
     def pathway_to_graph(
         self,
@@ -582,6 +344,244 @@ class MetacycParser(SBMLParser):
         self.db.add_props_to_nodes(
             "Pathway", "metaId", [{"metaId": pw_id, "props": props}]
         )
+
+    def _collect_pathways_dat_nodes(
+        self,
+        all_pws: Iterable[str],
+        pw_dat: Dict[str, List[List[str]]],
+        rxn_dat: Dict[str, List[List[str]]],
+    ):
+        raise NotImplementedError
+
+    def smiles_dat_to_graph(self):
+        """Parse the ``atom-mappings-smiles.dat`` file.
+
+        For details, see :meth:`setup`.
+        """
+        if not self.input_files["atom_mapping"]:
+            logger.warning("No atom-mappings-smiles.dat file given")
+            return
+
+        logger.info(f"Adding SMILES with {self.input_files['atom_mapping']}")
+        smiles_df = pd.read_table(
+            self.input_files["atom_mapping"],
+            sep="\t",
+            header=None,
+            names=["rxn", "smiles"],
+        )
+        smiles: Dict[str, str] = smiles_df.set_index("rxn").to_dict()["smiles"]
+        all_rxns = self.db.get_all_nodes("Reaction", "name")
+        rxn_smiles = self._collect_atom_mapping_dat_nodes(all_rxns, smiles)
+        self.db.add_props_to_nodes("Reaction", "name", rxn_smiles)
+
+    def _collect_atom_mapping_dat_nodes(
+        self, rxn_ids: Iterable[str], smiles: Dict[str, str]
+    ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
+        """
+        Args:
+            rxn_ids: The reaction name from the graph database.
+            smiles: The reaction ID -> SMILES dictionary from the atom
+             mapping file.
+        """
+        nodes = []
+        for rxn_id in tqdm(rxn_ids, desc="atom_mapping.dat file"):
+            canonical_id = self._find_rxn_canonical_id(rxn_id, smiles.keys())
+            if canonical_id not in smiles:
+                self.missing_ids["atom_mappings"].add(canonical_id)
+                continue
+            node = {
+                "name": rxn_id,
+                "props": {"smilesAtomMapping": smiles[canonical_id]},
+            }
+            nodes.append(node)
+
+        return nodes
+
+    def compounds_dat_to_graph(self):
+        """Annotate compound nodes with the ``compounds.dat`` file.
+
+        For details, see :meth:`setup`.
+        """
+        if not self.input_files["compounds"]:
+            logger.warning("No compounds.dat file given")
+            return
+
+        logger.info(f"Parsing {self.input_files['compounds']}")
+        cpd_dat = self._read_dat_file(self.input_files["compounds"])
+        all_cpds = self.db.get_all_compounds()
+        cpd_nodes = self._collect_compounds_dat_nodes(all_cpds, cpd_dat)
+        self.db.create_nodes(
+            "Compound", cpd_nodes, self.db.metacyc_default_cyphers["compounds"]
+        )
+
+    def _collect_compounds_dat_nodes(
+        self, all_cpds: List[Tuple[str, str]], cpd_dat: Dict[str, List[List[str]]]
+    ):
+        nodes = []
+        for cpd, biocyc in tqdm(all_cpds, desc="compounds.dat file"):
+            # self.compounds_to_graph(cpd, biocyc, cpd_dat)
+            if biocyc not in cpd_dat:
+                self.missing_ids["compounds"].add(biocyc)
+                continue
+            lines = cpd_dat[biocyc]
+            node = {"name": cpd}
+            node = self._dat_entry_to_node(
+                node,
+                lines,
+                props_str_keys={
+                    "COMMON-NAME",
+                    "GIBBS-0",
+                    "LOGP",
+                    "MOLECULAR-WEIGHT",
+                    "MONOISOTOPIC-MW",
+                    "POLAR-SURFACE-AREA",
+                    "PKA1",
+                    "PKA2",
+                    "PKA3",
+                    "COMMENT",
+                    # "DBLINKS",  # TODO: parse DBLINKS
+                },
+                props_list_keys={"SYNONYMS", "SMILES", "INCHI"},
+                node_list_keys={"CITATIONS"},
+                prop_num_keys=[
+                    "GIBBS-0",
+                    "LOGP",
+                    "MOLECULAR-WEIGHT",
+                    "MONOISOTOPIC-MW",
+                    "POLAR-SURFACE-AREA",
+                    "PKA1",
+                    "PKA2",
+                    "PKA3",
+                ],
+            )
+            nodes.append(node)
+
+        return nodes
+
+    def citations_dat_to_graph(self):
+        """Annotate citation nodes with the ``pubs.dat`` file.
+
+        For details, see :meth:`setup`.
+        """
+        if not self.input_files["publications"]:
+            logger.warning("No pubs.dat file given")
+            return
+        logger.info(f"Annotating publications with {self.input_files['publications']}")
+        pub_dat = self._read_dat_file(self.input_files["publications"])
+
+        all_cits = self.db.get_all_nodes("Citation", "metaId")
+        cit_nodes = self._collect_citation_dat_nodes(all_cits, pub_dat)
+        self.db.add_props_to_nodes("Citation", "metaId", cit_nodes)
+
+    def _collect_citation_dat_nodes(
+        self, cit_ids: Iterable[str], pub_dat: Dict[str, List[List[str]]]
+    ):
+        """Annotate a citation node with data from the publication.dat file.
+
+        If there are multiple fields in the given ``cit_id``, then the fields are
+        separated by colons. The first field is the citation ID, the second is the
+        evidence type (in classes.dat), the third is not documented, and the
+        fourth is the curator's name.
+
+        In most cases the citation ID should match: ``PUB-[A-Z0-9]+$``,
+        with a few exceptions containing double dashes, e.g. ``PUB--8``,
+        or some dashes within author names, e.g. ``PUB-CHIH-CHING95``.
+
+        Args:
+            cit_id: The citation ``metaId`` property.
+            pub_dat: The publication.dat data.
+        """
+        # TODO: deal with evidence frames. Evidence frames are in the form of
+        # 10066805:EV-EXP-IDA:3354997111:hartmut
+        nodes = []
+        for cit_id in tqdm(cit_ids, desc="pubs.dat file"):
+            pub_dat_id = re.sub(r"[\[\]\s,']", "", cit_id.split(":")[0].upper())
+            pub_dat_id = re.sub(r"-(\d+)", r"\1", pub_dat_id)
+            if pub_dat_id == "BOREJSZA-WYSOCKI94":
+                pub_dat_id = "BOREJSZAWYSOCKI94"  # only exception with dash removed
+            if not pub_dat_id:
+                continue
+            pub_dat_id = "PUB-" + pub_dat_id
+            if pub_dat_id not in pub_dat:
+                self.missing_ids["publications"].add(pub_dat_id)
+                continue
+
+            lines = pub_dat[pub_dat_id]
+            node = {"metaId": cit_id, "props": {"citationId": pub_dat_id}}
+            node = self._dat_entry_to_node(
+                node,
+                lines,
+                props_str_keys={
+                    "DOI-ID",
+                    "PUBMED-ID",
+                    "MEDLINE-ID",
+                    "TITLE",
+                    "SOURCE",
+                    "YEAR",
+                    "URL",
+                    "REFERENT-FRAME",
+                },
+                props_list_keys={"AUTHORS"},
+            )
+            nodes.append(node)
+
+        return nodes
+
+    def classes_dat_to_graph(self):
+        """Parse the ``classes.dat`` file.
+
+        Add common name and synonyms to ``Compartment`` nodes.
+        Add common name, strain name, comment, and synonyms to ``Taxa`` nodes.
+        """
+        if not self.input_files["classes"]:
+            logger.warning("No classes.dat file given")
+            return
+
+        logger.info(f"Annotating with {self.input_files['classes']}")
+        cls_dat = self._read_dat_file(self.input_files["classes"])
+        cco_nodes, taxa_nodes = self._collect_classes_dat_nodes(cls_dat)
+        self.db.add_props_to_nodes("Compartment", "name", cco_nodes)
+        self.db.add_props_to_nodes("Taxa", "metaId", taxa_nodes)
+
+    def _collect_classes_dat_nodes(self, class_dat: Dict[str, List[List[str]]]):
+        cco_nodes = []
+        # Common names for cell components
+        all_cco = self.db.get_all_nodes("Compartment", "name")
+        for cco in all_cco:
+            if cco not in class_dat:
+                self.missing_ids["compartments"].add(cco)
+                continue
+            node = {"name": cco}
+            props: Dict[str, Union[str, List[str]]] = {}
+            node = self._dat_entry_to_node(
+                node,
+                class_dat[cco],
+                props_str_keys={"COMMON-NAME"},
+                props_list_keys={"SYNONYMS"},
+            )
+            cco_nodes.append(node)
+
+        # Common names and synonyms for organisms. Some also have strain names
+        taxa_nodes = []
+        all_taxon = self.db.get_all_nodes("Taxa", "metaId")
+        for taxa in tqdm(all_taxon, desc="Taxon in classes.dat"):
+            if taxa not in class_dat:
+                self.missing_ids["taxon"].add(taxa)
+                continue
+
+            node = {"metaId": taxa}
+            node = self._dat_entry_to_node(
+                node,
+                class_dat[taxa],
+                props_str_keys={"COMMON-NAME", "STRAIN-NAME", "COMMENT"},
+                props_list_keys={"SYNONYMS"},
+                # TODO: TYPES links the taxon
+            )
+
+            taxa_nodes.append(node)
+
+        # TODO: Evidence code in citations are in the `Evidence` attr
+        return cco_nodes, taxa_nodes
 
     @staticmethod
     def _read_dat_file(filepath: Union[str, Path]) -> Dict[str, List[List[str]]]:
