@@ -80,7 +80,16 @@ UNWIND $batch_nodes AS n
     MERGE (spw:Pathway {metaId: super_pw})
       ON CREATE SET spw.name = super_pw
     MERGE (spw)-[:hasSubPathway]->(pw)
-  );
+  )
+  FOREACH (pred in n.predecessors |
+    MERGE (r1: Reaction {canonicalId: pred.r1})
+    FOREACH (rxn IN pred.r2 |
+      MERGE (r2:Reaction {canonicalId: rxn})
+      MERGE (r2)-[l:isPrecedingEvent]->(r1)
+        ON CREATE SET l.hasRelatedPathway = n.metaId
+    )
+  )
+  ;
 """
 
 

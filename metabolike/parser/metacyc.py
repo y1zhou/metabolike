@@ -257,12 +257,6 @@ class MetacycParser(SBMLParser):
 
         for node in tqdm(pw_nodes, desc="Annotating pathways"):
             pw_id = node["metaId"]
-            if predecessors := node.get("predecessors"):
-                for v in predecessors:
-                    rxns = v[2:-2].split('" "')  # leading (" and trailing ")
-                    r1, r2 = rxns[0], rxns[1:]  # could have multiple predecessors
-                    self.db.link_reaction_to_next_step(r1, r2, pw_id)
-
             if rxn_layout := node.get("reactionLayout"):
                 for v in rxn_layout:
                     rxn_id, d = self._parse_reaction_layout(v)
@@ -382,15 +376,22 @@ class MetacycParser(SBMLParser):
         * ``pathwayLinks`` links the pathway to other pathways through
          intermediate ``Compound``s.
 
+        While parsing these fields, we don't add any new ``Reaction`` nodes.
+        These are often hypothetical reactions and not part of the SBML file.
+
         Args:
             pw_nodes: Output of :meth:`_collect_pathways_dat_nodes`.
         """
-        for n in pw_nodes:
+        all_rxns = set(self.db.get_all_nodes("Reaction", "name"))
+        for i, n in enumerate(pw_nodes):
             if predecessors := n.get("predecessors"):
                 predecessors: List[str]
+                new_pred = []
                 for v in predecessors:
-                    rxns = v[2:-2].split('" "')  # leading (" and trailing ")
-                    r1, r2 = rxns[0], rxns[1:]  # could have >1 predecessors
+                    if pred := self._parse_pathway_predecessors(v, all_rxns):
+                        new_pred.append(pred)
+
+                pw_nodes[i]["predecessors"] = new_pred
 
         return pw_nodes
 
@@ -742,6 +743,38 @@ class MetacycParser(SBMLParser):
                 props[f] = enum_pattern.sub("", props[f])
 
         return props
+
+    @staticmethod
+    def _parse_pathway_predecessors(
+        s: str, all_rxns: Set[str]
+    ) -> Dict[str, Union[str, List[str]]]:
+        """Parse the pathway predecessors.
+
+        In most cases the string takes the form of:
+         ``("RXN66-347" "1.1.1.64-RXN")``
+
+        However, in some cases:
+
+          * The reaction IDs are not quoted.
+          * There is a single pathway ID, e.g. ``PWY-7306``.
+          * There is a single reaction ID, e.g.
+           ``(QUEUOSINE-TRNA-RIBOSYLTRANSFERASE-RXN)``.
+
+        We handle the first case, and ignore the second and third cases.
+        """
+        if s[0] != "(":  # single pathway ID
+            return {}
+
+        if re.fullmatch(r"\([^\s]+\)", s):  # single reaction ID
+            return {}
+
+        s = s.replace('"', "")
+        rxns = s[1:-1].split(" ")  # leading ( and trailing )
+        r1, r2 = rxns[0], rxns[1:]  # could have >1 predecessors
+        if r1 not in all_rxns:
+            return {}
+        r2 = [x for x in r2 if x in all_rxns]
+        return {"r1": r1, "r2": r2}
 
     @staticmethod
     def _parse_reaction_layout(s: str) -> Tuple[str, Dict[str, List[str]]]:
