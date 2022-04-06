@@ -201,8 +201,8 @@ class MetacycParser(SBMLParser):
         Returns:
             A list of dictionaries, each of which contains the information
         """
-        nodes = []
-        for rxn_id in tqdm(rxn_ids, desc="reactions.dat file"):
+        nodes: List[Dict[str, Any]] = []
+        for rxn_id in rxn_ids:
             canonical_id = self._find_rxn_canonical_id(rxn_id, rxn_dat.keys())
             if canonical_id not in rxn_dat:
                 self.missing_ids["reactions"].add(canonical_id)
@@ -240,110 +240,47 @@ class MetacycParser(SBMLParser):
             logger.warning("No pathways.dat file given")
             return
 
-        # TODO: refactor to process in batches
         logger.info(f"Parsing {self.input_files['pathways']}")
         pw_dat = self._read_dat_file(self.input_files["pathways"])
-
         all_pws = self.db.get_all_nodes("Pathway", "metaId")
-        self.super_pathways = set()
-        for pw in tqdm(all_pws, desc="pathways.dat file"):
-            self.pathway_to_graph(pw, pw_dat, rxn_dat)
-            logger.debug(f"Added pathway annotation for {pw}")
 
-        # Annotate the super-pathways
-        self.super_pathways = self.super_pathways - set(all_pws)
-        while self.super_pathways:
-            spw = self.super_pathways.pop()
-            self.pathway_to_graph(spw, pw_dat, rxn_dat)
-            logger.debug(f"Added pathway annotation for {spw}")
-
-        del self.super_pathways
-
-        # Correct composite reactions
-        self.db.set_composite_reaction_labels()
-
-        # Fix the direction of newly-added reactions
-        self.db.fix_reaction_direction()
-
-    def pathway_to_graph(
-        self,
-        pw_id: str,
-        pw_dat: Dict[str, List[List[str]]],
-        rxn_dat: Dict[str, List[List[str]]],
-    ):
-        """
-        Parse one entry from the pathway attribute-value file, and add relevant
-        information to the graph database in one transaction.
-
-        Args:
-            pw_id: The pathway ID from the graph database.
-            pw_dat: The pathways.dat file as an attribute-value list.
-            rxn_dat: The reactions.dat file as an attribute-value list. This is
-             used to find the annotation data for composite reactions marked as
-             pathways.
-        """
-        if (pw_id not in pw_dat) and (pw_id not in rxn_dat):
-            self.missing_ids["pathways"].add(pw_id)
-            return
-
-        # Deal with pathway nodes with reaction IDs (composite reactions)
-        if pw_id in rxn_dat:
-            pw_node = self._collect_reactions_dat_nodes([pw_id], rxn_dat)
-            self.db.create_nodes(
-                "Composite reaction",
-                pw_node,
-                self.db.metacyc_default_cyphers["reactions"],
-            )
-            # Merge the Reaction node with the Pathway node under the same ID
-            self.db.merge_nodes("Pathway", "Reaction", "metaId", "name", pw_id)
-            return
-
-        lines = pw_dat[pw_id]
-        props: Dict[str, Union[str, List[str]]] = {"name": pw_id}
-        for k, v in lines:
-            # Pathway node properties
-            if k in {"SYNONYMS", "TYPES"}:
-                add_kv_to_dict(props, k, v, as_list=True)
-            elif k in {"COMMENT", "COMMON-NAME"}:
-                add_kv_to_dict(props, k, v, as_list=False)
-
-            # Relationship with other nodes
-            elif k in {"IN-PATHWAY", "SUPER-PATHWAYS"}:
-                self.super_pathways.add(v)
-                self.db.link_pathway_to_superpathway(pw_id, v)
-            elif k == "CITATIONS":
-                self.db.link_node_to_citation("Pathway", pw_id, v)
-            elif k == "SPECIES":
-                self.db.link_pathway_to_taxa(pw_id, v, "hasRelatedSpecies")
-            elif k == "TAXONOMIC-RANGE":
-                self.db.link_pathway_to_taxa(pw_id, v, "hasExpectedTaxonRange")
-            elif k == "PREDECESSORS":
-                rxns = v[2:-2].split('" "')  # leading (" and trailing ")
-                r1, r2 = rxns[0], rxns[1:]  # could have multiple predecessors
-                self.db.link_reaction_to_next_step(r1, r2, pw_id)
-            elif k == "RATE-LIMITING-STEP":
-                self.db.link_pathway_to_rate_limiting_step(pw_id, v)
-            elif k in {"PRIMARY-PRODUCTS", "PRIMARY-REACTANTS"}:
-                relationship = "Product" if k == "PRIMARY-PRODUCTS" else "Reactant"
-                self.db.link_pathway_to_primary_compound(pw_id, v, relationship)
-            elif k == "REACTION-LAYOUT":
-                rxn_id, d = self._parse_reaction_layout(v)
-                if not rxn_id:
-                    continue
-                # Two cypher statements for Reactant and Product compounds
-                for side, compounds in d.items():
-                    self.db.link_reaction_to_primary_compound(
-                        rxn_id, compounds, pw_id, side
-                    )
-            elif k == "PATHWAY-LINKS":
-                cpd_id, pw_ids, direction = self._parse_pathway_links(v)
-                if pw_ids:
-                    self.db.link_pathway_to_pathway(pw_id, pw_ids, direction, cpd_id)
-
-        # Write Pathway node properties
-        self.db.add_props_to_nodes(
-            "Pathway", "metaId", [{"metaId": pw_id, "props": props}]
+        pw_nodes, comp_rxn_nodes = self._collect_pathways_dat_nodes(
+            all_pws, pw_dat, rxn_dat
         )
+        self._fix_composite_reaction_nodes(comp_rxn_nodes)
+
+        # Annotate regular pathway nodes
+        pw_nodes = self._fix_pathway_nodes(pw_nodes)
+        self.db.create_nodes(
+            "Pathway", pw_nodes, self.db.metacyc_default_cyphers["pathways"]
+        )
+
+        for node in tqdm(pw_nodes, desc="Annotating pathways"):
+            pw_id = node["metaId"]
+            if predecessors := node.get("predecessors"):
+                for v in predecessors:
+                    rxns = v[2:-2].split('" "')  # leading (" and trailing ")
+                    r1, r2 = rxns[0], rxns[1:]  # could have multiple predecessors
+                    self.db.link_reaction_to_next_step(r1, r2, pw_id)
+
+            if rxn_layout := node.get("reactionLayout"):
+                for v in rxn_layout:
+                    rxn_id, d = self._parse_reaction_layout(v)
+                    if not rxn_id:
+                        continue
+                    # Two cypher statements for Reactant and Product compounds
+                    for side, compounds in d.items():
+                        self.db.link_reaction_to_primary_compound(
+                            rxn_id, compounds, pw_id, side
+                        )
+
+            if pw_links := node.get("pathwayLinks"):
+                for v in pw_links:
+                    cpd_id, pw_ids, direction = self._parse_pathway_links(v)
+                    if pw_ids:
+                        self.db.link_pathway_to_pathway(
+                            pw_id, pw_ids, direction, cpd_id
+                        )
 
     def _collect_pathways_dat_nodes(
         self,
@@ -351,7 +288,111 @@ class MetacycParser(SBMLParser):
         pw_dat: Dict[str, List[List[str]]],
         rxn_dat: Dict[str, List[List[str]]],
     ):
-        raise NotImplementedError
+        pw_nodes = []
+        comp_rxn_nodes = []
+        parsed_pathway_ids = set()
+
+        # We can't iterate all_pws directly because during the parsing process
+        # we may add new (super-)pathways to the queue
+        queue: Set[str] = set(all_pws)
+        while queue:
+            pw_id = queue.pop()
+            # Skip if the pathway is already processed
+            if pw_id in parsed_pathway_ids:
+                continue
+            if (pw_id not in pw_dat) and (pw_id not in rxn_dat):
+                self.missing_ids["pathways"].add(pw_id)
+                continue
+
+            # pathway nodes with reaction IDs (composite reactions)
+            if pw_id in rxn_dat:
+                node = self._collect_reactions_dat_nodes([pw_id], rxn_dat)[0]
+                if new_pws := node.get("inPathway"):
+                    queue.update(new_pws)
+                comp_rxn_nodes.append(node)
+                parsed_pathway_ids.add(pw_id)
+                continue
+
+            # normal pathway nodes
+            lines = pw_dat[pw_id]
+            node = {"metaId": pw_id}
+            node = self._dat_entry_to_node(
+                node,
+                lines,
+                props_str_keys={"COMMENT", "COMMON-NAME"},
+                props_list_keys={"SYNONYMS", "TYPES"},
+                node_list_keys={
+                    "IN-PATHWAY",
+                    "SUPER-PATHWAYS",
+                    "CITATIONS",
+                    "SPECIES",
+                    "TAXONOMIC-RANGE",
+                    "PREDECESSORS",
+                    "RATE-LIMITING-STEP",
+                    "PRIMARY-PRODUCTS",
+                    "PRIMARY-REACTANTS",
+                    "REACTION-LAYOUT",
+                    "PATHWAY-LINKS",
+                },
+            )
+            if new_pws := node.get("inPathway"):
+                queue.update(new_pws)
+            if new_pws := node.get("superPathways"):
+                queue.update(new_pws)
+            pw_nodes.append(node)
+            parsed_pathway_ids.add(pw_id)
+
+        return pw_nodes, comp_rxn_nodes
+
+    def _fix_composite_reaction_nodes(self, comp_rxn_nodes: List[Dict[str, Any]]):
+        """
+        Composite reaction nodes are just aggregated reactions.
+        We need to change the label of these nodes from ``Pathway`` to
+         ``Reaction``, and also correct their directions.
+
+        Args:
+            comp_rxn_nodes: Output of :meth:`_collect_pathways_dat_nodes`.
+        """
+        self.db.create_nodes(
+            "Composite reaction",
+            comp_rxn_nodes,
+            self.db.metacyc_default_cyphers["reactions"],
+        )
+
+        # Merge the Reaction node with the Pathway node under the same ID
+        for node in comp_rxn_nodes:
+            self.db.merge_nodes("Pathway", "Reaction", "metaId", "name", node["rxnId"])
+
+        # Correct composite reactions
+        self.db.set_composite_reaction_labels()
+
+        # Fix the direction of newly-added reactions
+        self.db.fix_reaction_direction()
+
+    def _fix_pathway_nodes(self, pw_nodes: List[Dict[str, Any]]):
+        """
+        Some fields in the list of ``Pathway`` nodes require preprocessing
+         before being fed into the database. Specifically:
+
+        * ``predecessors`` contains a list of reaction IDs wrapped in
+         parentheses. We need to extract the first ID as the target reaction,
+         and take all the others as preceding events of the first one.
+        * ``reactionLayout`` tells us the primary reactants and products of
+         the reaction in a given pathway.
+        * ``pathwayLinks`` links the pathway to other pathways through
+         intermediate ``Compound``s.
+
+        Args:
+            pw_nodes: Output of :meth:`_collect_pathways_dat_nodes`.
+        """
+        for n in pw_nodes:
+            if predecessors := n.get("predecessors"):
+                predecessors: List[str]
+                for v in predecessors:
+                    rxns = v[2:-2].split('" "')  # leading (" and trailing ")
+                    r1, r2 = rxns[0], rxns[1:]  # could have >1 predecessors
+
+        return pw_nodes
 
     def smiles_dat_to_graph(self):
         """Parse the ``atom-mappings-smiles.dat`` file.

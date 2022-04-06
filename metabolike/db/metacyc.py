@@ -42,8 +42,44 @@ UNWIND $batch_nodes AS n
   );
 """
 
+_pathways_dat_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (pw:Pathway {metaId: n.metaId})
+    ON CREATE SET pw.name = n.metaId, pw += n.props
+    ON MATCH SET pw += n.props
+  FOREACH (cit IN n.citations |
     MERGE (c:Citation {metaId: cit})
-    MERGE (n)-[:hasCitation]->(c)
+    MERGE (pw)-[:hasCitation]->(c)
+  )
+  FOREACH (taxa IN n.species |
+    MERGE (t:Taxa {metaId: taxa})
+    MERGE (pw)-[:hasRelatedSpecies]->(t)
+  )
+  FOREACH (taxa IN n.taxonomicRange |
+    MERGE (t:Taxa {metaId: taxa})
+    MERGE (pw)-[:hasExpectedTaxonRange]->(t)
+  )
+  FOREACH (rxn IN n.rateLimitingStep |
+    MERGE (pw)-[l:hasReaction]->(:Reaction {name: rxn})
+      ON MATCH SET l.isRateLimitingStep = true
+  )
+  FOREACH (cpd IN n.primaryReactants |
+    MERGE (c:Compound)-[:hasRDF {bioQualifier: 'is'}]->(:RDF {biocyc: cpd})
+    MERGE (pw)-[:hasPrimaryReactant]->(c)
+  )
+  FOREACH (cpd IN n.primaryProducts |
+    MERGE (c:Compound)-[:hasRDF {bioQualifier: 'is'}]->(:RDF {biocyc: cpd})
+    MERGE (pw)-[:hasPrimaryProduct]->(c)
+  )
+  FOREACH (super_pw IN n.superPathways |
+    MERGE (spw:Pathway {metaId: super_pw})
+      ON CREATE SET spw.name = super_pw
+    MERGE (spw)-[:hasSubPathway]->(pw)
+  )
+  FOREACH (super_pw IN n.inPathway |
+    MERGE (spw:Pathway {metaId: super_pw})
+      ON CREATE SET spw.name = super_pw
+    MERGE (spw)-[:hasSubPathway]->(pw)
   );
 """
 
@@ -65,6 +101,7 @@ class MetacycClient(SBMLClient):
     metacyc_default_cyphers = {
         "reactions": _reactions_dat_cypher,
         "compounds": _compounds_dat_cypher,
+        "pathways": _pathways_dat_cypher,
     }
 
     def __init__(
@@ -104,29 +141,6 @@ class MetacycClient(SBMLClient):
         )  # TODO: 38 POLYMER nodes don't have BioCyc IDs
         return [(cpd["c.name"], cpd["r.biocyc"]) for cpd in res]
 
-    def link_node_to_citation(
-        self, node_label: str, node_display_name: str, citation_id: str
-    ):
-        """Link a node to a ``Citation`` node.
-
-        Args:
-            node_label: Type of the node (Reaction, Pathway, or Compound).
-            node_display_name: ``name`` of the node.
-            citation_id: ``metaId`` of the ``Citation`` node.
-        """
-        logger.debug(
-            f"{node_label} node {node_display_name} has citation {citation_id}"
-        )
-        self.write(
-            f"""
-            MATCH (n:{node_label} {{name: $dn}})
-            MERGE (c:Citation {{metaId: $citation}})
-            MERGE (n)-[:hasCitation]->(c)
-            """,
-            dn=node_display_name,
-            citation=citation_id,
-        )
-
     def add_props_to_nodes(
         self,
         node_label: str,
@@ -153,33 +167,6 @@ class MetacycClient(SBMLClient):
             batch_nodes=nodes,
         )
         logger.info(f"Annotated {len(nodes)} {node_label} nodes")
-
-    def add_props_to_compound(
-        self, compound_id: str, c_props: Dict[str, Any], rdf_props: Dict[str, Any]
-    ):
-        self.write(
-            """
-            MATCH (c:Compound {name: $cpd_id})-[:is]->(r:RDF)
-            SET c += $c_props, r += $rdf_props;
-            """,
-            cpd_id=compound_id,
-            c_props=c_props,
-            rdf_props=rdf_props,
-        )
-
-    def link_pathway_to_superpathway(self, pathway_id: str, superpathway_id: str):
-        """Link a ``Pathway`` to its super-pathway."""
-        logger.debug(f"Pathway {pathway_id} has SuperPathway {superpathway_id}")
-        self.write(
-            """
-            MATCH (pw:Pathway {name: $pw_id})
-            MERGE (spw:Pathway {metaId: $super_pw})
-                ON CREATE SET spw.name = $super_pw
-            MERGE (spw)-[:hasSubPathway]->(pw)
-            """,
-            pw_id=pathway_id,
-            super_pw=superpathway_id,
-        )
 
     def link_pathway_to_pathway(
         self, pw: str, pws: List[str], direction: str, cpd: str
@@ -220,48 +207,6 @@ class MetacycClient(SBMLClient):
             pw_id=pw,
             pws=pws,
             cpd=cpd,
-        )
-
-    def link_pathway_to_taxa(self, pathway_id: str, tax_id: str, relationship: str):
-        """Link a ``Pathway`` to a ``Taxa`` node."""
-        if not relationship in {"hasRelatedSpecies", "hasExpectedTaxonRange"}:
-            raise ValueError(f"Invalid relationship: {relationship}")
-        logger.debug(f"Pathway {pathway_id} {relationship} {tax_id}")
-        self.write(
-            f"""
-            MATCH (pw:Pathway {{name: $pw}})
-            MERGE (s:Taxa {{metaId: $taxa_id}})
-            MERGE (pw)-[:{relationship}]->(s)
-            """,
-            pw=pathway_id,
-            taxa_id=tax_id,
-        )
-
-    def link_pathway_to_rate_limiting_step(self, pathway_id: str, reaction_id: str):
-        logger.debug(f"Pathway {pathway_id} has rate limiting step {reaction_id}")
-        self.write(
-            """
-            MATCH (pw:Pathway {name: $pw}),
-                  (r:Reaction {canonicalId: $rxn})
-            MERGE (pw)-[l:hasReaction]->(r)
-                ON MATCH SET l.isRateLimitingStep = true
-            """,
-            pw=pathway_id,
-            rxn=reaction_id,
-        )
-
-    def link_pathway_to_primary_compound(
-        self, pathway_id: str, compound_id: str, relationship: str
-    ):
-        logger.debug(f"Pathway {pathway_id} has primary {relationship} {compound_id}")
-        self.write(
-            f"""
-            MATCH (cpd:Compound)-[:is]->(:RDF {{Biocyc: $compound_id}}),
-                  (pw:Pathway {{name: $pw}})-[:hasReaction]->(:Reaction)-[:hasLeft|hasRight]->(cpd)
-            MERGE (pw)-[:hasPrimary{relationship}]->(cpd)
-            """,
-            pw=pathway_id,
-            compound_id=compound_id,
         )
 
     def link_reaction_to_next_step(self, r1: str, r2: List[str], pathway_id: str):
