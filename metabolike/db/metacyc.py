@@ -15,7 +15,7 @@ COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
 
 _reactions_dat_cypher = """
 UNWIND $batch_nodes AS n
-  MATCH (r:Reaction {name: n.rxnId})
+  MERGE (r:Reaction {name: n.name})
     SET r += n.props
   FOREACH (pw IN n.inPathway |
     MERGE (p:Pathway {metaId: pw})

@@ -208,7 +208,7 @@ class MetacycParser(SBMLParser):
                 self.missing_ids["reactions"].add(canonical_id)
                 continue
 
-            node = {"rxnId": rxn_id, "props": {"canonicalId": canonical_id}}
+            node = {"name": rxn_id, "props": {"canonicalId": canonical_id}}
             lines = rxn_dat[canonical_id]
             node = self._dat_entry_to_node(
                 node,
@@ -361,7 +361,7 @@ class MetacycParser(SBMLParser):
 
         # Merge the Reaction node with the Pathway node under the same ID
         for node in comp_rxn_nodes:
-            self.db.merge_nodes("Pathway", "Reaction", "metaId", "name", node["rxnId"])
+            self.db.merge_nodes("Pathway", "Reaction", "metaId", "name", node["name"])
 
         # Correct composite reactions
         self.db.set_composite_reaction_labels()
