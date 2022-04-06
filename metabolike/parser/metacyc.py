@@ -301,6 +301,8 @@ class MetacycParser(SBMLParser):
             # pathway nodes with reaction IDs (composite reactions)
             if pw_id in rxn_dat:
                 node = self._collect_reactions_dat_nodes([pw_id], rxn_dat)[0]
+                # metaId should follow the SBML specification
+                node["props"]["metaId"] = self._name_to_metaid(node["name"])
                 if new_pws := node.get("inPathway"):
                     queue.update(new_pws)
                 comp_rxn_nodes.append(node)
@@ -743,6 +745,15 @@ class MetacycParser(SBMLParser):
                 props[f] = enum_pattern.sub("", props[f])
 
         return props
+
+    @staticmethod
+    def _name_to_metaid(s: str):
+        if s[0].isnumeric():
+            s = f"_{s}"
+        s = s.replace("-", "__45__")
+        s = s.replace(".", "__46__")
+        s = s.replace("+", "")
+        return s
 
     @staticmethod
     def _parse_pathway_predecessors(
