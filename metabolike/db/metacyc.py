@@ -29,7 +29,7 @@ UNWIND $batch_nodes AS n
   FOREACH (cit IN n.citations |
     MERGE (c:Citation {metaId: cit})
     MERGE (r)-[:hasCitation]->(c)
-  )
+  );
 """
 
 _compounds_dat_cypher = """
@@ -37,6 +37,11 @@ UNWIND $batch_nodes AS n
   MATCH (c:Compound {name: n.name})
     SET c += n.props
   FOREACH (cit IN n.citations |
+    MERGE (x:Citation {metaId: cit})
+    MERGE (c)-[:hasCitation]->(x)
+  );
+"""
+
     MERGE (c:Citation {metaId: cit})
     MERGE (n)-[:hasCitation]->(c)
   );
