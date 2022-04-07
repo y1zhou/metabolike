@@ -139,7 +139,7 @@ class SBMLClient(Neo4jClient):
 
     def create_nodes(
         self,
-        node_label: str,
+        desc: str,
         nodes: List[Dict[str, Any]],
         query: str,
         batch_size: int = 1000,
@@ -157,17 +157,17 @@ class SBMLClient(Neo4jClient):
         nodes, but they are linked to corresponding ``RDF`` nodes.
 
         Args:
-            node_label: Label of the node.
+            desc: Label of the node in log and progress bar.
             nodes: List of properties of the nodes.
             query: Cypher query to create the nodes.
             batch_size: Number of nodes to create in each batch.
         """
-        logger.info(f"Creating {node_label} nodes")
+        logger.info(f"Creating {desc} nodes")
 
         if progress_bar:
             it = tqdm(
                 chunk(nodes, batch_size),
-                desc=node_label,
+                desc=desc,
                 total=len(nodes) // batch_size,
             )
         else:
@@ -176,7 +176,7 @@ class SBMLClient(Neo4jClient):
         for batch in it:
             self.write(query, batch_nodes=batch)
 
-        logger.info(f"Created {len(nodes)} {node_label} nodes")
+        logger.info(f"Created {len(nodes)} {desc} nodes")
 
     def link_node_to_gene(
         self,

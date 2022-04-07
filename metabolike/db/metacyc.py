@@ -155,27 +155,26 @@ class MetacycClient(SBMLClient):
         node_label: str,
         node_prop_key: str,
         nodes: List[Dict[str, Any]],
+        desc: str,
+        **kwargs,
     ):
         """Add properties to a list of nodes.
 
         Args:
             node_label: Label of the node.
             node_prop_key: Property key of the node used to locate the node.
-            props: Properties to add to the node.
+            nodes: Properties to add to the node.
+            desc: see :meth:`create_nodes`.
         """
         if node_label not in self.available_node_labels:
             raise ValueError(f"Invalid label: {node_label}")
-        # TODO: check for valid properties
 
-        self.write(
-            f"""
-            UNWIND $batch_nodes AS n
-              MATCH (x:{node_label} {{{node_prop_key}: n.{node_prop_key}}})
-              SET x += n.props;
-            """,
-            batch_nodes=nodes,
-        )
-        logger.info(f"Annotated {len(nodes)} {node_label} nodes")
+        query = f"""
+        UNWIND $batch_nodes AS n
+          MATCH (x:{node_label} {{{node_prop_key}: n.{node_prop_key}}})
+          SET x += n.props;
+        """
+        self.create_nodes(desc, nodes, query, **kwargs)
 
     def link_pathway_to_pathway(
         self, pw: str, pws: List[str], direction: str, cpd: str

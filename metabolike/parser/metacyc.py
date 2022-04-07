@@ -257,6 +257,7 @@ class MetacycParser(SBMLParser):
             "Pathway",
             pw_nodes,
             self.db.metacyc_default_cyphers["pathways"],
+            batch_size=100,
             progress_bar=True,
         )
 
@@ -440,7 +441,9 @@ class MetacycParser(SBMLParser):
         smiles: Dict[str, str] = smiles_df.set_index("rxn").to_dict()["smiles"]
         all_rxns = self.db.get_all_nodes("Reaction", "name")
         rxn_smiles = self._collect_atom_mapping_dat_nodes(all_rxns, smiles)
-        self.db.add_props_to_nodes("Reaction", "name", rxn_smiles)
+        self.db.add_props_to_nodes(
+            "Reaction", "name", rxn_smiles, "Atom mapping SMILES", progress_bar=True
+        )
 
     def _collect_atom_mapping_dat_nodes(
         self, rxn_ids: Iterable[str], smiles: Dict[str, str]
@@ -479,7 +482,10 @@ class MetacycParser(SBMLParser):
         all_cpds = self.db.get_all_compounds()
         cpd_nodes = self._collect_compounds_dat_nodes(all_cpds, cpd_dat)
         self.db.create_nodes(
-            "Compound", cpd_nodes, self.db.metacyc_default_cyphers["compounds"]
+            "compounds.dat",
+            cpd_nodes,
+            self.db.metacyc_default_cyphers["compounds"],
+            progress_bar=True,
         )
 
     def _collect_compounds_dat_nodes(
@@ -539,7 +545,7 @@ class MetacycParser(SBMLParser):
 
         all_cits = self.db.get_all_nodes("Citation", "metaId")
         cit_nodes = self._collect_citation_dat_nodes(all_cits, pub_dat)
-        self.db.add_props_to_nodes("Citation", "metaId", cit_nodes)
+        self.db.add_props_to_nodes("Citation", "metaId", cit_nodes, "Citations")
 
     def _collect_citation_dat_nodes(
         self, cit_ids: Iterable[str], pub_dat: Dict[str, List[List[str]]]
@@ -608,8 +614,10 @@ class MetacycParser(SBMLParser):
         logger.info(f"Annotating with {self.input_files['classes']}")
         cls_dat = self._read_dat_file(self.input_files["classes"])
         cco_nodes, taxa_nodes = self._collect_classes_dat_nodes(cls_dat)
-        self.db.add_props_to_nodes("Compartment", "name", cco_nodes)
-        self.db.add_props_to_nodes("Taxa", "metaId", taxa_nodes)
+        self.db.add_props_to_nodes(
+            "Compartment", "name", cco_nodes, "Compartment names"
+        )
+        self.db.add_props_to_nodes("Taxa", "metaId", taxa_nodes, "Taxa names")
 
     def _collect_classes_dat_nodes(self, class_dat: Dict[str, List[List[str]]]):
         cco_nodes = []
