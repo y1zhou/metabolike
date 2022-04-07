@@ -1,6 +1,7 @@
 import logging
+from itertools import islice
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, overload
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, overload
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,16 @@ def validate_path(filepath: Optional[Union[str, Path]]) -> Optional[Path]:
         raise FileNotFoundError(str(f))
 
     return f
+
+
+def chunk(itr: Iterable, chunk_size: int) -> Iterable:
+    """Chunk an iterator into chunks of size chunk_size.
+
+    Ref: https://stackoverflow.com/a/71572942/5925357
+    """
+    itr = iter(itr)
+    while slice := list(islice(itr, chunk_size)):
+        yield slice
 
 
 def snake_to_camel(s: str, sep: str = "-") -> str:
@@ -83,10 +94,10 @@ def generate_gene_reaction_rule(genes: List[Tuple[Dict[str, str], Dict[str, str]
                 res_genes.append(r["name"])
             # GeneProductSet -> GeneProductComplex
             else:
-                res_complex[r["mcId"]] = []
+                res_complex[r["metaId"]] = []
         else:
             # GeneProductSet -> GeneProductComplex -> GeneProduct
-            res_complex[l["mcId"]].append(r["name"])
+            res_complex[l["metaId"]].append(r["name"])
 
     res_complex = {k: " and ".join(v) for k, v in res_complex.items()}
     rule_complex = [f"( {v} )" for v in res_complex.values()]

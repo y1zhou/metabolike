@@ -1,9 +1,65 @@
 import logging
-from typing import Dict, List, Union
+from typing import Any, Dict, List
+
+from metabolike.utils import chunk
+from tqdm import tqdm
 
 from .neo4j import Neo4jClient
 
 logger = logging.getLogger(__name__)
+
+_compartment_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (x:Compartment {metaId: n.metaId})
+    ON CREATE SET x += n.props;
+"""
+
+_compound_cypher = """
+UNWIND $batch_nodes AS n
+  MATCH (cpt:Compartment {metaId: n.compartment})
+  MERGE (c:Compound {metaId: n.metaId})-[:hasCompartment]->(cpt)
+    ON CREATE SET c += n.props
+  FOREACH (rdf IN n.rdf |
+    CREATE (r:RDF)
+    SET r = rdf.rdf
+    MERGE (r)<-[rel:hasRDF]-(c)
+      ON CREATE SET rel.bioQualifier = rdf.bioQual
+  );
+"""
+
+_gene_product_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (gp:GeneProduct {metaId: n.metaId})
+    ON CREATE SET gp += n.props
+  FOREACH (rdf IN n.rdf |
+    CREATE (r:RDF)
+    SET r = rdf.rdf
+    MERGE (r)<-[rel:hasRDF]-(c)
+      ON CREATE SET rel.bioQualifier = rdf.bioQual
+  );
+"""
+
+_reaction_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (r:Reaction {metaId: n.metaId})
+    ON CREATE SET r += n.props
+  FOREACH (rdf IN n.rdf |
+    CREATE (x:RDF)
+    SET x = rdf.rdf
+    MERGE (x)<-[rel:hasRDF]-(r)
+      ON CREATE SET rel.bioQualifier = rdf.bioQual
+  )
+  FOREACH (reactant IN n.reactants |
+    MERGE (c:Compound {metaId: reactant.cpdId})  // can't MATCH here
+    MERGE (r)-[rel:hasLeft]->(c)
+      ON CREATE SET rel = reactant.props
+  )
+  FOREACH (product IN n.products |
+    MERGE (c:Compound {metaId: product.cpdId})
+    MERGE (r)-[rel:hasRight]->(c)
+      ON CREATE SET rel = product.props
+  );
+"""
 
 
 class SBMLClient(Neo4jClient):
@@ -17,6 +73,8 @@ class SBMLClient(Neo4jClient):
         neo4j_user: Neo4j user. Defaults to ``neo4j``.
         neo4j_password: Neo4j password. Defaults to ``neo4j``.
         database: Name of the database. Defaults to ``neo4j``.
+        create_db: Whether to create the database. See :meth:`.setup_graph_db`.
+        drop_if_exists: Whether to drop the database if it already exists.
 
     Attributes:
         driver: :class:`neo4j.Neo4jDriver` or :class:`neo4j.BoltDriver`.
@@ -25,24 +83,35 @@ class SBMLClient(Neo4jClient):
          labels in the graph.
     """
 
+    available_node_labels = (
+        "Pathway",
+        "Compartment",
+        "Reaction",
+        "Compound",
+        "GeneProduct",
+        "RDF",
+        "GeneProductComplex",
+        "GeneProductSet",
+    )
+
+    default_cyphers = {
+        "Compartment": _compartment_cypher,
+        "Compound": _compound_cypher,
+        "GeneProduct": _gene_product_cypher,
+        "Reaction": _reaction_cypher,
+    }
+
     def __init__(
         self,
         uri: str = "neo4j://localhost:7687",
         neo4j_user: str = "neo4j",
         neo4j_password: str = "neo4j",
         database: str = "neo4j",
+        create_db: bool = True,
+        drop_if_exists: bool = False,
     ):
         super().__init__(uri, neo4j_user, neo4j_password, database)
-        self.available_node_labels = (
-            "Pathway",
-            "Compartment",
-            "Reaction",
-            "Compound",
-            "GeneProduct",
-            "RDF",
-            "GeneProductComplex",
-            "GeneProductSet",
-        )
+        self.setup_graph_db(create_db=create_db, drop_if_exists=drop_if_exists)
 
     def setup_graph_db(self, create_db: bool = True, drop_if_exists: bool = False):
         """
@@ -59,94 +128,55 @@ class SBMLClient(Neo4jClient):
         if create_db:
             self.create(force=drop_if_exists)
 
-        # Set constraints
-        logger.debug("Creating constraint for RDF nodes")
-        self.write(
-            """CREATE CONSTRAINT IF NOT EXISTS ON (r:RDF)
-               ASSERT r.uri IS UNIQUE;""",
-        )
-
         # Constraints automatically create indexes, so we don't need to
         # create them manually.
         for label in self.available_node_labels:
             logger.debug(f"Creating constraint for node: {label}")
             self.write(
                 f"""CREATE CONSTRAINT IF NOT EXISTS ON (n:{label})
-                    ASSERT n.mcId IS UNIQUE;""",
+                    ASSERT n.metaId IS UNIQUE;""",
             )
 
-    def create_node(self, node_label: str, mcid: str, props: Dict[str, str]):
-        """Create a node with the given label and properties.
+    def create_nodes(
+        self,
+        desc: str,
+        nodes: List[Dict[str, Any]],
+        query: str,
+        batch_size: int = 1000,
+        progress_bar: bool = False,
+    ):
+        """Create nodes in batches with the given label and properties.
 
-        See :meth:`.SBMLParser.sbml_to_graph` for details.
+        For ``Compartment`` nodes, simply create them with given properties.
+
+        Each ``compound`` node is linked to its ``Compartment`` node. If it
+        has related ``RDF`` nodes, these are also created and linked to the
+        ``Compound`` node.
+
+        ``GeneProduct`` nodes don't have relationships to ``Compartment``
+        nodes, but they are linked to corresponding ``RDF`` nodes.
 
         Args:
-            node_label: Label of the node.
-            mcid: ``mcId`` of the node.
-            props: Properties of the node.
+            desc: Label of the node in log and progress bar.
+            nodes: List of properties of the nodes.
+            query: Cypher query to create the nodes.
+            batch_size: Number of nodes to create in each batch.
         """
-        logger.debug(f"Creating {node_label} node: {mcid}")
-        self.write(
-            f"""
-            MERGE (n:{node_label} {{mcId: $mcId}})
-            ON CREATE SET n += $props;
-            """,
-            mcId=mcid,
-            props=props,
-        )
+        logger.info(f"Creating {desc} nodes")
 
-    def create_compound_node(self, compartment: str, mcid: str, props: Dict[str, str]):
-        """See :meth:`.SBMLParser.sbml_to_graph` for details."""
-        logger.debug(f"Creating Compound node: {mcid}")
-        self.write(
-            """
-            MATCH (cpt:Compartment {mcId: $compartment})
-            MERGE (c:Compound {mcId: $mcId})-[:hasCompartment]->(cpt)
-            ON CREATE SET c += $props;
-            """,
-            compartment=compartment,
-            mcId=mcid,
-            props=props,
-        )
+        if progress_bar:
+            it = tqdm(
+                chunk(nodes, batch_size),
+                desc=desc,
+                total=len(nodes) // batch_size,
+            )
+        else:
+            it = chunk(nodes, batch_size)
 
-    def link_node_to_rdf(
-        self,
-        node_label: str,
-        mcid: str,
-        bio_qual: str,
-        props: Dict[str, Union[str, List[str]]],
-    ):
-        """See :meth:`.SBMLParser._add_sbml_rdf_node` for details."""
-        logger.debug(f"{node_label} node {mcid} {bio_qual} RDF")
-        self.write(
-            f"""
-                MATCH (c:{node_label} {{mcId: $mcId}})
-                MERGE (n:RDF)<-[:{bio_qual}]-(c)
-                ON CREATE SET n += $props;
-                """,
-            mcId=mcid,
-            props=props,
-        )
+        for batch in it:
+            self.write(query, batch_nodes=batch)
 
-    def link_reaction_to_compound(
-        self,
-        reaction_id: str,
-        compound_id: str,
-        compound_type: str,
-        props: Dict[str, str],
-    ):
-        logger.debug(f"Adding {compound_type} {compound_id} to Reaction {reaction_id}")
-        self.write(
-            f"""
-            MATCH (r:Reaction {{mcId: $reaction}}),
-                  (c:Compound {{mcId: $compound}})
-            MERGE (r)-[l:has{compound_type}]->(c)
-            ON CREATE SET l += $props;
-            """,
-            reaction=reaction_id,
-            compound=compound_id,
-            props=props,
-        )
+        logger.info(f"Created {len(nodes)} {desc} nodes")
 
     def link_node_to_gene(
         self,
@@ -165,8 +195,8 @@ class SBMLClient(Neo4jClient):
 
         Args:
             node_label: Label of the node.
-            node_id: ``mcId`` of the node.
-            group_id: ``mcId`` of the ``GeneProduct``, ``GeneProductComplex`` or
+            node_id: ``metaId`` of the node.
+            group_id: ``metaId`` of the ``GeneProduct``, ``GeneProductComplex`` or
              ``GeneProductSet``.
             group_label: ``GeneProductComplex`` or ``GeneProductSet``.
             edge_type: Type of the edge.
@@ -178,8 +208,8 @@ class SBMLClient(Neo4jClient):
         )
         self.write(
             f"""
-            MATCH (n:{node_label} {{mcId: $node_id}})
-            MERGE (g:{group_label} {{mcId: $group_id}})
+            MATCH (n:{node_label} {{metaId: $node_id}})
+            MERGE (g:{group_label} {{metaId: $group_id}})
             MERGE (g)<-[l:{edge_type}]-(n)
             """,
             node_id=node_id,

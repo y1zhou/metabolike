@@ -36,10 +36,13 @@ def setup(
     db = MetacycClient(
         **conf.neo4j.dict(include={"uri", "database"}),
         neo4j_user=conf.neo4j.user,
-        neo4j_password=conf.neo4j.password.get_secret_value()
+        neo4j_password=conf.neo4j.password.get_secret_value(),
+        create_db=create_db,
+        drop_if_exists=drop_if_exists,
     )
     meta = MetacycParser(
-        db, **conf.metacyc.dict(), create_db=create_db, drop_if_exists=drop_if_exists
+        db,
+        **conf.metacyc.dict(),
     )
 
     logger.info("Setting up database using MetaCyc data")

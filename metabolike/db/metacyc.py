@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -13,39 +13,117 @@ logger = logging.getLogger(__name__)
 # TODO: refactor this with get_high_degree_compound_nodes()
 COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
 
+_reactions_dat_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (r:Reaction {name: n.name})
+    ON CREATE SET r += n.props
+    ON MATCH SET r += n.props
+  FOREACH (pw IN n.inPathway |
+    MERGE (p:Pathway {metaId: pw})
+      ON CREATE SET p.name = pw
+    MERGE (p)-[:hasReaction]->(r)
+  )
+  FOREACH (cpt IN n.rxnLocations |
+    MERGE (c:Compartment {metaId: cpt})
+    MERGE (r)-[:hasCompartment]->(c)
+  )
+  FOREACH (cit IN n.citations |
+    MERGE (c:Citation {metaId: cit})
+    MERGE (r)-[:hasCitation]->(c)
+  );
+"""
+
+_compounds_dat_cypher = """
+UNWIND $batch_nodes AS n
+  MATCH (c:Compound {name: n.name})
+    SET c += n.props
+  FOREACH (cit IN n.citations |
+    MERGE (x:Citation {metaId: cit})
+    MERGE (c)-[:hasCitation]->(x)
+  );
+"""
+
+_pathways_dat_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (pw:Pathway {metaId: n.metaId})
+    ON CREATE SET pw.name = n.metaId, pw += n.props
+    ON MATCH SET pw += n.props
+  FOREACH (cit IN n.citations |
+    MERGE (c:Citation {metaId: cit})
+    MERGE (pw)-[:hasCitation]->(c)
+  )
+  FOREACH (taxa IN n.species |
+    MERGE (t:Taxa {metaId: taxa})
+    MERGE (pw)-[:hasRelatedSpecies]->(t)
+  )
+  FOREACH (taxa IN n.taxonomicRange |
+    MERGE (t:Taxa {metaId: taxa})
+    MERGE (pw)-[:hasExpectedTaxonRange]->(t)
+  )
+  FOREACH (rxn IN n.rateLimitingStep |
+    MERGE (pw)-[l:hasReaction]->(:Reaction {name: rxn})
+      ON MATCH SET l.isRateLimitingStep = true
+  )
+  FOREACH (cpd IN n.primaryReactants |
+    MERGE (c:Compound)-[:hasRDF {bioQualifier: 'is'}]->(:RDF {biocyc: cpd})
+    MERGE (pw)-[:hasPrimaryReactant]->(c)
+  )
+  FOREACH (cpd IN n.primaryProducts |
+    MERGE (c:Compound)-[:hasRDF {bioQualifier: 'is'}]->(:RDF {biocyc: cpd})
+    MERGE (pw)-[:hasPrimaryProduct]->(c)
+  )
+  FOREACH (super_pw IN n.superPathways |
+    MERGE (spw:Pathway {metaId: super_pw})
+      ON CREATE SET spw.name = super_pw
+    MERGE (spw)-[:hasSubPathway]->(pw)
+  )
+  FOREACH (super_pw IN n.inPathway |
+    MERGE (spw:Pathway {metaId: super_pw})
+      ON CREATE SET spw.name = super_pw
+    MERGE (spw)-[:hasSubPathway]->(pw)
+  )
+  FOREACH (pred IN n.predecessors |
+    MERGE (r1: Reaction {canonicalId: pred.r1})
+    FOREACH (rxn IN pred.r2 |
+      MERGE (r2:Reaction {canonicalId: rxn})
+      MERGE (r2)-[l:isPrecedingEvent]->(r1)
+        ON CREATE SET l.hasRelatedPathway = n.metaId
+    )
+  );
+"""
+
 
 class MetacycClient(SBMLClient):
+    available_node_labels = (
+        "Pathway",
+        "Compartment",
+        "Reaction",
+        "Compound",
+        "GeneProduct",
+        "RDF",
+        "GeneProductComplex",
+        "GeneProductSet",
+        "Citation",
+        "Taxa",
+    )
+
+    metacyc_default_cyphers = {
+        "reactions": _reactions_dat_cypher,
+        "compounds": _compounds_dat_cypher,
+        "pathways": _pathways_dat_cypher,
+    }
+
     def __init__(
         self,
         uri: str = "neo4j://localhost:7687",
         neo4j_user: str = "neo4j",
         neo4j_password: str = "neo4j",
         database: str = "neo4j",
+        create_db: bool = True,
+        drop_if_exists: bool = False,
     ):
         super().__init__(uri, neo4j_user, neo4j_password, database)
-        self.available_node_labels = (
-            "Pathway",
-            "Compartment",
-            "Reaction",
-            "Compound",
-            "GeneProduct",
-            "RDF",
-            "GeneProductComplex",
-            "GeneProductSet",
-            "Citation",
-            "Taxa",
-        )
-
-    def link_reaction_to_compartment(self, reaction_id: str, compartment_name: str):
-        self.write(
-            """
-            MATCH (r:Reaction {displayName: $reaction}),
-                  (c:Compartment {displayName: $compartment})
-            MERGE (r)-[:hasCompartment]->(c);
-            """,
-            reaction=reaction_id,
-            compartment=compartment_name,
-        )
+        self.setup_graph_db(create_db=create_db, drop_if_exists=drop_if_exists)
 
     def get_all_nodes(self, label: str, prop: str) -> List[str]:
         """Fetch an property of nodes with a certain label."""
@@ -66,101 +144,37 @@ class MetacycClient(SBMLClient):
         """
         res = self.read(
             """
-            MATCH (c:Compound)-[:is]->(r:RDF)
-            RETURN DISTINCT c.displayName, r.biocyc;
+            MATCH (c:Compound)-[:hasRDF {bioQualifier: 'is'}]->(r:RDF)
+            RETURN DISTINCT c.name, r.biocyc;
             """
         )  # TODO: 38 POLYMER nodes don't have BioCyc IDs
-        return [(cpd["c.displayName"], cpd["r.biocyc"]) for cpd in res]
+        return [(cpd["c.name"], cpd["r.biocyc"]) for cpd in res]
 
-    def link_node_to_citation(
-        self, node_label: str, node_display_name: str, citation_id: str
-    ):
-        """Link a node to a ``Citation`` node.
-
-        Args:
-            node_label: Type of the node (Reaction, Pathway, or Compound).
-            node_display_name: ``displayName`` of the node.
-            citation_id: ``mcId`` of the ``Citation`` node.
-        """
-        logger.debug(
-            f"{node_label} node {node_display_name} has citation {citation_id}"
-        )
-        self.write(
-            f"""
-            MATCH (n:{node_label} {{displayName: $dn}})
-            MERGE (c:Citation {{mcId: $citation}})
-            MERGE (n)-[:hasCitation]->(c)
-            """,
-            dn=node_display_name,
-            citation=citation_id,
-        )
-
-    def add_props_to_node(
+    def add_props_to_nodes(
         self,
         node_label: str,
         node_prop_key: str,
-        node_prop_val: str,
-        props: Dict[str, Any],
+        nodes: List[Dict[str, Any]],
+        desc: str,
+        **kwargs,
     ):
-        """Add properties to a node.
+        """Add properties to a list of nodes.
 
         Args:
             node_label: Label of the node.
             node_prop_key: Property key of the node used to locate the node.
-            node_prop_val: Property value of the node used to filter ``node_prop_key``.
-            props: Properties to add to the node.
+            nodes: Properties to add to the node.
+            desc: see :meth:`create_nodes`.
         """
         if node_label not in self.available_node_labels:
             raise ValueError(f"Invalid label: {node_label}")
-        # TODO: check for valid properties
-        self.write(
-            f"""
-            MATCH (n:{node_label} {{{node_prop_key}: $val}})
-            SET n += $props;
-            """,
-            val=node_prop_val,
-            props=props,
-        )
 
-    def add_props_to_compound(
-        self, compound_id: str, c_props: Dict[str, Any], rdf_props: Dict[str, Any]
-    ):
-        self.write(
-            """
-            MATCH (c:Compound {displayName: $cpd_id})-[:is]->(r:RDF)
-            SET c += $c_props, r += $rdf_props;
-            """,
-            cpd_id=compound_id,
-            c_props=c_props,
-            rdf_props=rdf_props,
-        )
-
-    def link_reaction_to_pathway(self, reaction_id: str, pathway_id: str):
-        logger.debug(f"Reaction {reaction_id} is in Pathway {pathway_id}")
-        self.write(
-            """
-            MATCH (r:Reaction {displayName: $reaction})
-            MERGE (pw:Pathway {mcId: $pathway})
-                ON CREATE SET pw.displayName = $pathway
-            MERGE (pw)-[:hasReaction]->(r)
-            """,
-            reaction=reaction_id,
-            pathway=pathway_id,
-        )
-
-    def link_pathway_to_superpathway(self, pathway_id: str, superpathway_id: str):
-        """Link a ``Pathway`` to its super-pathway."""
-        logger.debug(f"Pathway {pathway_id} has SuperPathway {superpathway_id}")
-        self.write(
-            """
-            MATCH (pw:Pathway {displayName: $pw_id})
-            MERGE (spw:Pathway {mcId: $super_pw})
-                ON CREATE SET spw.displayName = $super_pw
-            MERGE (spw)-[:hasSubPathway]->(pw)
-            """,
-            pw_id=pathway_id,
-            super_pw=superpathway_id,
-        )
+        query = f"""
+        UNWIND $batch_nodes AS n
+          MATCH (x:{node_label} {{{node_prop_key}: n.{node_prop_key}}})
+          SET x += n.props;
+        """
+        self.create_nodes(desc, nodes, query, **kwargs)
 
     def link_pathway_to_pathway(
         self, pw: str, pws: List[str], direction: str, cpd: str
@@ -186,79 +200,21 @@ class MetacycClient(SBMLClient):
             l1, l2 = "hasLeft", "hasRight"
         self.write(
             f"""
-            MATCH (pw1:Pathway {{displayName: $pw_id}})
-            MATCH (pw2s:Pathway) WHERE pw2s.displayName IN $pws
+            MATCH (pw1:Pathway {{name: $pw_id}})
+            MATCH (pw2s:Pathway) WHERE pw2s.name IN $pws
             UNWIND pw2s AS pw2
             MERGE (pw1){pw_rel_type}(pw2)
                 ON CREATE SET l.hasRelatedCompound = $cpd
             WITH pw1, pw2
-            MATCH (pw1)-[:hasReaction]->(r1:Reaction)-[:{l1}]->(:Compound)-[:is]->(:RDF {{biocyc: $cpd}})
+            MATCH (pw1)-[:hasReaction]->(r1:Reaction)-[:{l1}]->(:Compound)-[:hasRDF {{bioQualifier: 'is'}}]->(:RDF {{biocyc: $cpd}})
             WITH r1, pw2
-            MATCH (pw2)-[:hasReaction]->(r2:Reaction)-[:{l2}]->(:Compound)-[:is]->(:RDF {{biocyc: $cpd}})
+            MATCH (pw2)-[:hasReaction]->(r2:Reaction)-[:{l2}]->(:Compound)-[:hasRDF {{bioQualifier: 'is'}}]->(:RDF {{biocyc: $cpd}})
             MERGE (r1){rxn_rel_type}(r2)
-                ON CREATE SET l.fromPathway = $pw_id, l.toPathway = pw2.mcId;
+                ON CREATE SET l.fromPathway = $pw_id, l.toPathway = pw2.metaId;
             """,
             pw_id=pw,
             pws=pws,
             cpd=cpd,
-        )
-
-    def link_pathway_to_taxa(self, pathway_id: str, tax_id: str, relationship: str):
-        """Link a ``Pathway`` to a ``Taxa`` node."""
-        if not relationship in {"hasRelatedSpecies", "hasExpectedTaxonRange"}:
-            raise ValueError(f"Invalid relationship: {relationship}")
-        logger.debug(f"Pathway {pathway_id} {relationship} {tax_id}")
-        self.write(
-            f"""
-            MATCH (pw:Pathway {{displayName: $pw}})
-            MERGE (s:Taxa {{mcId: $taxa_id}})
-            MERGE (pw)-[:{relationship}]->(s)
-            """,
-            pw=pathway_id,
-            taxa_id=tax_id,
-        )
-
-    def link_pathway_to_rate_limiting_step(self, pathway_id: str, reaction_id: str):
-        logger.debug(f"Pathway {pathway_id} has rate limiting step {reaction_id}")
-        self.write(
-            """
-            MATCH (pw:Pathway {displayName: $pw}),
-                  (r:Reaction {canonicalId: $rxn})
-            MERGE (pw)-[l:hasReaction]->(r)
-                ON MATCH SET l.isRateLimitingStep = true
-            """,
-            pw=pathway_id,
-            rxn=reaction_id,
-        )
-
-    def link_pathway_to_primary_compound(
-        self, pathway_id: str, compound_id: str, relationship: str
-    ):
-        logger.debug(f"Pathway {pathway_id} has primary {relationship} {compound_id}")
-        self.write(
-            f"""
-            MATCH (cpd:Compound)-[:is]->(:RDF {{Biocyc: $compound_id}}),
-                  (pw:Pathway {{displayName: $pw}})-[:hasReaction]->(:Reaction)-[:hasLeft|hasRight]->(cpd)
-            MERGE (pw)-[:hasPrimary{relationship}]->(cpd)
-            """,
-            pw=pathway_id,
-            compound_id=compound_id,
-        )
-
-    def link_reaction_to_next_step(self, r1: str, r2: List[str], pathway_id: str):
-        """Link a reaction to its next step in a pathway."""
-        logger.debug(f"Reaction {r1} has next steps {r2} in {pathway_id}")
-        self.write(
-            """
-            MATCH (r1:Reaction {canonicalId: $r1})
-            MATCH (r2:Reaction) WHERE r2.canonicalId IN $r2
-            UNWIND r2 AS pred
-            MERGE (pred)-[l:isPrecedingEvent]->(r1)
-                ON CREATE SET l.hasRelatedPathway = $pw
-            """,
-            r1=r1,
-            r2=r2,
-            pw=pathway_id,
         )
 
     def link_reaction_to_primary_compound(
@@ -271,10 +227,10 @@ class MetacycClient(SBMLClient):
         logger.debug(f"Reaction {reaction_id} has primary {side}s {compound_ids}")
         self.write(
             f"""
-            MATCH (r:Reaction {{canonicalId: $rxn_id}}),
-                  (cpds:Compound)-[:is]->(rdf:RDF)
-            WHERE rdf.biocyc IN $compound_ids
-            UNWIND cpds AS cpd
+            MATCH (r:Reaction {{canonicalId: $rxn_id}})
+            UNWIND $compound_ids AS cpd_id
+            MATCH (cpd:Compound)-[:hasRDF {{bioQualifier: 'is'}}]->(rdf:RDF)
+            WHERE rdf.biocyc = cpd_id
             MATCH (r)-[l:hasLeft|hasRight]->(cpd)
             SET l.isPrimary{side}InPathway = CASE
               WHEN l.isPrimary{side}InPathway IS NULL THEN [$pw]
@@ -336,11 +292,11 @@ class MetacycClient(SBMLClient):
 
     def delete_bad_reaction_nodes(self):
         """
-        Delete reaction nodes with non-canonical mcIds and all their relationships.
+        Delete reaction nodes with non-canonical metaIds and all their relationships.
         """
         self.write(
             """
-            MATCH (r:Reaction) WHERE r.displayName <> r.canonicalId
+            MATCH (r:Reaction) WHERE r.name <> r.canonicalId
             DETACH DELETE r;
             """
         )
@@ -365,16 +321,16 @@ class MetacycClient(SBMLClient):
             """
         )
 
-    def get_all_ec_numbers(self):
+    def get_all_ec_numbers(self) -> Set[str]:
         ec = self.read(
             """
-            MATCH (r:Reaction)-[:is]->(rdf:RDF)
+            MATCH (r:Reaction)-[:hasRDF {bioQualifier: 'is'}]->(rdf:RDF)
             WHERE rdf.ecCode IS NOT NULL
             UNWIND rdf.ecCode as ec
             RETURN collect(ec);
             """
         )
-        return set(n["ec"] for n in ec)
+        return {n["ec"] for n in ec}
 
     def get_view_of_pathway(self, pathway_id: str):
         """
@@ -388,14 +344,14 @@ class MetacycClient(SBMLClient):
         """
         nodes = self.read(
             """
-        MATCH (:Pathway {mcId: $pw_id})-[l:hasReaction]->(r:Reaction)
+        MATCH (:Pathway {metaId: $pw_id})-[l:hasReaction]->(r:Reaction)
         WITH r
-        MATCH (r)-[:is]->(rrdf:RDF),
-              (r)-[:hasGeneProduct|hasComponent|hasMember*]->(gp:GeneProduct)-[:isEncodedBy]->(grdf:RDF)
+        MATCH (r)-[:hasRDF {bioQualifier: 'is'}]->(rrdf:RDF),
+              (r)-[:hasGeneProduct|hasComponent|hasMember*]->(gp:GeneProduct)-[:hasRDF {bioQualifier: 'isEncodedBy'}]->(grdf:RDF)
         WITH r, rrdf.ecCode AS ec,
-             COLLECT(gp.displayName) as symbol, COLLECT(grdf.ncbigene) AS ncbi
+             COLLECT(gp.name) as symbol, COLLECT(grdf.ncbigene) AS ncbi
         RETURN {
-          id: id(r), name: r.displayName, ec: ec, gibbs: r.gibbs0,
+          id: id(r), name: r.name, ec: ec, gibbs: r.gibbs0,
           direction: r.reactionDirection,
           genes: {symbol: symbol, ncbi: ncbi}
         } AS node;
@@ -405,7 +361,7 @@ class MetacycClient(SBMLClient):
 
         edges = self.read(
             """
-        MATCH (:Pathway {mcId: $pw_id})-[l:hasReaction]->(r:Reaction)
+        MATCH (:Pathway {metaId: $pw_id})-[l:hasReaction]->(r:Reaction)
         WITH COLLECT(r) AS nodes
         UNWIND nodes AS r1
         UNWIND nodes AS r2
@@ -428,15 +384,15 @@ class MetacycClient(SBMLClient):
         q = self.read(
             """
             MATCH (p:Pathway)-[:hasReaction]->(r:Reaction)-[l:hasLeft|hasRight]->(c:Compound)-[:hasCompartment]->(cpt:Compartment)
-            WHERE p.mcId IN $pw_ids
+            WHERE p.metaId IN $pw_ids
             WITH r, l, c, cpt
-            OPTIONAL MATCH (r)-[:is]->(rdf:RDF)
+            OPTIONAL MATCH (r)-[:hasRDF {bioQualifier: 'is'}]->(rdf:RDF)
             RETURN
-              r.mcId, r.displayName, r.synonyms, r.reactionDirection, r.gibbs0,
+              r.metaId, r.name, r.synonyms, r.reactionDirection, r.gibbs0,
               rdf.ecCode,
               type(l), l.stoichiometry,
-              c.mcId, c.displayName, c.chemicalFormula, c.gibbs0,
-              cpt.mcId;
+              c.metaId, c.name, c.chemicalFormula, c.gibbs0,
+              cpt.metaId;
             """,
             pw_ids=pathway_ids,
         )
@@ -486,8 +442,7 @@ class MetacycClient(SBMLClient):
         # Get gene associations
         rxn_genes = {}
         for rxn in all_rxns:
-            genes = self.get_genes_of_reaction(rxn)
-            if genes:
+            if genes := self.get_genes_of_reaction(rxn):
                 rxn_genes[rxn] = generate_gene_reaction_rule(genes)
 
         return df, rxn_genes
@@ -496,7 +451,7 @@ class MetacycClient(SBMLClient):
         self, reaction_id: str
     ) -> List[Tuple[Dict[str, str], Dict[str, str]]]:
         """
-        Given a reaction mcId, return the gene products associated with it in
+        Given a reaction metaId, return the gene products associated with it in
         the form of a list of (source, target) nodes. This is because certain
         reactions are associated with ``GeneProductSet`` or
         ``GeneProductComplex`` nodes, which represent ``OR`` and ``AND``
@@ -507,7 +462,7 @@ class MetacycClient(SBMLClient):
         """
         res = self.read(
             """
-            MATCH (r:Reaction {mcId: $rxn})
+            MATCH (r:Reaction {metaId: $rxn})
             WITH r
             CALL apoc.path.expandConfig(r, {
                 labelFilter: "GeneProductSet|GeneProductComplex|/GeneProduct",
@@ -522,13 +477,13 @@ class MetacycClient(SBMLClient):
             RETURN DISTINCT
               {
                 label: labels(elements[index])[0],
-                mcId: elements[index].mcId,
-                name: elements[index].displayName
+                metaId: elements[index].metaId,
+                name: elements[index].name
               } AS source_node,
               {
                 label: labels(elements[index+2])[0],
-                mcId: elements[index+2].mcId,
-                name: elements[index+2].displayName
+                metaId: elements[index+2].metaId,
+                name: elements[index+2].name
               } AS target_node;
             """,
             rxn=reaction_id,
@@ -544,12 +499,12 @@ class MetacycClient(SBMLClient):
         Get the view of a pathway with primary compounds linked by reactions.
 
         Args:
-            pathway_id: The pathway mcId or displayName.
-            ignore_cpds: A list of common compound displayNames to ignore.
+            pathway_id: The pathway metaId or name.
+            ignore_cpds: A list of common compound names to ignore.
         """
-        res = self.read(
+        return self.read(
             """
-            MATCH (:Pathway {displayName: $pw_id})-[:hasReaction]->(r:Reaction),
+            MATCH (:Pathway {name: $pw_id})-[:hasReaction]->(r:Reaction),
               (r)-[lr]->(cr:Compound),
               (r)-[lp]->(cp:Compound)
             WHERE (
@@ -561,18 +516,16 @@ class MetacycClient(SBMLClient):
             ) AND (
               id(lr) <> id(lp)
             ) AND (
-              NOT cr.displayName IN $ignore_cpds
+              NOT cr.name IN $ignore_cpds
             ) AND (
-              NOT cp.displayName IN $ignore_cpds
+              NOT cp.name IN $ignore_cpds
             )
             RETURN cr, cp,
-              apoc.create.vRelationship(cr, r.displayName, properties(r), cp);
+              apoc.create.vRelationship(cr, r.name, properties(r), cp);
             """,
             pw_id=pathway_id,
             ignore_cpds=ignore_cpds,
         )
-
-        return res
 
     def get_high_degree_compound_nodes(self, degree: int = 60):
         """
@@ -589,7 +542,7 @@ class MetacycClient(SBMLClient):
         return self.read(
             """
             MATCH (c:Compound)<-[:hasLeft|hasRight]-(r:Reaction)
-            WITH c.mcId as cpd, COUNT(*) AS cnt
+            WITH c.metaId as cpd, COUNT(*) AS cnt
             WHERE cnt >= $degree
             RETURN COLLECT(cpd);
             """,
@@ -610,10 +563,10 @@ class MetacycClient(SBMLClient):
         one for following any chain of reactions between two compounds.
 
         Args:
-            c1: The first compound mcId.
-            c2: The second compound mcId.
+            c1: The first compound metaId.
+            c2: The second compound metaId.
             only_pathway_reactions: If True, only follow reactions in pathways.
-            ignore_node_mcids: A list of mcIds to ignore.
+            ignore_node_mcids: A list of metaIds to ignore.
             num_routes: The number of routes to return.
             max_hops: The maximum number of hops to follow. When argument
              ``only_pathway_reactions`` is False, this is doubled to account
@@ -625,11 +578,11 @@ class MetacycClient(SBMLClient):
         if only_pathway_reactions:
             query = """
             MATCH (n)
-            WHERE n.mcId IN $ignore_nodes
+            WHERE n.metaId IN $ignore_nodes
             WITH COLLECT(n) AS ns
-            MATCH (r:Reaction)-[:hasRight]->(c2:Compound {mcId: $c2})
+            MATCH (r:Reaction)-[:hasRight]->(c2:Compound {metaId: $c2})
             WITH c2, ns, COLLECT(r) AS rxns
-            MATCH (c1:Compound {mcId: $c1})
+            MATCH (c1:Compound {metaId: $c1})
             CALL apoc.path.expandConfig(c1, {
                 relationshipFilter: "<hasLeft|isPrecedingEvent>|isRelatedEvent>",
                 labelFilter: "+Reaction",
@@ -647,10 +600,10 @@ class MetacycClient(SBMLClient):
         else:
             query = """
             MATCH (n)
-            WHERE n.mcId IN $ignore_nodes
+            WHERE n.metaId IN $ignore_nodes
             WITH COLLECT(n) AS ns
-            MATCH (c1:Compound {mcId: $c1}),
-                  (c2:Compound {mcId: $c2})
+            MATCH (c1:Compound {metaId: $c1}),
+                  (c2:Compound {metaId: $c2})
             CALL apoc.path.expandConfig(c1, {
                 relationshipFilter: "<hasLeft,hasRight>",
                 labelFilter: "+Reaction|Compound",
@@ -665,7 +618,7 @@ class MetacycClient(SBMLClient):
             RETURN c2, path, length(path) AS hops
             ORDER BY hops;
             """
-        res = self.read(
+        return self.read(
             query,
             ignore_nodes=ignore_node_mcids,
             c1=c1,
@@ -673,4 +626,3 @@ class MetacycClient(SBMLClient):
             num_routes=num_routes,
             max_hops=max_hops * 2,
         )
-        return res
