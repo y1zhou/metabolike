@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -16,7 +16,8 @@ COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
 _reactions_dat_cypher = """
 UNWIND $batch_nodes AS n
   MERGE (r:Reaction {name: n.name})
-    SET r += n.props
+    ON CREATE SET r += n.props
+    ON MATCH SET r += n.props
   FOREACH (pw IN n.inPathway |
     MERGE (p:Pathway {metaId: pw})
       ON CREATE SET p.name = pw
@@ -321,7 +322,7 @@ class MetacycClient(SBMLClient):
             """
         )
 
-    def get_all_ec_numbers(self):
+    def get_all_ec_numbers(self) -> Set[str]:
         ec = self.read(
             """
             MATCH (r:Reaction)-[:hasRDF {bioQualifier: 'is'}]->(rdf:RDF)
@@ -330,7 +331,7 @@ class MetacycClient(SBMLClient):
             RETURN collect(ec);
             """
         )
-        return set(n["ec"] for n in ec)
+        return {n["ec"] for n in ec}
 
     def get_view_of_pathway(self, pathway_id: str):
         """
@@ -442,8 +443,7 @@ class MetacycClient(SBMLClient):
         # Get gene associations
         rxn_genes = {}
         for rxn in all_rxns:
-            genes = self.get_genes_of_reaction(rxn)
-            if genes:
+            if genes := self.get_genes_of_reaction(rxn):
                 rxn_genes[rxn] = generate_gene_reaction_rule(genes)
 
         return df, rxn_genes
@@ -503,7 +503,7 @@ class MetacycClient(SBMLClient):
             pathway_id: The pathway metaId or name.
             ignore_cpds: A list of common compound names to ignore.
         """
-        res = self.read(
+        return self.read(
             """
             MATCH (:Pathway {name: $pw_id})-[:hasReaction]->(r:Reaction),
               (r)-[lr]->(cr:Compound),
@@ -527,8 +527,6 @@ class MetacycClient(SBMLClient):
             pw_id=pathway_id,
             ignore_cpds=ignore_cpds,
         )
-
-        return res
 
     def get_high_degree_compound_nodes(self, degree: int = 60):
         """
@@ -621,7 +619,7 @@ class MetacycClient(SBMLClient):
             RETURN c2, path, length(path) AS hops
             ORDER BY hops;
             """
-        res = self.read(
+        return self.read(
             query,
             ignore_nodes=ignore_node_mcids,
             c1=c1,
@@ -629,4 +627,3 @@ class MetacycClient(SBMLClient):
             num_routes=num_routes,
             max_hops=max_hops * 2,
         )
-        return res
