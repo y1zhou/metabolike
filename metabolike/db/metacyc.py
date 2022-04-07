@@ -244,10 +244,10 @@ class MetacycClient(SBMLClient):
         logger.debug(f"Reaction {reaction_id} has primary {side}s {compound_ids}")
         self.write(
             f"""
-            MATCH (r:Reaction {{canonicalId: $rxn_id}}),
-                  (cpds:Compound)-[:hasRDF {{bioQualifier: 'is'}}]->(rdf:RDF)
-            WHERE rdf.biocyc IN $compound_ids
-            UNWIND cpds AS cpd
+            MATCH (r:Reaction {{canonicalId: $rxn_id}})
+            UNWIND $compound_ids AS cpd_id
+            MATCH (cpd:Compound)-[:hasRDF {{bioQualifier: 'is'}}]->(rdf:RDF)
+            WHERE rdf.biocyc = cpd_id
             MATCH (r)-[l:hasLeft|hasRight]->(cpd)
             SET l.isPrimary{side}InPathway = CASE
               WHEN l.isPrimary{side}InPathway IS NULL THEN [$pw]
