@@ -746,8 +746,8 @@ class MetacycParser(SBMLParser):
         # Clean up props before writing to graph
         node["props"] = self._clean_props(
             node["props"],
-            num_fields=[snake_to_camel(x) for x in prop_num_keys],
-            enum_fields=[snake_to_camel(x) for x in prop_enum_keys],
+            num_fields=prop_num_keys,
+            enum_fields=prop_enum_keys,
         )
 
         return node
@@ -767,14 +767,14 @@ class MetacycParser(SBMLParser):
             A dictionary with normalized properties.
         """
         for f in num_fields:
-            if f in props:
-                props[f] = float(props[f])
+            if (k := snake_to_camel(f)) in props:
+                props[k] = float(props[k])
 
         enum_pattern = re.compile(r"\W+")
         for f in enum_fields:
-            if f in props:
-                props[f] = props[f].replace("-", "_").lower()
-                props[f] = enum_pattern.sub("", props[f])
+            if (k := snake_to_camel(f)) in props:
+                props[k] = props[k].replace("-", "_").lower()
+                props[k] = enum_pattern.sub("", props[k])
 
         return props
 
