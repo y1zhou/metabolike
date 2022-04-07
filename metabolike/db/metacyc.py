@@ -81,15 +81,14 @@ UNWIND $batch_nodes AS n
       ON CREATE SET spw.name = super_pw
     MERGE (spw)-[:hasSubPathway]->(pw)
   )
-  FOREACH (pred in n.predecessors |
+  FOREACH (pred IN n.predecessors |
     MERGE (r1: Reaction {canonicalId: pred.r1})
     FOREACH (rxn IN pred.r2 |
       MERGE (r2:Reaction {canonicalId: rxn})
       MERGE (r2)-[l:isPrecedingEvent]->(r1)
         ON CREATE SET l.hasRelatedPathway = n.metaId
     )
-  )
-  ;
+  );
 """
 
 
@@ -216,22 +215,6 @@ class MetacycClient(SBMLClient):
             pw_id=pw,
             pws=pws,
             cpd=cpd,
-        )
-
-    def link_reaction_to_next_step(self, r1: str, r2: List[str], pathway_id: str):
-        """Link a reaction to its next step in a pathway."""
-        logger.debug(f"Reaction {r1} has next steps {r2} in {pathway_id}")
-        self.write(
-            """
-            MATCH (r1:Reaction {canonicalId: $r1})
-            MATCH (r2:Reaction) WHERE r2.canonicalId IN $r2
-            UNWIND r2 AS pred
-            MERGE (pred)-[l:isPrecedingEvent]->(r1)
-                ON CREATE SET l.hasRelatedPathway = $pw
-            """,
-            r1=r1,
-            r2=r2,
-            pw=pathway_id,
         )
 
     def link_reaction_to_primary_compound(

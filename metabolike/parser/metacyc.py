@@ -259,22 +259,19 @@ class MetacycParser(SBMLParser):
             pw_id = node["metaId"]
             if rxn_layout := node.get("reactionLayout"):
                 for v in rxn_layout:
-                    rxn_id, d = self._parse_reaction_layout(v)
-                    if not rxn_id:
-                        continue
                     # Two cypher statements for Reactant and Product compounds
-                    for side, compounds in d.items():
-                        self.db.link_reaction_to_primary_compound(
-                            rxn_id, compounds, pw_id, side
-                        )
+                    self.db.link_reaction_to_primary_compound(
+                        v["reaction"], v["reactants"], pw_id, "Reactant"
+                    )
+                    self.db.link_reaction_to_primary_compound(
+                        v["reaction"], v["products"], pw_id, "Product"
+                    )
 
             if pw_links := node.get("pathwayLinks"):
                 for v in pw_links:
-                    cpd_id, pw_ids, direction = self._parse_pathway_links(v)
-                    if pw_ids:
-                        self.db.link_pathway_to_pathway(
-                            pw_id, pw_ids, direction, cpd_id
-                        )
+                    self.db.link_pathway_to_pathway(
+                        pw_id, v["pathways"], v["direction"], v["cpd"]
+                    )
 
     def _collect_pathways_dat_nodes(
         self,
@@ -374,7 +371,7 @@ class MetacycParser(SBMLParser):
          parentheses. We need to extract the first ID as the target reaction,
          and take all the others as preceding events of the first one.
         * ``reactionLayout`` tells us the primary reactants and products of
-         the reaction in a given pathway.
+         the reactions in a given pathway.
         * ``pathwayLinks`` links the pathway to other pathways through
          intermediate ``Compound``s.
 
@@ -394,6 +391,28 @@ class MetacycParser(SBMLParser):
                         new_pred.append(pred)
 
                 pw_nodes[i]["predecessors"] = new_pred
+
+            if rxn_layout := n.get("reactionLayout"):
+                rxn_layout: List[str]
+                rxn_prim_cpds = []
+                for v in rxn_layout:
+                    rxn_id, d = self._parse_reaction_layout(v)
+                    if rxn_id:
+                        rxn_prim_cpds.append({"reaction": rxn_id, **d})
+
+                pw_nodes[i]["reactionLayout"] = rxn_prim_cpds
+
+            if pw_links := n.get("pathwayLinks"):
+                pw_links: List[str]
+                conn_pathways = []
+                for v in pw_links:
+                    cpd_id, pw_ids, direction = self._parse_pathway_links(v)
+                    if pw_ids:
+                        conn_pathways.append(
+                            {"cpd": cpd_id, "pathways": pw_ids, "direction": direction}
+                        )
+
+                pw_nodes[i]["pathwayLinks"] = conn_pathways
 
         return pw_nodes
 
@@ -824,8 +843,8 @@ class MetacycParser(SBMLParser):
             products = l_prim.split(" ")
 
         d = {
-            "Reactant": reactants,
-            "Product": products,
+            "reactants": reactants,
+            "products": products,
         }
 
         return rxn_id, d
