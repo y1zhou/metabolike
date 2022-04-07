@@ -96,7 +96,12 @@ class SBMLParser:
         # Reactions
         rxns = model.getListOfReactions()
         reactions = self._collect_reactions(rxns)
-        self.db.create_nodes("Reaction", reactions, self.db.default_cyphers["Reaction"])
+        self.db.create_nodes(
+            "Reaction",
+            reactions,
+            self.db.default_cyphers["Reaction"],
+            progress_bar=True,
+        )
         for r in tqdm(rxns, desc="Reaction-GeneProduct"):
             # Add associated gene products
             # This could be complicated where the child nodes could be:

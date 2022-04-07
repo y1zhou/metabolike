@@ -180,6 +180,8 @@ class MetacycParser(SBMLParser):
             "reactions.dat",
             rxn_nodes,
             self.db.metacyc_default_cyphers["reactions"],
+            batch_size=100,
+            progress_bar=True,
         )
 
         # Fix the direction of reactions
@@ -252,7 +254,10 @@ class MetacycParser(SBMLParser):
         # Annotate regular pathway nodes
         pw_nodes = self._fix_pathway_nodes(pw_nodes)
         self.db.create_nodes(
-            "Pathway", pw_nodes, self.db.metacyc_default_cyphers["pathways"]
+            "Pathway",
+            pw_nodes,
+            self.db.metacyc_default_cyphers["pathways"],
+            progress_bar=True,
         )
 
         for node in tqdm(pw_nodes, desc="Annotating pathways"):

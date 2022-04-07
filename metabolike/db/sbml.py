@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, List
 
 from metabolike.utils import chunk
+from tqdm import tqdm
 
 from .neo4j import Neo4jClient
 
@@ -142,6 +143,7 @@ class SBMLClient(Neo4jClient):
         nodes: List[Dict[str, Any]],
         query: str,
         batch_size: int = 1000,
+        progress_bar: bool = False,
     ):
         """Create nodes in batches with the given label and properties.
 
@@ -162,7 +164,16 @@ class SBMLClient(Neo4jClient):
         """
         logger.info(f"Creating {node_label} nodes")
 
-        for batch in chunk(nodes, batch_size):
+        if progress_bar:
+            it = tqdm(
+                chunk(nodes, batch_size),
+                desc=node_label,
+                total=len(nodes) // batch_size,
+            )
+        else:
+            it = chunk(nodes, batch_size)
+
+        for batch in it:
             self.write(query, batch_nodes=batch)
 
         logger.info(f"Created {len(nodes)} {node_label} nodes")
