@@ -102,13 +102,14 @@ def test_dat_entry_to_node(mc: MetacycParser, rxn_dat: Dict[str, List[List[str]]
             "REACTION-BALANCE-STATUS",
         },
         props_list_keys={"TYPES"},
+        node_str_keys={"EC-NUMBER"},
         node_list_keys={"IN-PATHWAY", "NONEXISTENT-KEY"},
         prop_num_keys={"GIBBS-0"},
         prop_enum_keys={"REACTION-BALANCE-STATUS", "REACTION-DIRECTION"},
     )
 
     assert isinstance(n, dict)
-    assert set(n.keys()) == {"name", "props", "inPathway"}
+    assert set(n.keys()) == {"name", "props", "inPathway", "ecNumber"}
     assert set(n["props"].keys()) == {
         "canonicalId",
         "gibbs0",
@@ -190,7 +191,7 @@ def test_parse_pathway_links(mc: MetacycParser):
     s = "(PYRUVATE  ))"
     with pytest.raises(ValueError):
         mc._parse_pathway_links(s)
-    s = "(PYRUVATE  (XXX)"
+    s = "(PYRUVATE (XXX)"
     with pytest.raises(ValueError):
         mc._parse_pathway_links(s)
 
@@ -320,6 +321,9 @@ def test_collect_atom_mapping_dat_nodes(mc: MetacycParser):
     assert len(nodes) == 2
     assert "props" in nodes[0]
     assert "smilesAtomMapping" in nodes[0]["props"]
+
+    _ = mc._collect_atom_mapping_dat_nodes({"RXN-000"}, smiles)
+    assert mc.missing_ids["atom_mappings"] == {"RXN-000"}
 
 
 def test_collect_compounds_dat_nodes(mc: MetacycParser):
