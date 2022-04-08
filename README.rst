@@ -37,6 +37,4 @@ To-Do
 -----
 
 * Add tutorial for the package
-* Add documentation to the CLI
 * Add Dockerfile and docker-compose file
-* Add tests
