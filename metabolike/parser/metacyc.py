@@ -930,7 +930,7 @@ class MetacycParser(SBMLParser):
             s = s[m.end() :].strip()
 
         # Final cleanup
-        cpd = cpd.replace("|", "")
+        cpd = cpd.replace("|", "").replace('"', "")
         pathways = [
             p.replace('"', "") for p in pathways if (" " not in p) and p.isupper()
         ]  # remove frame IDs and quoted annotations
