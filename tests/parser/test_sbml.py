@@ -6,6 +6,8 @@ from metabolike.parser import SBMLParser
 @pytest.fixture
 def sbml_parser():
     # No need to pass an actual database to the parser
+    with pytest.raises(ValueError):
+        SBMLParser(None, None)
     return SBMLParser(None, "tests/data/metabolic-reactions.sbml")
 
 
@@ -133,4 +135,12 @@ def test_split_uri(sbml_parser: SBMLParser):
     assert sbml_parser._split_uri("http://identifiers.org/ec-code/1.1.1.1") == (
         "ec-code",
         "1.1.1.1",
+    )
+    assert sbml_parser._split_uri("http://identifiers.org/biocyc/META:RXN-15513") == (
+        "biocyc",
+        "RXN-15513",
+    )
+    assert sbml_parser._split_uri("http://identifiers.org/kegg.reaction/R00199") == (
+        "kegg-reaction",
+        "R00199",
     )
