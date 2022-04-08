@@ -433,13 +433,7 @@ class MetacycParser(SBMLParser):
             return
 
         logger.info(f"Adding SMILES with {self.input_files['atom_mapping']}")
-        smiles_df = pd.read_table(
-            self.input_files["atom_mapping"],
-            sep="\t",
-            header=None,
-            names=["rxn", "smiles"],
-        )
-        smiles: Dict[str, str] = smiles_df.set_index("rxn").to_dict()["smiles"]
+        smiles = self._read_smiles_dat(self.input_files["atom_mapping"])
         all_rxns = self.db.get_all_nodes("Reaction", "name")
         rxn_smiles = self._collect_atom_mapping_dat_nodes(all_rxns, smiles)
         self.db.add_props_to_nodes(
@@ -614,17 +608,26 @@ class MetacycParser(SBMLParser):
 
         logger.info(f"Annotating with {self.input_files['classes']}")
         cls_dat = self._read_dat_file(self.input_files["classes"])
-        cco_nodes, taxa_nodes = self._collect_classes_dat_nodes(cls_dat)
+        all_cco = self.db.get_all_nodes("Compartment", "name")
+        all_taxon = self.db.get_all_nodes("Taxa", "metaId")
+
+        cco_nodes, taxa_nodes = self._collect_classes_dat_nodes(
+            cls_dat, all_cco, all_taxon
+        )
         self.db.add_props_to_nodes(
             "Compartment", "name", cco_nodes, "Compartment names"
         )
         self.db.add_props_to_nodes("Taxa", "metaId", taxa_nodes, "Taxa names")
 
-    def _collect_classes_dat_nodes(self, class_dat: Dict[str, List[List[str]]]):
+    def _collect_classes_dat_nodes(
+        self,
+        class_dat: Dict[str, List[List[str]]],
+        cco_ids: Iterable[str],
+        taxa_ids: Iterable[str],
+    ):
         cco_nodes = []
         # Common names for cell components
-        all_cco = self.db.get_all_nodes("Compartment", "name")
-        for cco in all_cco:
+        for cco in cco_ids:
             if cco not in class_dat:
                 self.missing_ids["compartments"].add(cco)
                 continue
@@ -640,8 +643,7 @@ class MetacycParser(SBMLParser):
 
         # Common names and synonyms for organisms. Some also have strain names
         taxa_nodes = []
-        all_taxon = self.db.get_all_nodes("Taxa", "metaId")
-        for taxa in tqdm(all_taxon, desc="Taxon in classes.dat"):
+        for taxa in tqdm(taxa_ids, desc="Taxon in classes.dat"):
             if taxa not in class_dat:
                 self.missing_ids["taxon"].add(taxa)
                 continue
@@ -690,6 +692,17 @@ class MetacycParser(SBMLParser):
             docs[uniq_id] = doc
 
         return docs
+
+    @staticmethod
+    def _read_smiles_dat(filepath: Path) -> Dict[str, str]:
+        smiles_df = pd.read_table(
+            filepath,
+            sep="\t",
+            header=None,
+            names=["rxn", "smiles"],
+        )
+        smiles = smiles_df.set_index("rxn").to_dict()
+        return smiles["smiles"]
 
     @staticmethod
     def _find_rxn_canonical_id(rxn_id: str, all_ids: Iterable[str]) -> str:
