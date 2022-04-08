@@ -252,7 +252,8 @@ class MetacycParser(SBMLParser):
         self._fix_composite_reaction_nodes(comp_rxn_nodes)
 
         # Annotate regular pathway nodes
-        pw_nodes = self._fix_pathway_nodes(pw_nodes)
+        all_rxns = set(self.db.get_all_nodes("Reaction", "name"))
+        pw_nodes = self._fix_pathway_nodes(pw_nodes, all_rxns)
         self.db.create_nodes(
             "Pathway",
             pw_nodes,
@@ -368,7 +369,7 @@ class MetacycParser(SBMLParser):
         # Fix the direction of newly-added reactions
         self.db.fix_reaction_direction()
 
-    def _fix_pathway_nodes(self, pw_nodes: List[Dict[str, Any]]):
+    def _fix_pathway_nodes(self, pw_nodes: List[Dict[str, Any]], all_rxns: Set[str]):
         """
         Some fields in the list of ``Pathway`` nodes require preprocessing
          before being fed into the database. Specifically:
@@ -386,8 +387,8 @@ class MetacycParser(SBMLParser):
 
         Args:
             pw_nodes: Output of :meth:`_collect_pathways_dat_nodes`.
+            all_rxns: All valid reaction names.
         """
-        all_rxns = set(self.db.get_all_nodes("Reaction", "name"))
         for i, n in enumerate(pw_nodes):
             if predecessors := n.get("predecessors"):
                 predecessors: List[str]
