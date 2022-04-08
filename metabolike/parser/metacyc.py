@@ -252,7 +252,8 @@ class MetacycParser(SBMLParser):
         self._fix_composite_reaction_nodes(comp_rxn_nodes)
 
         # Annotate regular pathway nodes
-        pw_nodes = self._fix_pathway_nodes(pw_nodes)
+        all_rxns = set(self.db.get_all_nodes("Reaction", "name"))
+        pw_nodes = self._fix_pathway_nodes(pw_nodes, all_rxns)
         self.db.create_nodes(
             "Pathway",
             pw_nodes,
@@ -368,7 +369,7 @@ class MetacycParser(SBMLParser):
         # Fix the direction of newly-added reactions
         self.db.fix_reaction_direction()
 
-    def _fix_pathway_nodes(self, pw_nodes: List[Dict[str, Any]]):
+    def _fix_pathway_nodes(self, pw_nodes: List[Dict[str, Any]], all_rxns: Set[str]):
         """
         Some fields in the list of ``Pathway`` nodes require preprocessing
          before being fed into the database. Specifically:
@@ -386,8 +387,8 @@ class MetacycParser(SBMLParser):
 
         Args:
             pw_nodes: Output of :meth:`_collect_pathways_dat_nodes`.
+            all_rxns: All valid reaction names.
         """
-        all_rxns = set(self.db.get_all_nodes("Reaction", "name"))
         for i, n in enumerate(pw_nodes):
             if predecessors := n.get("predecessors"):
                 predecessors: List[str]
@@ -432,13 +433,7 @@ class MetacycParser(SBMLParser):
             return
 
         logger.info(f"Adding SMILES with {self.input_files['atom_mapping']}")
-        smiles_df = pd.read_table(
-            self.input_files["atom_mapping"],
-            sep="\t",
-            header=None,
-            names=["rxn", "smiles"],
-        )
-        smiles: Dict[str, str] = smiles_df.set_index("rxn").to_dict()["smiles"]
+        smiles = self._read_smiles_dat(self.input_files["atom_mapping"])
         all_rxns = self.db.get_all_nodes("Reaction", "name")
         rxn_smiles = self._collect_atom_mapping_dat_nodes(all_rxns, smiles)
         self.db.add_props_to_nodes(
@@ -613,17 +608,26 @@ class MetacycParser(SBMLParser):
 
         logger.info(f"Annotating with {self.input_files['classes']}")
         cls_dat = self._read_dat_file(self.input_files["classes"])
-        cco_nodes, taxa_nodes = self._collect_classes_dat_nodes(cls_dat)
+        all_cco = self.db.get_all_nodes("Compartment", "name")
+        all_taxon = self.db.get_all_nodes("Taxa", "metaId")
+
+        cco_nodes, taxa_nodes = self._collect_classes_dat_nodes(
+            cls_dat, all_cco, all_taxon
+        )
         self.db.add_props_to_nodes(
             "Compartment", "name", cco_nodes, "Compartment names"
         )
         self.db.add_props_to_nodes("Taxa", "metaId", taxa_nodes, "Taxa names")
 
-    def _collect_classes_dat_nodes(self, class_dat: Dict[str, List[List[str]]]):
+    def _collect_classes_dat_nodes(
+        self,
+        class_dat: Dict[str, List[List[str]]],
+        cco_ids: Iterable[str],
+        taxa_ids: Iterable[str],
+    ):
         cco_nodes = []
         # Common names for cell components
-        all_cco = self.db.get_all_nodes("Compartment", "name")
-        for cco in all_cco:
+        for cco in cco_ids:
             if cco not in class_dat:
                 self.missing_ids["compartments"].add(cco)
                 continue
@@ -639,8 +643,7 @@ class MetacycParser(SBMLParser):
 
         # Common names and synonyms for organisms. Some also have strain names
         taxa_nodes = []
-        all_taxon = self.db.get_all_nodes("Taxa", "metaId")
-        for taxa in tqdm(all_taxon, desc="Taxon in classes.dat"):
+        for taxa in tqdm(taxa_ids, desc="Taxon in classes.dat"):
             if taxa not in class_dat:
                 self.missing_ids["taxon"].add(taxa)
                 continue
@@ -689,6 +692,17 @@ class MetacycParser(SBMLParser):
             docs[uniq_id] = doc
 
         return docs
+
+    @staticmethod
+    def _read_smiles_dat(filepath: Path) -> Dict[str, str]:
+        smiles_df = pd.read_table(
+            filepath,
+            sep="\t",
+            header=None,
+            names=["rxn", "smiles"],
+        )
+        smiles = smiles_df.set_index("rxn").to_dict()
+        return smiles["smiles"]
 
     @staticmethod
     def _find_rxn_canonical_id(rxn_id: str, all_ids: Iterable[str]) -> str:
@@ -746,8 +760,8 @@ class MetacycParser(SBMLParser):
         # Clean up props before writing to graph
         node["props"] = self._clean_props(
             node["props"],
-            num_fields=[snake_to_camel(x) for x in prop_num_keys],
-            enum_fields=[snake_to_camel(x) for x in prop_enum_keys],
+            num_fields=prop_num_keys,
+            enum_fields=prop_enum_keys,
         )
 
         return node
@@ -767,14 +781,14 @@ class MetacycParser(SBMLParser):
             A dictionary with normalized properties.
         """
         for f in num_fields:
-            if f in props:
-                props[f] = float(props[f])
+            if (k := snake_to_camel(f)) in props:
+                props[k] = float(props[k])
 
         enum_pattern = re.compile(r"\W+")
         for f in enum_fields:
-            if f in props:
-                props[f] = props[f].replace("-", "_").lower()
-                props[f] = enum_pattern.sub("", props[f])
+            if (k := snake_to_camel(f)) in props:
+                props[k] = props[k].replace("-", "_").lower()
+                props[k] = enum_pattern.sub("", props[k])
 
         return props
 
@@ -930,7 +944,7 @@ class MetacycParser(SBMLParser):
             s = s[m.end() :].strip()
 
         # Final cleanup
-        cpd = cpd.replace("|", "")
+        cpd = cpd.replace("|", "").replace('"', "")
         pathways = [
             p.replace('"', "") for p in pathways if (" " not in p) and p.isupper()
         ]  # remove frame IDs and quoted annotations
