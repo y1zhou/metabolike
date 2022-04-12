@@ -10,17 +10,17 @@ license = { file = "LICENSE" }
 requires-python = ">=3.8,<4"
 keywords = ["bioinformatics", "metabolic-pathway", "network", "graph-database"]
 dependencies = [
-    "lark>=0.11.3",
-    "pandas>=1.0.0",
-    "orjson",
-    "numpy",
+    "lark>=0.11.3,<2.0.0",
+    "pandas>=1.0.0,<2.0.0",
+    "orjson>=3.6.2,<4.0.0",
+    "numpy>=1.22.0,<2.0.0",
     "python-libsbml>=5.19.2",
     "neo4j>=4.3.4",
-    "tqdm",
-    "pyyaml",
+    "tqdm>=4.61.2",
+    "pyyaml>=6.0.0",
     "typer>=0.4.1,<0.5.0",
-    "fastapi>=0.70.0,<0.71.0",
-    "uvicorn>=0.16.0,<0.17.0",
+    "fastapi>=0.71.0,<0.76.0",
+    "uvicorn>=0.17.0,<0.18.0",
 ]
 classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
