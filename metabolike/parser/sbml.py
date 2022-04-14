@@ -86,13 +86,6 @@ class SBMLParser:
         compounds = self._collect_compounds(model.getListOfSpecies())
         self.db.create_nodes("Compound", compounds, self.db.default_cyphers["Compound"])
 
-        # Gene products
-        fbc: libsbml.FbcModelPlugin = model.getPlugin("fbc")
-        gene_prods = self._collect_gene_products(fbc.getListOfGeneProducts())
-        self.db.create_nodes(
-            "GeneProduct", gene_prods, self.db.default_cyphers["GeneProduct"]
-        )
-
         # Reactions
         rxns = model.getListOfReactions()
         reactions = self._collect_reactions(rxns)
@@ -102,20 +95,32 @@ class SBMLParser:
             self.db.default_cyphers["Reaction"],
             progress_bar=True,
         )
-        for r in tqdm(rxns, desc="Reaction-GeneProduct"):
-            # Add associated gene products
-            # This could be complicated where the child nodes could be:
-            # 1. GeneProductRef
-            # 2. fbc:or -> GeneProductRef
-            # 3. fbc:and -> GeneProductRef
-            # 4. Arbitrarily nested fbc:or / fbc:and within cases 2 and 3
-            mcid = r.getMetaId()
-            gpa: libsbml.GeneProductAssociation = r.getPlugin(
-                "fbc"
-            ).getGeneProductAssociation()
-            if gpa is not None:
-                node = gpa.getAssociation()
-                self._add_sbml_gene_product_association_node(node, mcid)
+
+        # Gene products
+        fbc = model.getPlugin("fbc")
+        if fbc is None:
+            logger.warning("No FBC plugin found in SBML file.")
+        else:
+            fbc: libsbml.FbcModelPlugin
+            gene_prods = self._collect_gene_products(fbc.getListOfGeneProducts())
+            self.db.create_nodes(
+                "GeneProduct", gene_prods, self.db.default_cyphers["GeneProduct"]
+            )
+
+            for r in tqdm(rxns, desc="Reaction-GeneProduct"):
+                # Add associated gene products
+                # This could be complicated where the child nodes could be:
+                # 1. GeneProductRef
+                # 2. fbc:or -> GeneProductRef
+                # 3. fbc:and -> GeneProductRef
+                # 4. Arbitrarily nested fbc:or / fbc:and within cases 2 and 3
+                mcid = r.getMetaId()
+                gpa: libsbml.GeneProductAssociation = r.getPlugin(
+                    "fbc"
+                ).getGeneProductAssociation()
+                if gpa is not None:
+                    node = gpa.getAssociation()
+                    self._add_sbml_gene_product_association_node(node, mcid)
 
     @staticmethod
     def _read_sbml(sbml_file: Path) -> libsbml.SBMLDocument:
