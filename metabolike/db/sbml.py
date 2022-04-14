@@ -61,6 +61,16 @@ UNWIND $batch_nodes AS n
   );
 """
 
+_group_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (g:Group {metaId: n.metaId})
+    ON CREATE SET g += n.props
+  FOREACH (member IN n.members |
+    MERGE (m {metaId: member})
+    MERGE (g)-[:hasGroupMember]->(m)
+  );
+"""
+
 
 class SBMLClient(Neo4jClient):
     """In addition to the Neo4j driver, this class also includes a set of
@@ -99,6 +109,7 @@ class SBMLClient(Neo4jClient):
         "Compound": _compound_cypher,
         "GeneProduct": _gene_product_cypher,
         "Reaction": _reaction_cypher,
+        "Group": _group_cypher,
     }
 
     def __init__(

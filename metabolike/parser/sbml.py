@@ -1,7 +1,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Dict, Iterable, List, Tuple, Union
 
 import libsbml
 from metabolike.db import SBMLClient
@@ -122,6 +122,22 @@ class SBMLParser:
                     node = gpa.getAssociation()
                     self._add_sbml_gene_product_association_node(node, mcid)
 
+        # Groups, i.e. related reactions in SBML
+        groups = model.getPlugin("groups")
+        if groups is None:
+            logger.warning("No groups plugin found in SBML file.")
+        else:
+            groups: libsbml.GroupsModelPlugin
+            group_nodes = self._collect_groups(groups.getListOfGroups())
+
+            self.db.create_nodes(
+                "Group",
+                group_nodes,
+                self.db.default_cyphers["Group"],
+                batch_size=10,
+                progress_bar=True,
+            )
+
     @staticmethod
     def _read_sbml(sbml_file: Path) -> libsbml.SBMLDocument:
         reader = libsbml.SBMLReader()
@@ -142,7 +158,7 @@ class SBMLParser:
 
     @staticmethod
     def _collect_compartments(
-        compartments: List[libsbml.Compartment],
+        compartments: Iterable[libsbml.Compartment],
     ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
         nodes = [
             {"metaId": c.getMetaId(), "props": {"name": c.getName()}}
@@ -153,7 +169,7 @@ class SBMLParser:
 
     def _collect_compounds(
         self,
-        compounds: List[libsbml.Species],
+        compounds: Iterable[libsbml.Species],
     ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
         nodes = []
         for c in tqdm(compounds, desc="Compounds"):
@@ -176,7 +192,7 @@ class SBMLParser:
         return nodes
 
     def _collect_gene_products(
-        self, gene_prods: List[libsbml.GeneProduct]
+        self, gene_prods: Iterable[libsbml.GeneProduct]
     ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
         nodes = []
         for gp in tqdm(gene_prods, desc="GeneProducts"):
@@ -194,7 +210,7 @@ class SBMLParser:
 
         return nodes
 
-    def _collect_reactions(self, reactions: List[libsbml.Reaction]):
+    def _collect_reactions(self, reactions: Iterable[libsbml.Reaction]):
         nodes = []
         for r in tqdm(reactions, desc="Reactions"):
             r: libsbml.Reaction
@@ -218,6 +234,20 @@ class SBMLParser:
             nodes.append(node)
 
         return nodes
+
+    @staticmethod
+    def _collect_groups(groups: Iterable[libsbml.Group]):
+        return [
+            {
+                "metaId": g.getId(),
+                "props": {
+                    "name": g.getName(),
+                    "kind": g.getKindAsString(),
+                },
+                "members": [m.getIdRef() for m in g.getListOfMembers()],
+            }
+            for g in groups
+        ]
 
     def _cvterm_to_rdf(
         self, cvterm: libsbml.CVTerm
