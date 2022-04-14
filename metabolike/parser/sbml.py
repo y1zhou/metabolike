@@ -203,6 +203,7 @@ class SBMLParser:
                 "props": {
                     "name": r.getName(),
                     "fast": r.getFast(),
+                    "reversible": r.getReversible(),
                 },
             }
             cvterms: List[libsbml.CVTerm] = r.getCVTerms()
