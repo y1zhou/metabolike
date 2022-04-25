@@ -270,11 +270,11 @@ class SBMLParser:
             reaction_link_id = node.getGeneProduct()
         elif isinstance(node, libsbml.FbcAnd):
             reaction_link_id = self._parse_gene_product_complex(
-                node, gene_complexes, gene_sets
+                node, gene_sets, gene_complexes
             )
         elif isinstance(node, libsbml.FbcOr):
             reaction_link_id = self._parse_gene_product_set(
-                node, gene_complexes, gene_sets
+                node, gene_sets, gene_complexes
             )
         else:
             raise ValueError(f"Unhandled GeneProductAssociation type {type(node)}")
@@ -284,8 +284,8 @@ class SBMLParser:
     def _parse_gene_product_complex(
         self,
         node: libsbml.FbcAnd,
-        gene_complexes: Dict[str, Set[str]],
         gene_sets: Dict[str, Set[str]],
+        gene_complexes: Dict[str, Set[str]],
     ):
         components = set()
         for i in range(node.getNumAssociations()):
@@ -293,19 +293,20 @@ class SBMLParser:
             if isinstance(g, libsbml.GeneProductRef):
                 components.add(g.getGeneProduct())
             elif isinstance(g, libsbml.FbcOr):
-                gene_set = self._parse_gene_product_set(g, gene_complexes, gene_sets)
+                gene_set = self._parse_gene_product_set(g, gene_sets, gene_complexes)
                 components.add(gene_set)
             else:
                 raise ValueError(node.getMetaId())
-        return self._add_gene_product_group(
-            components, gene_complexes, "GeneProductComplex"
-        )
+        if components:
+            return self._add_gene_product_group(
+                components, gene_complexes, "GeneProductComplex"
+            )
 
     def _parse_gene_product_set(
         self,
         node: libsbml.FbcOr,
-        gene_complexes: Dict[str, Set[str]],
         gene_sets: Dict[str, Set[str]],
+        gene_complexes: Dict[str, Set[str]],
     ):
         members = set()
         for i in range(node.getNumAssociations()):
@@ -314,13 +315,13 @@ class SBMLParser:
                 members.add(member.getGeneProduct())
             elif isinstance(member, libsbml.FbcAnd):
                 gene_complex = self._parse_gene_product_complex(
-                    member, gene_complexes, gene_sets
+                    member, gene_sets, gene_complexes
                 )
                 members.add(gene_complex)
             else:
                 raise ValueError(node.getMetaId())
-
-        return self._add_gene_product_group(members, gene_sets, "GeneProductSet")
+        if members:
+            return self._add_gene_product_group(members, gene_sets, "GeneProductSet")
 
     @staticmethod
     def _add_gene_product_group(
@@ -329,6 +330,7 @@ class SBMLParser:
         """
         Add a set of genes to a dict of gene sets / complexes.
         """
+        ids.discard(None)
         for k, v in gene_group.items():
             if ids == v:
                 return k
