@@ -39,6 +39,25 @@ UNWIND $batch_nodes AS n
   );
 """
 
+_gene_product_complex_cypher = """
+UNWIND $batch_nodes AS n
+  CREATE (gpc:GeneProductComplex:GeneProduct {metaId: n.metaId})
+  FOREACH (g IN n.components |
+    MERGE (gp:GeneProduct {metaId: g})
+    MERGE (gpc)-[:hasComponent]->(gp)
+  );
+"""
+
+_gene_product_set_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (gps:GeneProduct {metaId: n.metaId})
+    SET gps:GeneProductSet:GeneProduct
+  FOREACH (g IN n.members |
+    MERGE (m:GeneProduct {metaId: g})
+    MERGE (gps)-[:hasMember]->(m)
+  );
+"""
+
 _reaction_cypher = """
 UNWIND $batch_nodes AS n
   MERGE (r:Reaction {metaId: n.metaId})
@@ -59,6 +78,13 @@ UNWIND $batch_nodes AS n
     MERGE (r)-[rel:hasRight]->(c)
       ON CREATE SET rel = product.props
   );
+"""
+
+_reaction_gene_product_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (r:Reaction {metaId: n.reaction})
+  MERGE (gp:GeneProduct {metaId: n.target})
+  MERGE (r)-[:hasGeneProduct]->(gp);
 """
 
 _group_cypher = """
@@ -110,6 +136,9 @@ class SBMLClient(Neo4jClient):
         "GeneProduct": _gene_product_cypher,
         "Reaction": _reaction_cypher,
         "Group": _group_cypher,
+        "GeneProductComplex": _gene_product_complex_cypher,
+        "GeneProductSet": _gene_product_set_cypher,
+        "Reaction-GeneProduct": _reaction_gene_product_cypher,
     }
 
     def __init__(

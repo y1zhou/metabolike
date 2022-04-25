@@ -1,7 +1,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple, Union
+from typing import Dict, Iterable, List, Set, Tuple, Union
 
 import libsbml
 from metabolike.db import SBMLClient
@@ -107,20 +107,38 @@ class SBMLParser:
                 "GeneProduct", gene_prods, self.db.default_cyphers["GeneProduct"]
             )
 
-            for r in tqdm(rxns, desc="Reaction-GeneProduct"):
-                # Add associated gene products
-                # This could be complicated where the child nodes could be:
-                # 1. GeneProductRef
-                # 2. fbc:or -> GeneProductRef
-                # 3. fbc:and -> GeneProductRef
-                # 4. Arbitrarily nested fbc:or / fbc:and within cases 2 and 3
-                mcid = r.getMetaId()
-                gpa: libsbml.GeneProductAssociation = r.getPlugin(
-                    "fbc"
-                ).getGeneProductAssociation()
-                if gpa is not None:
-                    node = gpa.getAssociation()
-                    self._add_sbml_gene_product_association_node(node, mcid)
+            (
+                reaction_links,
+                gene_sets,
+                gene_complexes,
+            ) = self._collect_reaction_gene_product_links(rxns)
+
+            # Create complex and set nodes first
+            complex_nodes = [
+                {"metaId": k, "components": list(v)} for k, v in gene_complexes.items()
+            ]
+            self.db.create_nodes(
+                "GeneProductComplex",
+                complex_nodes,
+                self.db.default_cyphers["GeneProductComplex"],
+            )
+
+            set_nodes = [
+                {"metaId": k, "members": list(v)} for k, v in gene_sets.items()
+            ]
+            self.db.create_nodes(
+                "GeneProductSet", set_nodes, self.db.default_cyphers["GeneProductSet"]
+            )
+
+            # Link reactions to these nodes
+            reaction_rels = [
+                {"reaction": k, "target": v} for k, v in reaction_links.items()
+            ]
+            self.db.create_nodes(
+                "Reaction-GeneProduct",
+                reaction_rels,
+                self.db.default_cyphers["Reaction-GeneProduct"],
+            )
 
         # Groups, i.e. related reactions in SBML
         groups = model.getPlugin("groups")
@@ -296,21 +314,18 @@ class SBMLParser:
             }
             for cpd in compounds
         ]
-        return cpds
 
-    def _add_sbml_gene_product_association_node(
-        self,
-        node: Union[libsbml.GeneProductRef, libsbml.FbcAnd, libsbml.FbcOr],
-        source_id: str,
-        source_label: str = "Reaction",
-        edge_type: str = "hasGeneProduct",
-        node_index: int = 0,
+    def _collect_reaction_gene_product_links(
+        self, reactions: Iterable[libsbml.Reaction]
     ):
         """
-        Add gene products to a reaction. When the added node is FbcAnd or FbcOr,
-        recursively add the children. This means a custom ``metaId`` is
-        constructed for the ``GeneProductComplex`` and ``GeneProductSet`` nodes
-        corresponding to the ``FbcAnd`` and ``FbcOr`` nodes, respectively.
+        Add gene products to a reaction. This could be complicated where the
+        child nodes could be:
+
+        #. GeneProductRef
+        #. fbc:or -> GeneProductRef
+        #. fbc:and -> GeneProductRef
+        #. fbc:or -> {fbc:and -> GeneProductRef, GeneProductRef}
 
         Args:
             node: The GeneProductAssociation child node to add.
@@ -323,45 +338,109 @@ class SBMLParser:
                 the ``metaId`` of the ``GeneProductComplex`` and
                 ``GeneProductSet`` nodes.
         """
-        # If there's no nested association, add the node directly
+        # We need to know the metaId of children of each geneSet / geneComplex.
+        # Also need to name the geneSet / geneComplex nodes.
+        # Note that the same set/complex can catalyze multiple reactions.
+        gene_sets: Dict[str, Set[str]] = {}
+        gene_complexes: Dict[str, Set[str]] = {}
+
+        # For each reaction, we store its associated gene products
+        reaction_genes = {}
+        for r in tqdm(reactions, desc="Associated GeneProduct"):
+            mcid = r.getMetaId()
+            gpa = r.getPlugin("fbc").getGeneProductAssociation()
+            if gpa is not None:
+                gpa: libsbml.GeneProductAssociation
+                node = gpa.getAssociation()
+                reaction_genes[mcid] = self._parse_gene_association_nodes(
+                    node, gene_sets, gene_complexes
+                )
+
+        return reaction_genes, gene_sets, gene_complexes
+
+    def _parse_gene_association_nodes(
+        self,
+        node: Union[libsbml.GeneProductRef, libsbml.FbcAnd, libsbml.FbcOr],
+        gene_sets: Dict[str, Set[str]],
+        gene_complexes: Dict[str, Set[str]],
+    ):
+        """
+        Get unique gene product sets/complexes from a GeneProductAssociation.
+
+        Returns:
+            The metaId of the associated gene product node of the reaction.
+        """
         if isinstance(node, libsbml.GeneProductRef):
-            self.db.link_node_to_gene(
-                source_label, source_id, node.getGeneProduct(), "GeneProduct", edge_type
-            )
-
-        # For nested associations, first add a `GeneProductComplex` or
-        # `GeneProductSet` node, then recursively add the children
+            # Add the gene product to the reaction
+            reaction_link_id = node.getGeneProduct()
         elif isinstance(node, libsbml.FbcAnd):
-            complex_id = f"{source_id}_complex{node_index}"
-            self.db.link_node_to_gene(
-                source_label, source_id, complex_id, "GeneProductComplex", edge_type
+            reaction_link_id = self._parse_gene_product_complex(
+                node, gene_complexes, gene_sets
             )
-
-            for i in range(node.getNumAssociations()):
-                self._add_sbml_gene_product_association_node(
-                    node.getAssociation(i),
-                    complex_id,
-                    "GeneProductComplex",
-                    "hasComponent",
-                    i,
-                )
         elif isinstance(node, libsbml.FbcOr):
-            eset_id = f"{source_id}_entityset{node_index}"
-            self.db.link_node_to_gene(
-                source_label, source_id, eset_id, "GeneProductSet", edge_type
+            reaction_link_id = self._parse_gene_product_set(
+                node, gene_complexes, gene_sets
             )
-
-            for i in range(node.getNumAssociations()):
-                self._add_sbml_gene_product_association_node(
-                    node.getAssociation(i),
-                    eset_id,
-                    "GeneProductSet",
-                    "hasMember",
-                    i,
-                )
         else:
-            logging.error(f"Unhandled GeneProductAssociation type {type(node)}")
-            raise ValueError
+            raise ValueError(f"Unhandled GeneProductAssociation type {type(node)}")
+
+        return reaction_link_id
+
+    def _parse_gene_product_complex(
+        self,
+        node: libsbml.FbcAnd,
+        gene_complexes: Dict[str, Set[str]],
+        gene_sets: Dict[str, Set[str]],
+    ):
+        components = set()
+        for i in range(node.getNumAssociations()):
+            g = node.getAssociation(i)
+            if isinstance(g, libsbml.GeneProductRef):
+                components.add(g.getGeneProduct())
+            elif isinstance(g, libsbml.FbcOr):
+                gene_set = self._parse_gene_product_set(g, gene_complexes, gene_sets)
+                components.add(gene_set)
+            else:
+                raise ValueError(node.getMetaId())
+        return self._add_gene_product_group(
+            components, gene_complexes, "GeneProductComplex"
+        )
+
+    def _parse_gene_product_set(
+        self,
+        node: libsbml.FbcOr,
+        gene_complexes: Dict[str, Set[str]],
+        gene_sets: Dict[str, Set[str]],
+    ):
+        members = set()
+        for i in range(node.getNumAssociations()):
+            member = node.getAssociation(i)
+            if isinstance(member, libsbml.GeneProductRef):
+                members.add(member.getGeneProduct())
+            elif isinstance(member, libsbml.FbcAnd):
+                gene_complex = self._parse_gene_product_complex(
+                    member, gene_complexes, gene_sets
+                )
+                members.add(gene_complex)
+            else:
+                raise ValueError(node.getMetaId())
+
+        return self._add_gene_product_group(members, gene_sets, "GeneProductSet")
+
+    @staticmethod
+    def _add_gene_product_group(
+        ids: Set[str], gene_group: Dict[str, Set[str]], group_type: str
+    ):
+        """
+        Add a set of genes to a dict of gene sets / complexes.
+        """
+        for k, v in gene_group.items():
+            if ids == v:
+                return k
+
+        new_k = f"{group_type}{len(gene_group)}"
+        gene_group[new_k] = ids
+        return new_k
 
     @staticmethod
     def _split_uri(uri: str) -> Tuple[str, str]:
