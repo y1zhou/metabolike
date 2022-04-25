@@ -7,13 +7,13 @@ from metabolike.parser import SBMLParser
 def sbml_parser():
     # No need to pass an actual database to the parser
     with pytest.raises(ValueError):
-        SBMLParser(None, None)
-    return SBMLParser(None, "tests/data/metabolic-reactions.sbml")
+        SBMLParser(None)
+    return SBMLParser("tests/data/metabolic-reactions.sbml")
 
 
 @pytest.fixture
 def sbml_model(sbml_parser: SBMLParser):
-    doc = sbml_parser._read_sbml(sbml_parser.sbml_file)
+    doc = sbml_parser.read_sbml(sbml_parser.sbml_file)
     assert isinstance(doc, SBMLDocument)
 
     model = doc.getModel()
@@ -25,7 +25,7 @@ def sbml_model(sbml_parser: SBMLParser):
 def test_collect_compartments(sbml_parser: SBMLParser, sbml_model: Model):
     assert sbml_model.getNumCompartments() == 33
     compartments = sbml_model.getListOfCompartments()
-    nodes = sbml_parser._collect_compartments(compartments)
+    nodes = sbml_parser.collect_compartments(compartments)
 
     assert isinstance(nodes, list)
     assert len(nodes) == 33
@@ -37,7 +37,7 @@ def test_collect_compartments(sbml_parser: SBMLParser, sbml_model: Model):
 def test_collect_compounds(sbml_parser: SBMLParser, sbml_model: Model):
     assert sbml_model.getNumSpecies() == 45
     species = sbml_model.getListOfSpecies()
-    nodes = sbml_parser._collect_compounds(species)
+    nodes = sbml_parser.collect_compounds(species)
 
     assert isinstance(nodes, list)
     assert len(nodes) == 45
@@ -77,7 +77,7 @@ def test_collect_gene_products(sbml_parser: SBMLParser, sbml_model: Model):
     fbc = sbml_model.getPlugin("fbc")
     assert fbc.getNumGeneProducts() == 118
     gene_products = fbc.getListOfGeneProducts()
-    nodes = sbml_parser._collect_gene_products(gene_products)
+    nodes = sbml_parser.collect_gene_products(gene_products)
 
     assert isinstance(nodes, list)
     assert len(nodes) == 118
@@ -106,7 +106,7 @@ def test_collect_gene_products(sbml_parser: SBMLParser, sbml_model: Model):
 def test_collect_reactions(sbml_parser: SBMLParser, sbml_model: Model):
     assert sbml_model.getNumReactions() == 12
     reactions = sbml_model.getListOfReactions()
-    nodes = sbml_parser._collect_reactions(reactions)
+    nodes = sbml_parser.collect_reactions(reactions)
 
     assert isinstance(nodes, list)
     assert len(nodes) == 12
@@ -118,7 +118,7 @@ def test_collect_reactions(sbml_parser: SBMLParser, sbml_model: Model):
 
     assert nodes[0] == {
         "metaId": "RXN__45__15513",
-        "props": {"name": "RXN-15513", "fast": False},
+        "props": {"name": "RXN-15513", "fast": False, "reversible": True},
         "rdf": [
             {"bioQual": "is", "rdf": {"biocyc": "RXN-15513", "ecCode": ["5.4.2.11"]}}
         ],

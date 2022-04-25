@@ -11,7 +11,6 @@ dat_path = Path("tests/data/")
 def mc_parser():
     # No need to pass an actual database to the parser
     return MetacycParser(
-        None,
         sbml=dat_path / "metabolic-reactions.sbml",
         reactions=dat_path / "reactions.dat",
         atom_mapping=dat_path / "atom-mappings-smiles.dat",
@@ -24,11 +23,11 @@ def mc_parser():
 
 @pytest.fixture
 def rxn_dat(mc: MetacycParser):
-    return mc._read_dat_file(mc.input_files["reactions"])
+    return mc.read_dat_file(mc.input_files["reactions"])
 
 
 def test_read_dat_file(mc: MetacycParser):
-    citations = mc._read_dat_file(mc.input_files["publications"])
+    citations = mc.read_dat_file(mc.input_files["publications"])
 
     assert isinstance(citations, dict)
     assert len(citations) == 105
@@ -40,14 +39,14 @@ def test_read_dat_file(mc: MetacycParser):
 
 
 def test_read_smiles_dat(mc: MetacycParser):
-    smiles = mc._read_smiles_dat(mc.input_files["atom_mapping"])
+    smiles = mc.read_smiles_dat(mc.input_files["atom_mapping"])
 
     assert isinstance(smiles, dict)
     assert len(smiles) == 12
 
 
 def test_find_rxn_canonical_id(mc: MetacycParser):
-    doc = mc._read_sbml(mc.sbml_file)
+    doc = mc.read_sbml(mc.sbml_file)
     model = doc.getModel()
     rxn_ids = [x.getMetaId() for x in model.getListOfReactions()]
 
@@ -247,26 +246,26 @@ def test_collect_reactions_dat_nodes(
     mc: MetacycParser, rxn_dat: Dict[str, List[List[str]]]
 ):
     rxn_ids = ["RXN-15513", "F16BDEPHOS-RXN"]
-    rxn_nodes = mc._collect_reactions_dat_nodes(rxn_ids, rxn_dat)
+    rxn_nodes = mc.collect_reactions_dat_nodes(rxn_ids, rxn_dat)
     assert isinstance(rxn_nodes, list)
     assert len(rxn_nodes) == 2
     assert len(mc.missing_ids["reactions"]) == 0
 
     rxn_ids = ["RXN-FAKE"]
     with pytest.raises(ValueError):
-        mc._collect_reactions_dat_nodes(rxn_ids, rxn_dat)
+        mc.collect_reactions_dat_nodes(rxn_ids, rxn_dat)
 
     rxn_ids = ["RXN-1"]
-    _ = mc._collect_reactions_dat_nodes(rxn_ids, rxn_dat)
+    _ = mc.collect_reactions_dat_nodes(rxn_ids, rxn_dat)
     assert len(mc.missing_ids["reactions"]) == 1
 
 
 def test_collect_pathways_dat_nodes(
     mc: MetacycParser, rxn_dat: Dict[str, List[List[str]]]
 ):
-    pw_dat = mc._read_dat_file(mc.input_files["pathways"])
+    pw_dat = mc.read_dat_file(mc.input_files["pathways"])
     pws = ["PWY-3801", "PWY-3801"]
-    pw_nodes, comp_rxn_nodes = mc._collect_pathways_dat_nodes(pws, pw_dat, rxn_dat)
+    pw_nodes, comp_rxn_nodes = mc.collect_pathways_dat_nodes(pws, pw_dat, rxn_dat)
 
     assert isinstance(pw_nodes, list)
     assert [x["metaId"] for x in pw_nodes] == ["PWY-3801", "PWY-7345"]
@@ -275,12 +274,12 @@ def test_collect_pathways_dat_nodes(
     assert len(mc.missing_ids["pathways"]) == 0
 
     # test with missing pathway ID
-    _ = mc._collect_pathways_dat_nodes(["PWY-FAKE"], pw_dat, rxn_dat)
+    _ = mc.collect_pathways_dat_nodes(["PWY-FAKE"], pw_dat, rxn_dat)
     assert len(mc.missing_ids["pathways"]) == 1
 
     # test with fake composite reaction node
     pws.append("RXN-15513")
-    pw_nodes, comp_rxn_nodes = mc._collect_pathways_dat_nodes(pws, pw_dat, rxn_dat)
+    pw_nodes, comp_rxn_nodes = mc.collect_pathways_dat_nodes(pws, pw_dat, rxn_dat)
     assert len(comp_rxn_nodes) == 1
     assert len(pw_nodes) == 15
 
@@ -301,7 +300,7 @@ def test_fix_pathway_nodes(mc: MetacycParser):
     }
 
     all_rxns = {"2.3.1.157-RXN", "5.4.2.10-RXN"}
-    mc._fix_pathway_nodes([n], all_rxns)  # dict is mutable
+    mc.fix_pathway_nodes([n], all_rxns)  # dict is mutable
 
     assert isinstance(n["predecessors"], list)
     assert isinstance(n["reactionLayout"], list)
@@ -313,38 +312,38 @@ def test_fix_pathway_nodes(mc: MetacycParser):
 
 
 def test_collect_atom_mapping_dat_nodes(mc: MetacycParser):
-    smiles = mc._read_smiles_dat(mc.input_files["atom_mapping"])
+    smiles = mc.read_smiles_dat(mc.input_files["atom_mapping"])
 
-    nodes = mc._collect_atom_mapping_dat_nodes({"RXN-15513", "PEPSYNTH-RXN"}, smiles)
+    nodes = mc.collect_atom_mapping_dat_nodes({"RXN-15513", "PEPSYNTH-RXN"}, smiles)
 
     assert isinstance(nodes, list)
     assert len(nodes) == 2
     assert "props" in nodes[0]
     assert "smilesAtomMapping" in nodes[0]["props"]
 
-    _ = mc._collect_atom_mapping_dat_nodes({"RXN-000"}, smiles)
+    _ = mc.collect_atom_mapping_dat_nodes({"RXN-000"}, smiles)
     assert mc.missing_ids["atom_mappings"] == {"RXN-000"}
 
 
 def test_collect_compounds_dat_nodes(mc: MetacycParser):
-    cpds_dat = mc._read_dat_file(mc.input_files["compounds"])
+    cpds_dat = mc.read_dat_file(mc.input_files["compounds"])
     cpds = [
         ("phosphate", "Pi"),
         ("pyruvate", "PYRUVATE"),
         ("2-phospho-D-glycerate", "2-PG"),
     ]
-    nodes = mc._collect_compounds_dat_nodes(cpds, cpds_dat)
+    nodes = mc.collect_compounds_dat_nodes(cpds, cpds_dat)
     assert isinstance(nodes, list)
     assert len(nodes) == 3
     assert len(mc.missing_ids["compounds"]) == 0
 
     cpds = [("fake", "fake")]
-    _ = mc._collect_compounds_dat_nodes(cpds, cpds_dat)
+    _ = mc.collect_compounds_dat_nodes(cpds, cpds_dat)
     assert len(mc.missing_ids["compounds"]) == 1
 
 
 def test_collect_citation_dat_nodes(mc: MetacycParser):
-    cit_dat = mc._read_dat_file(mc.input_files["publications"])
+    cit_dat = mc.read_dat_file(mc.input_files["publications"])
 
     test_ids = [
         "ARCHMICR161460",
@@ -353,7 +352,7 @@ def test_collect_citation_dat_nodes(mc: MetacycParser):
         "CHIH-CHING95",
         "[ ]",
     ]
-    nodes = mc._collect_citation_dat_nodes(test_ids, cit_dat)
+    nodes = mc.collect_citation_dat_nodes(test_ids, cit_dat)
 
     assert isinstance(nodes, list)
     assert len(nodes) == 2
@@ -364,13 +363,11 @@ def test_collect_citation_dat_nodes(mc: MetacycParser):
 
 
 def test_collect_classes_dat_nodes(mc: MetacycParser):
-    classes_dat = mc._read_dat_file(mc.input_files["classes"])
+    classes_dat = mc.read_dat_file(mc.input_files["classes"])
     cpt_ids = ["CCO-CHROM-STR", "CCO-CYTOSOL", "CCO-IN"]
     taxa_ids = ["TAX-9606", "TAX-10090", "TAX-0"]
 
-    cpt_nodes, taxa_nodes = mc._collect_classes_dat_nodes(
-        classes_dat, cpt_ids, taxa_ids
-    )
+    cpt_nodes, taxa_nodes = mc.collect_classes_dat_nodes(classes_dat, cpt_ids, taxa_ids)
 
     assert mc.missing_ids["compartments"] == {"CCO-IN"}
     assert mc.missing_ids["taxon"] == {"TAX-0"}
