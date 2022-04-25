@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Set, Tuple, Union
 
 import libsbml
-from metabolike.db import SBMLClient
 from metabolike.utils import add_kv_to_dict, validate_path
 from tqdm import tqdm
 
@@ -49,115 +48,13 @@ class SBMLParser:
         13: "unknown",
     }
 
-    def __init__(
-        self,
-        neo4j: SBMLClient,
-        sbml: Union[str, Path],
-    ):
-        self.db = neo4j  # Neo4j driver
+    def __init__(self, sbml: Union[str, Path]):
         self.sbml_file = validate_path(sbml)
         if not self.sbml_file:
             raise ValueError("Missing SBML file path.")
 
-    def sbml_to_graph(self):
-        """
-        Populate Neo4j database with SBML data. The process is as follows:
-
-        #. Parse the SBML file. All parsing errors are logged as warnings.
-        #. Create the database and constraints.
-        #. Feed the SBML file into the database. This will populate
-           ``Compartment``, ``Reaction``, ``Compound``, ``GeneProduct``,
-           ``GeneProductSet``, ``GeneProductComplex``, and ``RDF`` nodes.
-
-        Nodes are created for each SBML element using ``MERGE`` statements:
-        https://neo4j.com/docs/cypher-manual/current/clauses/merge/#merge-merge-with-on-create
-        """
-        # Read SBML file
-        doc = self._read_sbml(self.sbml_file)
-        model: libsbml.Model = doc.getModel()
-
-        # Compartments
-        compartments = self._collect_compartments(model.getListOfCompartments())
-        self.db.create_nodes(
-            "Compartment", compartments, self.db.default_cyphers["Compartment"]
-        )
-
-        # Compounds, i.e. metabolites, species
-        compounds = self._collect_compounds(model.getListOfSpecies())
-        self.db.create_nodes("Compound", compounds, self.db.default_cyphers["Compound"])
-
-        # Reactions
-        rxns = model.getListOfReactions()
-        reactions = self._collect_reactions(rxns)
-        self.db.create_nodes(
-            "Reaction",
-            reactions,
-            self.db.default_cyphers["Reaction"],
-            progress_bar=True,
-        )
-
-        # Gene products
-        fbc = model.getPlugin("fbc")
-        if fbc is None:
-            logger.warning("No FBC plugin found in SBML file.")
-        else:
-            fbc: libsbml.FbcModelPlugin
-            gene_prods = self._collect_gene_products(fbc.getListOfGeneProducts())
-            self.db.create_nodes(
-                "GeneProduct", gene_prods, self.db.default_cyphers["GeneProduct"]
-            )
-
-            (
-                reaction_links,
-                gene_sets,
-                gene_complexes,
-            ) = self._collect_reaction_gene_product_links(rxns)
-
-            # Create complex and set nodes first
-            complex_nodes = [
-                {"metaId": k, "components": list(v)} for k, v in gene_complexes.items()
-            ]
-            self.db.create_nodes(
-                "GeneProductComplex",
-                complex_nodes,
-                self.db.default_cyphers["GeneProductComplex"],
-            )
-
-            set_nodes = [
-                {"metaId": k, "members": list(v)} for k, v in gene_sets.items()
-            ]
-            self.db.create_nodes(
-                "GeneProductSet", set_nodes, self.db.default_cyphers["GeneProductSet"]
-            )
-
-            # Link reactions to these nodes
-            reaction_rels = [
-                {"reaction": k, "target": v} for k, v in reaction_links.items()
-            ]
-            self.db.create_nodes(
-                "Reaction-GeneProduct",
-                reaction_rels,
-                self.db.default_cyphers["Reaction-GeneProduct"],
-            )
-
-        # Groups, i.e. related reactions in SBML
-        groups = model.getPlugin("groups")
-        if groups is None:
-            logger.warning("No groups plugin found in SBML file.")
-        else:
-            groups: libsbml.GroupsModelPlugin
-            group_nodes = self._collect_groups(groups.getListOfGroups())
-
-            self.db.create_nodes(
-                "Group",
-                group_nodes,
-                self.db.default_cyphers["Group"],
-                batch_size=10,
-                progress_bar=True,
-            )
-
     @staticmethod
-    def _read_sbml(sbml_file: Path) -> libsbml.SBMLDocument:
+    def read_sbml(sbml_file: Path) -> libsbml.SBMLDocument:
         reader = libsbml.SBMLReader()
         doc = reader.readSBMLFromFile(sbml_file)
         logger.info("Finished reading SBML file")
@@ -175,17 +72,15 @@ class SBMLParser:
         return doc
 
     @staticmethod
-    def _collect_compartments(
+    def collect_compartments(
         compartments: Iterable[libsbml.Compartment],
     ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
-        nodes = [
+        return [
             {"metaId": c.getMetaId(), "props": {"name": c.getName()}}
             for c in compartments
         ]
 
-        return nodes
-
-    def _collect_compounds(
+    def collect_compounds(
         self,
         compounds: Iterable[libsbml.Species],
     ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
@@ -209,7 +104,7 @@ class SBMLParser:
 
         return nodes
 
-    def _collect_gene_products(
+    def collect_gene_products(
         self, gene_prods: Iterable[libsbml.GeneProduct]
     ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
         nodes = []
@@ -228,7 +123,7 @@ class SBMLParser:
 
         return nodes
 
-    def _collect_reactions(self, reactions: Iterable[libsbml.Reaction]):
+    def collect_reactions(self, reactions: Iterable[libsbml.Reaction]):
         nodes = []
         for r in tqdm(reactions, desc="Reactions"):
             r: libsbml.Reaction
@@ -245,16 +140,16 @@ class SBMLParser:
 
             # Add reactants and products
             reactants = r.getListOfReactants()
-            node["reactants"] = self._link_reaction_to_compound(reactants)
+            node["reactants"] = self._get_reaction_compounds(reactants)
             products = r.getListOfProducts()
-            node["products"] = self._link_reaction_to_compound(products)
+            node["products"] = self._get_reaction_compounds(products)
 
             nodes.append(node)
 
         return nodes
 
     @staticmethod
-    def _collect_groups(groups: Iterable[libsbml.Group]):
+    def collect_groups(groups: Iterable[libsbml.Group]):
         return [
             {
                 "metaId": g.getId(),
@@ -295,7 +190,7 @@ class SBMLParser:
 
         return {"bioQual": bio_qual, "rdf": props}
 
-    def _link_reaction_to_compound(
+    def _get_reaction_compounds(
         self,
         compounds: List[libsbml.SpeciesReference],
     ):
@@ -304,7 +199,7 @@ class SBMLParser:
         Args:
             compounds: The list of compounds to link to the reaction.
         """
-        cpds = [
+        return [
             {
                 "cpdId": cpd.getSpecies(),
                 "props": {
@@ -315,7 +210,7 @@ class SBMLParser:
             for cpd in compounds
         ]
 
-    def _collect_reaction_gene_product_links(
+    def collect_reaction_gene_product_links(
         self, reactions: Iterable[libsbml.Reaction]
     ):
         """

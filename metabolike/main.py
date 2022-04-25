@@ -40,13 +40,10 @@ def setup(
         create_db=create_db,
         drop_if_exists=drop_if_exists,
     )
-    meta = MetacycParser(
-        db,
-        **conf.metacyc.dict(),
-    )
+    meta = MetacycParser(**conf.metacyc.dict())
 
-    logger.info("Setting up database using MetaCyc data")
-    meta.setup()
+    logger.info(f"Setting up database using {type(meta)}")
+    db.metacyc_to_graph(meta)
 
     # if conf.brenda:
     #     logger.info("Reading BRENDA text file")

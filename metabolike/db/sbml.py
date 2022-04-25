@@ -1,6 +1,8 @@
 import logging
 from typing import Any, Dict, List
 
+from libsbml import FbcModelPlugin, GroupsModelPlugin, Model
+from metabolike.parser import SBMLParser
 from metabolike.utils import chunk
 from tqdm import tqdm
 
@@ -175,6 +177,102 @@ class SBMLClient(Neo4jClient):
             self.write(
                 f"""CREATE CONSTRAINT IF NOT EXISTS ON (n:{label})
                     ASSERT n.metaId IS UNIQUE;""",
+            )
+
+    def sbml_to_graph(self, parser: SBMLParser):
+        """
+        Populate Neo4j database with SBML data. The process is as follows:
+
+        #. Parse the SBML file. All parsing errors are logged as warnings.
+        #. Create the database and constraints.
+        #. Feed the SBML file into the database. This will populate
+           ``Compartment``, ``Reaction``, ``Compound``, ``GeneProduct``,
+           ``GeneProductSet``, ``GeneProductComplex``, and ``RDF`` nodes.
+
+        Nodes are created for each SBML element using ``MERGE`` statements:
+        https://neo4j.com/docs/cypher-manual/current/clauses/merge/#merge-merge-with-on-create
+        """
+        # Read SBML file
+        doc = parser.read_sbml(parser.sbml_file)
+        model: Model = doc.getModel()
+
+        # Compartments
+        compartments = parser.collect_compartments(model.getListOfCompartments())
+        self.create_nodes(
+            "Compartment", compartments, self.default_cyphers["Compartment"]
+        )
+
+        # Compounds, i.e. metabolites, species
+        compounds = parser.collect_compounds(model.getListOfSpecies())
+        self.create_nodes("Compound", compounds, self.default_cyphers["Compound"])
+
+        # Reactions
+        rxns = model.getListOfReactions()
+        reactions = parser.collect_reactions(rxns)
+        self.create_nodes(
+            "Reaction",
+            reactions,
+            self.default_cyphers["Reaction"],
+            progress_bar=True,
+        )
+
+        # Gene products
+        fbc: FbcModelPlugin = model.getPlugin("fbc")
+        if fbc is None:
+            logger.warning("No FBC plugin found in SBML file.")
+        else:
+            gene_prods = parser.collect_gene_products(fbc.getListOfGeneProducts())
+            self.create_nodes(
+                "GeneProduct", gene_prods, self.default_cyphers["GeneProduct"]
+            )
+
+            (
+                reaction_links,
+                gene_sets,
+                gene_complexes,
+            ) = parser.collect_reaction_gene_product_links(rxns)
+
+            # Create complex and set nodes first
+            complex_nodes = [
+                {"metaId": k, "components": list(v)} for k, v in gene_complexes.items()
+            ]
+            self.create_nodes(
+                "GeneProductComplex",
+                complex_nodes,
+                self.default_cyphers["GeneProductComplex"],
+            )
+
+            set_nodes = [
+                {"metaId": k, "members": list(v)} for k, v in gene_sets.items()
+            ]
+            self.create_nodes(
+                "GeneProductSet", set_nodes, self.default_cyphers["GeneProductSet"]
+            )
+
+            # Link reactions to these nodes
+            reaction_rels = [
+                {"reaction": k, "target": v} for k, v in reaction_links.items()
+            ]
+            self.create_nodes(
+                "Reaction-GeneProduct",
+                reaction_rels,
+                self.default_cyphers["Reaction-GeneProduct"],
+            )
+
+        # Groups, i.e. related reactions in SBML
+        groups = model.getPlugin("groups")
+        if groups is None:
+            logger.warning("No groups plugin found in SBML file.")
+        else:
+            groups: GroupsModelPlugin
+            group_nodes = parser.collect_groups(groups.getListOfGroups())
+
+            self.create_nodes(
+                "Group",
+                group_nodes,
+                self.default_cyphers["Group"],
+                batch_size=10,
+                progress_bar=True,
             )
 
     def create_nodes(

@@ -1,9 +1,11 @@
 import logging
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
+from metabolike.parser import MetacycParser
 from metabolike.utils import generate_gene_reaction_rule
+from tqdm import tqdm
 
 from .sbml import SBMLClient
 
@@ -125,6 +127,253 @@ class MetacycClient(SBMLClient):
         super().__init__(uri, neo4j_user, neo4j_password, database)
         self.setup_graph_db(create_db=create_db, drop_if_exists=drop_if_exists)
 
+    def metacyc_to_graph(self, parser: MetacycParser):
+        """Enterpoint for setting up the database.
+
+        The process is as follows:
+
+        #. Parse the SBML file. All parsing errors are logged as warnings.
+        #. If ``db_name`` is not given, use the ``metaid`` attribute of the SBML
+           file to name the database.
+        #. Create the database and constraints.
+        #. Feed the SBML file into the database. This will populate
+           ``Compartment``, ``Reaction``, ``Compound``, ``GeneProduct``,
+           ``GeneProductSet``, ``GeneProductComplex``, and ``RDF`` nodes.
+        #. If ``reactions.dat`` is given, parse the file and add standard Gibbs
+           free energy, standard reduction potential, reaction direction,
+           reaction balance status, systematic name, comment attributes to
+           ``Reaction`` nodes. Also link ``Reaction`` nodes to ``Pathway`` and
+           ``Citation`` nodes.
+           #. If ``pathways.dat`` is given:
+
+              * Add synonyms, types, comments, common names to ``Pathway`` nodes.
+              * Link ``Pathway`` nodes to super-pathway ``Pathway`` and taxonomy
+                  ``Taxa`` nodes.
+              * Link ``Reaction`` nodes within the pathway with
+                  ``isPrecedingEvent`` relationships.
+              * Link ``Pathway`` nodes with their rate limiting steps
+                  (``Reaction`` nodes).
+              * Link ``Pathway`` nodes with primary reactant and product
+                  ``Compound`` nodes.
+              * Link ``Pathway`` nodes with other ``Pathway`` nodes and annotate
+                the shared ``Compound`` nodes.
+              * For ``Reaction`` nodes, add ``isPrimary[Reactant|Product]InPathway``
+                  labels in their links to ``Compound`` nodes.
+        #. If ``atom-mappings-smiles.dat`` is given, parse the file and add
+           SMILES_ mappings to ``Reaction`` nodes.
+
+        #. If ``compounds.dat`` is given, parse the file and add standard Gibbs
+           free energy, logP, molecular weight, monoisotopic molecular weight,
+           polar surface area, pKa {1,2,3}, comment, and synonyms to ``Compound``
+           nodes. Also add SMILES and INCHI strings to related ``RDF`` nodes, and
+           link the ``Compound`` nodes to ``Citation`` nodes.
+        #. If ``pubs.dat`` is given, parse the file and add DOI, PUBMED, MEDLINE IDs,
+           title, source, year, URL, and ``REFERENT-FRAME`` to ``Citation`` nodes.
+        #. If ``classes.dat`` is given, parse the file and:
+
+           * Add common name and synonyms to ``Compartment`` nodes.
+           * Add common name, strain name, comment, and synonyms to ``Taxa`` nodes.
+
+        .. _SMILES: https://en.wikipedia.org/wiki/SMILES
+        """
+        # Populate Neo4j database with data from SBML file
+        self.sbml_to_graph(parser)
+
+        rxn_dat = self._reactions_dat_to_graph(parser)
+        if rxn_dat is not None:
+            self._pathways_to_graph(rxn_dat, parser)
+
+        self._smiles_dat_to_graph(parser)
+        self._compounds_dat_to_graph(parser)
+        self._citations_dat_to_graph(parser)
+        self._classes_dat_to_graph(parser)
+
+        parser.report_missing_ids()
+
+    def _reactions_dat_to_graph(
+        self, parser: MetacycParser
+    ) -> Optional[Dict[str, List[List[str]]]]:
+        """
+        Parse the ``reactions.dat`` file and:
+
+        * Add properties to ``Reaction`` nodes.
+        * Link ``Reaction`` nodes to ``Pathway``, ``Citation``, and
+        ``Compartment`` nodes.
+
+        Returns:
+            A dictionary of the parsed file. This is useful for passing into
+            :meth:`pathways_to_graph` if the ``pathways.dat`` file is also
+            given.
+        """
+        if not parser.input_files["reactions"]:
+            logger.warning("No reactions.dat file given")
+            return
+        logger.info(f"Parsing {parser.input_files['reactions']}")
+        all_rxns = self.get_all_nodes("Reaction", "name")
+        rxn_dat = parser.read_dat_file(parser.input_files["reactions"])
+
+        rxn_nodes = parser.collect_reactions_dat_nodes(all_rxns, rxn_dat)
+        self.create_nodes(
+            "reactions.dat",
+            rxn_nodes,
+            self.metacyc_default_cyphers["reactions"],
+            batch_size=100,
+            progress_bar=True,
+        )
+
+        # Fix the direction of reactions
+        self._fix_reaction_direction()
+        return rxn_dat
+
+    def _pathways_to_graph(
+        self, rxn_dat: Dict[str, List[List[str]]], parser: MetacycParser
+    ):
+        """Parse the ``pathways.dat`` file.
+
+        For details, see :meth:`setup`.
+        """
+        if not parser.input_files["pathways"]:
+            logger.warning("No pathways.dat file given")
+            return
+
+        logger.info(f"Parsing {parser.input_files['pathways']}")
+        pw_dat = parser.read_dat_file(parser.input_files["pathways"])
+        all_pws = self.get_all_nodes("Pathway", "metaId")
+
+        pw_nodes, comp_rxn_nodes = parser.collect_pathways_dat_nodes(
+            all_pws, pw_dat, rxn_dat
+        )
+        self._fix_composite_reaction_nodes(comp_rxn_nodes)
+
+        # Annotate regular pathway nodes
+        all_rxns = set(self.get_all_nodes("Reaction", "name"))
+        pw_nodes = parser.fix_pathway_nodes(pw_nodes, all_rxns)
+        self.create_nodes(
+            "Pathway",
+            pw_nodes,
+            self.metacyc_default_cyphers["pathways"],
+            batch_size=100,
+            progress_bar=True,
+        )
+
+        for node in tqdm(pw_nodes, desc="Annotating pathways"):
+            pw_id = node["metaId"]
+            if rxn_layout := node.get("reactionLayout"):
+                for v in rxn_layout:
+                    # Two cypher statements for Reactant and Product compounds
+                    self._link_reaction_to_primary_compound(
+                        v["reaction"], v["reactants"], pw_id, "Reactant"
+                    )
+                    self._link_reaction_to_primary_compound(
+                        v["reaction"], v["products"], pw_id, "Product"
+                    )
+
+            if pw_links := node.get("pathwayLinks"):
+                for v in pw_links:
+                    self._link_pathway_to_pathway(
+                        pw_id, v["pathways"], v["direction"], v["cpd"]
+                    )
+
+    def _fix_composite_reaction_nodes(self, comp_rxn_nodes: List[Dict[str, Any]]):
+        """
+        Composite reaction nodes are just aggregated reactions.
+        We need to change the label of these nodes from ``Pathway`` to
+         ``Reaction``, and also correct their directions.
+
+        Args:
+            comp_rxn_nodes: Output of :meth:`_collect_pathways_dat_nodes`.
+        """
+        self.create_nodes(
+            "Composite reaction",
+            comp_rxn_nodes,
+            self.metacyc_default_cyphers["reactions"],
+        )
+
+        # Merge the Reaction node with the Pathway node under the same ID
+        for node in comp_rxn_nodes:
+            self.merge_nodes("Pathway", "Reaction", "metaId", "name", node["name"])
+
+        # Correct composite reactions
+        self._set_composite_reaction_labels()
+
+        # Fix the direction of newly-added reactions
+        self._fix_reaction_direction()
+
+    def _smiles_dat_to_graph(self, parser: MetacycParser):
+        """Parse the ``atom-mappings-smiles.dat`` file.
+
+        For details, see :meth:`setup`.
+        """
+        if not parser.input_files["atom_mapping"]:
+            logger.warning("No atom-mappings-smiles.dat file given")
+            return
+
+        logger.info(f"Adding SMILES with {parser.input_files['atom_mapping']}")
+        smiles = parser.read_smiles_dat(parser.input_files["atom_mapping"])
+        all_rxns = self.get_all_nodes("Reaction", "name")
+        rxn_smiles = parser.collect_atom_mapping_dat_nodes(all_rxns, smiles)
+        self.add_props_to_nodes(
+            "Reaction", "name", rxn_smiles, "Atom mapping SMILES", progress_bar=True
+        )
+
+    def _compounds_dat_to_graph(self, parser: MetacycParser):
+        """Annotate compound nodes with the ``compounds.dat`` file.
+
+        For details, see :meth:`setup`.
+        """
+        if not parser.input_files["compounds"]:
+            logger.warning("No compounds.dat file given")
+            return
+
+        logger.info(f"Parsing {parser.input_files['compounds']}")
+        cpd_dat = parser.read_dat_file(parser.input_files["compounds"])
+        all_cpds = self.get_all_compounds()
+        cpd_nodes = parser.collect_compounds_dat_nodes(all_cpds, cpd_dat)
+        self.create_nodes(
+            "compounds.dat",
+            cpd_nodes,
+            self.metacyc_default_cyphers["compounds"],
+            progress_bar=True,
+        )
+
+    def _citations_dat_to_graph(self, parser: MetacycParser):
+        """Annotate citation nodes with the ``pubs.dat`` file.
+
+        For details, see :meth:`setup`.
+        """
+        if not parser.input_files["publications"]:
+            logger.warning("No pubs.dat file given")
+            return
+        logger.info(
+            f"Annotating publications with {parser.input_files['publications']}"
+        )
+        pub_dat = parser.read_dat_file(parser.input_files["publications"])
+
+        all_cits = self.get_all_nodes("Citation", "metaId")
+        cit_nodes = parser.collect_citation_dat_nodes(all_cits, pub_dat)
+        self.add_props_to_nodes("Citation", "metaId", cit_nodes, "Citations")
+
+    def _classes_dat_to_graph(self, parser: MetacycParser):
+        """Parse the ``classes.dat`` file.
+
+        Add common name and synonyms to ``Compartment`` nodes.
+        Add common name, strain name, comment, and synonyms to ``Taxa`` nodes.
+        """
+        if not parser.input_files["classes"]:
+            logger.warning("No classes.dat file given")
+            return
+
+        logger.info(f"Annotating with {parser.input_files['classes']}")
+        cls_dat = parser.read_dat_file(parser.input_files["classes"])
+        all_cco = self.get_all_nodes("Compartment", "name")
+        all_taxon = self.get_all_nodes("Taxa", "metaId")
+
+        cco_nodes, taxa_nodes = parser.collect_classes_dat_nodes(
+            cls_dat, all_cco, all_taxon
+        )
+        self.add_props_to_nodes("Compartment", "name", cco_nodes, "Compartment names")
+        self.add_props_to_nodes("Taxa", "metaId", taxa_nodes, "Taxa names")
+
     def get_all_nodes(self, label: str, prop: str) -> List[str]:
         """Fetch an property of nodes with a certain label."""
         if label not in self.available_node_labels:
@@ -176,7 +425,7 @@ class MetacycClient(SBMLClient):
         """
         self.create_nodes(desc, nodes, query, **kwargs)
 
-    def link_pathway_to_pathway(
+    def _link_pathway_to_pathway(
         self, pw: str, pws: List[str], direction: str, cpd: str
     ):
         """
@@ -217,7 +466,7 @@ class MetacycClient(SBMLClient):
             cpd=cpd,
         )
 
-    def link_reaction_to_primary_compound(
+    def _link_reaction_to_primary_compound(
         self,
         reaction_id: str,
         compound_ids: List[str],
@@ -269,7 +518,7 @@ class MetacycClient(SBMLClient):
             val=attr_val,
         )
 
-    def fix_reaction_direction(self):
+    def _fix_reaction_direction(self):
         """
         Seems like ``listOfReactants`` in the SBML file are always the true
         reactants in irreversible reactions, no matter if they are under
@@ -290,7 +539,7 @@ class MetacycClient(SBMLClient):
             """
         )
 
-    def delete_bad_reaction_nodes(self):
+    def _delete_bad_reaction_nodes(self):
         """
         Delete reaction nodes with non-canonical metaIds and all their relationships.
         """
@@ -307,7 +556,7 @@ class MetacycClient(SBMLClient):
             """
         )
 
-    def set_composite_reaction_labels(self):
+    def _set_composite_reaction_labels(self):
         """
         Composite reaction nodes are labeled as ``Pathway`` and ``Reaction``.
         The ``Pathway`` label should be removed and a ``isCompositeReaction``

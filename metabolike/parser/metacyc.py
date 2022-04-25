@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import pandas as pd
-from metabolike.db.metacyc import MetacycClient
 from metabolike.utils import add_kv_to_dict, snake_to_camel, validate_path
 from tqdm import tqdm
 
@@ -26,7 +25,6 @@ class MetacycParser(SBMLParser):
     See :class:`.sbml.SBMLParser` for more information on SBML parsing.
 
     Args:
-        neo4j: Database client object.
         sbml: The path to the SBML file.
         reactions: The path to the ``reaction.dat`` file. If given,
          the file will be parsed and extra annotation on ``Reaction`` nodes will
@@ -45,8 +43,6 @@ class MetacycParser(SBMLParser):
          nodes will be added.
 
     Attributes:
-        db: A :class:`.MetacycClient` instance. This is connected to neo4j and
-         used to perform all database operations. Should be closed after use.
         sbml_file: Filepath to the input SBML file.
         input_files: A dictionary of the paths to the input ``.dat`` files.
         missing_ids: A dictionary of sets of IDs that were not found in the
@@ -57,7 +53,6 @@ class MetacycParser(SBMLParser):
 
     def __init__(
         self,
-        neo4j: MetacycClient,
         sbml: Union[str, Path],
         reactions: Optional[Union[str, Path]] = None,
         atom_mapping: Optional[Union[str, Path]] = None,
@@ -67,8 +62,7 @@ class MetacycParser(SBMLParser):
         classes: Optional[Union[str, Path]] = None,
     ):
         # Neo4j driver and SBML file path
-        super().__init__(neo4j, sbml)
-        self.db = neo4j
+        super().__init__(sbml)
 
         # File paths
         self.input_files = {
@@ -92,103 +86,7 @@ class MetacycParser(SBMLParser):
             "taxon": set(),
         }
 
-    def setup(self):
-        """Enterpoint for setting up the database.
-
-        The process is as follows:
-
-        #. Parse the SBML file. All parsing errors are logged as warnings.
-        #. If ``db_name`` is not given, use the ``metaid`` attribute of the SBML
-           file to name the database.
-        #. Create the database and constraints.
-        #. Feed the SBML file into the database. This will populate
-           ``Compartment``, ``Reaction``, ``Compound``, ``GeneProduct``,
-           ``GeneProductSet``, ``GeneProductComplex``, and ``RDF`` nodes.
-        #. If ``reactions.dat`` is given, parse the file and add standard Gibbs
-           free energy, standard reduction potential, reaction direction,
-           reaction balance status, systematic name, comment attributes to
-           ``Reaction`` nodes. Also link ``Reaction`` nodes to ``Pathway`` and
-           ``Citation`` nodes.
-           #. If ``pathways.dat`` is given:
-
-              * Add synonyms, types, comments, common names to ``Pathway`` nodes.
-              * Link ``Pathway`` nodes to super-pathway ``Pathway`` and taxonomy
-                  ``Taxa`` nodes.
-              * Link ``Reaction`` nodes within the pathway with
-                  ``isPrecedingEvent`` relationships.
-              * Link ``Pathway`` nodes with their rate limiting steps
-                  (``Reaction`` nodes).
-              * Link ``Pathway`` nodes with primary reactant and product
-                  ``Compound`` nodes.
-              * Link ``Pathway`` nodes with other ``Pathway`` nodes and annotate
-                the shared ``Compound`` nodes.
-              * For ``Reaction`` nodes, add ``isPrimary[Reactant|Product]InPathway``
-                  labels in their links to ``Compound`` nodes.
-        #. If ``atom-mappings-smiles.dat`` is given, parse the file and add
-           SMILES_ mappings to ``Reaction`` nodes.
-
-        #. If ``compounds.dat`` is given, parse the file and add standard Gibbs
-           free energy, logP, molecular weight, monoisotopic molecular weight,
-           polar surface area, pKa {1,2,3}, comment, and synonyms to ``Compound``
-           nodes. Also add SMILES and INCHI strings to related ``RDF`` nodes, and
-           link the ``Compound`` nodes to ``Citation`` nodes.
-        #. If ``pubs.dat`` is given, parse the file and add DOI, PUBMED, MEDLINE IDs,
-           title, source, year, URL, and ``REFERENT-FRAME`` to ``Citation`` nodes.
-        #. If ``classes.dat`` is given, parse the file and:
-
-           * Add common name and synonyms to ``Compartment`` nodes.
-           * Add common name, strain name, comment, and synonyms to ``Taxa`` nodes.
-
-        .. _SMILES: https://en.wikipedia.org/wiki/SMILES
-        """
-        # Populate Neo4j database with data from SBML file
-        self.sbml_to_graph()
-
-        rxn_dat = self.reactions_dat_to_graph()
-        if rxn_dat:
-            self.pathways_to_graph(rxn_dat)
-
-        self.smiles_dat_to_graph()
-        self.compounds_dat_to_graph()
-        self.citations_dat_to_graph()
-        self.classes_dat_to_graph()
-
-        self._report_missing_ids()
-
-    def reactions_dat_to_graph(self) -> Optional[Dict[str, List[List[str]]]]:
-        """
-        Parse the ``reactions.dat`` file and:
-
-        * Add properties to ``Reaction`` nodes.
-        * Link ``Reaction`` nodes to ``Pathway``, ``Citation``, and
-         ``Compartment`` nodes.
-
-        Returns:
-            A dictionary of the parsed file. This is useful for passing into
-            :meth:`pathways_to_graph` if the ``pathways.dat`` file is also
-            given.
-        """
-        if not self.input_files["reactions"]:
-            logger.warning("No reactions.dat file given")
-            return
-        logger.info(f"Parsing {self.input_files['reactions']}")
-        all_rxns = self.db.get_all_nodes("Reaction", "name")
-        rxn_dat = self._read_dat_file(self.input_files["reactions"])
-
-        rxn_nodes = self._collect_reactions_dat_nodes(all_rxns, rxn_dat)
-        self.db.create_nodes(
-            "reactions.dat",
-            rxn_nodes,
-            self.db.metacyc_default_cyphers["reactions"],
-            batch_size=100,
-            progress_bar=True,
-        )
-
-        # Fix the direction of reactions
-        self.db.fix_reaction_direction()
-        return rxn_dat
-
-    def _collect_reactions_dat_nodes(
+    def collect_reactions_dat_nodes(
         self, rxn_ids: Iterable[str], rxn_dat: Dict[str, List[List[str]]]
     ):
         """
@@ -233,54 +131,7 @@ class MetacycParser(SBMLParser):
 
         return nodes
 
-    def pathways_to_graph(self, rxn_dat: Dict[str, List[List[str]]]):
-        """Parse the ``pathways.dat`` file.
-
-        For details, see :meth:`setup`.
-        """
-        if not self.input_files["pathways"]:
-            logger.warning("No pathways.dat file given")
-            return
-
-        logger.info(f"Parsing {self.input_files['pathways']}")
-        pw_dat = self._read_dat_file(self.input_files["pathways"])
-        all_pws = self.db.get_all_nodes("Pathway", "metaId")
-
-        pw_nodes, comp_rxn_nodes = self._collect_pathways_dat_nodes(
-            all_pws, pw_dat, rxn_dat
-        )
-        self._fix_composite_reaction_nodes(comp_rxn_nodes)
-
-        # Annotate regular pathway nodes
-        all_rxns = set(self.db.get_all_nodes("Reaction", "name"))
-        pw_nodes = self._fix_pathway_nodes(pw_nodes, all_rxns)
-        self.db.create_nodes(
-            "Pathway",
-            pw_nodes,
-            self.db.metacyc_default_cyphers["pathways"],
-            batch_size=100,
-            progress_bar=True,
-        )
-
-        for node in tqdm(pw_nodes, desc="Annotating pathways"):
-            pw_id = node["metaId"]
-            if rxn_layout := node.get("reactionLayout"):
-                for v in rxn_layout:
-                    # Two cypher statements for Reactant and Product compounds
-                    self.db.link_reaction_to_primary_compound(
-                        v["reaction"], v["reactants"], pw_id, "Reactant"
-                    )
-                    self.db.link_reaction_to_primary_compound(
-                        v["reaction"], v["products"], pw_id, "Product"
-                    )
-
-            if pw_links := node.get("pathwayLinks"):
-                for v in pw_links:
-                    self.db.link_pathway_to_pathway(
-                        pw_id, v["pathways"], v["direction"], v["cpd"]
-                    )
-
-    def _collect_pathways_dat_nodes(
+    def collect_pathways_dat_nodes(
         self,
         all_pws: Iterable[str],
         pw_dat: Dict[str, List[List[str]]],
@@ -304,7 +155,7 @@ class MetacycParser(SBMLParser):
 
             # pathway nodes with reaction IDs (composite reactions)
             if pw_id in rxn_dat:
-                node = self._collect_reactions_dat_nodes([pw_id], rxn_dat)[0]
+                node = self.collect_reactions_dat_nodes([pw_id], rxn_dat)[0]
                 # metaId should follow the SBML specification
                 node["props"]["metaId"] = self._name_to_metaid(node["name"])
                 if new_pws := node.get("inPathway"):
@@ -344,32 +195,7 @@ class MetacycParser(SBMLParser):
 
         return pw_nodes, comp_rxn_nodes
 
-    def _fix_composite_reaction_nodes(self, comp_rxn_nodes: List[Dict[str, Any]]):
-        """
-        Composite reaction nodes are just aggregated reactions.
-        We need to change the label of these nodes from ``Pathway`` to
-         ``Reaction``, and also correct their directions.
-
-        Args:
-            comp_rxn_nodes: Output of :meth:`_collect_pathways_dat_nodes`.
-        """
-        self.db.create_nodes(
-            "Composite reaction",
-            comp_rxn_nodes,
-            self.db.metacyc_default_cyphers["reactions"],
-        )
-
-        # Merge the Reaction node with the Pathway node under the same ID
-        for node in comp_rxn_nodes:
-            self.db.merge_nodes("Pathway", "Reaction", "metaId", "name", node["name"])
-
-        # Correct composite reactions
-        self.db.set_composite_reaction_labels()
-
-        # Fix the direction of newly-added reactions
-        self.db.fix_reaction_direction()
-
-    def _fix_pathway_nodes(self, pw_nodes: List[Dict[str, Any]], all_rxns: Set[str]):
+    def fix_pathway_nodes(self, pw_nodes: List[Dict[str, Any]], all_rxns: Set[str]):
         """
         Some fields in the list of ``Pathway`` nodes require preprocessing
          before being fed into the database. Specifically:
@@ -423,24 +249,7 @@ class MetacycParser(SBMLParser):
 
         return pw_nodes
 
-    def smiles_dat_to_graph(self):
-        """Parse the ``atom-mappings-smiles.dat`` file.
-
-        For details, see :meth:`setup`.
-        """
-        if not self.input_files["atom_mapping"]:
-            logger.warning("No atom-mappings-smiles.dat file given")
-            return
-
-        logger.info(f"Adding SMILES with {self.input_files['atom_mapping']}")
-        smiles = self._read_smiles_dat(self.input_files["atom_mapping"])
-        all_rxns = self.db.get_all_nodes("Reaction", "name")
-        rxn_smiles = self._collect_atom_mapping_dat_nodes(all_rxns, smiles)
-        self.db.add_props_to_nodes(
-            "Reaction", "name", rxn_smiles, "Atom mapping SMILES", progress_bar=True
-        )
-
-    def _collect_atom_mapping_dat_nodes(
+    def collect_atom_mapping_dat_nodes(
         self, rxn_ids: Iterable[str], smiles: Dict[str, str]
     ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
         """
@@ -463,27 +272,7 @@ class MetacycParser(SBMLParser):
 
         return nodes
 
-    def compounds_dat_to_graph(self):
-        """Annotate compound nodes with the ``compounds.dat`` file.
-
-        For details, see :meth:`setup`.
-        """
-        if not self.input_files["compounds"]:
-            logger.warning("No compounds.dat file given")
-            return
-
-        logger.info(f"Parsing {self.input_files['compounds']}")
-        cpd_dat = self._read_dat_file(self.input_files["compounds"])
-        all_cpds = self.db.get_all_compounds()
-        cpd_nodes = self._collect_compounds_dat_nodes(all_cpds, cpd_dat)
-        self.db.create_nodes(
-            "compounds.dat",
-            cpd_nodes,
-            self.db.metacyc_default_cyphers["compounds"],
-            progress_bar=True,
-        )
-
-    def _collect_compounds_dat_nodes(
+    def collect_compounds_dat_nodes(
         self, all_cpds: List[Tuple[str, str]], cpd_dat: Dict[str, List[List[str]]]
     ):
         nodes = []
@@ -527,22 +316,7 @@ class MetacycParser(SBMLParser):
 
         return nodes
 
-    def citations_dat_to_graph(self):
-        """Annotate citation nodes with the ``pubs.dat`` file.
-
-        For details, see :meth:`setup`.
-        """
-        if not self.input_files["publications"]:
-            logger.warning("No pubs.dat file given")
-            return
-        logger.info(f"Annotating publications with {self.input_files['publications']}")
-        pub_dat = self._read_dat_file(self.input_files["publications"])
-
-        all_cits = self.db.get_all_nodes("Citation", "metaId")
-        cit_nodes = self._collect_citation_dat_nodes(all_cits, pub_dat)
-        self.db.add_props_to_nodes("Citation", "metaId", cit_nodes, "Citations")
-
-    def _collect_citation_dat_nodes(
+    def collect_citation_dat_nodes(
         self, cit_ids: Iterable[str], pub_dat: Dict[str, List[List[str]]]
     ):
         """Annotate a citation node with data from the publication.dat file.
@@ -596,30 +370,7 @@ class MetacycParser(SBMLParser):
 
         return nodes
 
-    def classes_dat_to_graph(self):
-        """Parse the ``classes.dat`` file.
-
-        Add common name and synonyms to ``Compartment`` nodes.
-        Add common name, strain name, comment, and synonyms to ``Taxa`` nodes.
-        """
-        if not self.input_files["classes"]:
-            logger.warning("No classes.dat file given")
-            return
-
-        logger.info(f"Annotating with {self.input_files['classes']}")
-        cls_dat = self._read_dat_file(self.input_files["classes"])
-        all_cco = self.db.get_all_nodes("Compartment", "name")
-        all_taxon = self.db.get_all_nodes("Taxa", "metaId")
-
-        cco_nodes, taxa_nodes = self._collect_classes_dat_nodes(
-            cls_dat, all_cco, all_taxon
-        )
-        self.db.add_props_to_nodes(
-            "Compartment", "name", cco_nodes, "Compartment names"
-        )
-        self.db.add_props_to_nodes("Taxa", "metaId", taxa_nodes, "Taxa names")
-
-    def _collect_classes_dat_nodes(
+    def collect_classes_dat_nodes(
         self,
         class_dat: Dict[str, List[List[str]]],
         cco_ids: Iterable[str],
@@ -663,7 +414,7 @@ class MetacycParser(SBMLParser):
         return cco_nodes, taxa_nodes
 
     @staticmethod
-    def _read_dat_file(filepath: Union[str, Path]) -> Dict[str, List[List[str]]]:
+    def read_dat_file(filepath: Union[str, Path]) -> Dict[str, List[List[str]]]:
         # `rb` to bypass the 0xa9 character
         with open(filepath, "rb") as f:
             lines = [l.decode("utf-8", "ignore").strip() for l in f]
@@ -694,7 +445,7 @@ class MetacycParser(SBMLParser):
         return docs
 
     @staticmethod
-    def _read_smiles_dat(filepath: Path) -> Dict[str, str]:
+    def read_smiles_dat(filepath: Path) -> Dict[str, str]:
         smiles_df = pd.read_table(
             filepath,
             sep="\t",
@@ -951,7 +702,7 @@ class MetacycParser(SBMLParser):
         direction = "INCOMING" if direction == "INCOMING" else "OUTGOING"
         return cpd, pathways, direction
 
-    def _report_missing_ids(self):
+    def report_missing_ids(self):
         for datfile, ids in self.missing_ids.items():
             if ids:
                 logger.warning(f"The following IDs were not found in {datfile}: {ids}")
