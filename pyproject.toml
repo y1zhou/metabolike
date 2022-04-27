@@ -43,7 +43,7 @@ Source = "https://github.com/y1zhou/metabolike"
 metabolike = "metabolike.main:app"
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-cov"]
+test = ["pytest", "pytest-cov", "pytest-mock"]
 doc = ["sphinx", "sphinx_rtd_theme", "sphinx-autodoc-typehints"]
 dev = ["black"]
 

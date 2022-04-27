@@ -51,10 +51,7 @@ class Neo4jClient:
 
         logger.debug(f"Creating database {self.database}")
         with self.driver.session() as ss:
-            res = ss.run(query).data()
-
-        if res:
-            raise RuntimeError(f"Could not create database {self.database}: {res}")
+            ss.run(query)
 
     def write(self, cypher: str, **kwargs):
         """Helper function to write to the database. Ignores returned output.

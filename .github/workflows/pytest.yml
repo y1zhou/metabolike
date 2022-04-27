@@ -38,4 +38,9 @@ jobs:
         run: python -m pip install -e .[test]
 
       - name: Run test suite
+        env:
+          NEO4J_URI: ${{ secrets.NEO4J_URI }}
+          NEO4J_USERNAME: ${{ secrets.NEO4J_USERNAME }}
+          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+          NEO4J_DATABASE_NAME: neo4j
         run: pytest
