@@ -115,18 +115,6 @@ class MetacycClient(SBMLClient):
         "pathways": _pathways_dat_cypher,
     }
 
-    def __init__(
-        self,
-        uri: str = "neo4j://localhost:7687",
-        neo4j_user: str = "neo4j",
-        neo4j_password: str = "neo4j",
-        database: str = "neo4j",
-        create_db: bool = True,
-        drop_if_exists: bool = False,
-    ):
-        super().__init__(uri, neo4j_user, neo4j_password, database)
-        self.setup_graph_db(create_db=create_db, drop_if_exists=drop_if_exists)
-
     def metacyc_to_graph(self, parser: MetacycParser):
         """Enterpoint for setting up the database.
 
