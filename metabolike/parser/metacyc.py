@@ -296,10 +296,12 @@ class MetacycParser(SBMLParser):
                     "PKA1",
                     "PKA2",
                     "PKA3",
+                    "SMILES",
+                    "INCHI",
                     "COMMENT",
                     # "DBLINKS",  # TODO: parse DBLINKS
                 },
-                props_list_keys={"SYNONYMS", "SMILES", "INCHI"},
+                props_list_keys={"SYNONYMS"},
                 node_list_keys={"CITATIONS"},
                 prop_num_keys=[
                     "GIBBS-0",
