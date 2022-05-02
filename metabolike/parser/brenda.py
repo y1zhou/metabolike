@@ -27,9 +27,7 @@ given in the original paper only the organism is given.
 ``///``	indicates the end of an EC-number specific part.
 """
 
-import json
 import logging
-from io import BytesIO
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 

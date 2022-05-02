@@ -385,7 +385,6 @@ class MetacycParser(SBMLParser):
                 self.missing_ids["compartments"].add(cco)
                 continue
             node = {"name": cco}
-            props: Dict[str, Union[str, List[str]]] = {}
             node = self._dat_entry_to_node(
                 node,
                 class_dat[cco],

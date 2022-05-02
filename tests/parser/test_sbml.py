@@ -260,7 +260,7 @@ def test_parse_gene_product_set(sbml_parser: SBMLParser, set_node: libsbml.FbcOr
         sbml_parser._parse_gene_product_set(set_node, gene_sets, gene_complexes)
 
 
-def test_add_gene_product_group(sbml_parser: SBMLParser, sbml_model: Model):
+def test_add_gene_product_group(sbml_parser: SBMLParser):
     g = {}
     k0 = sbml_parser._add_gene_product_group({"g1", "g2"}, g, "GeneSet")
     assert k0 == "GeneSet0"
