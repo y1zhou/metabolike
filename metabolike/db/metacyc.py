@@ -96,19 +96,6 @@ UNWIND $batch_nodes AS n
 
 
 class MetacycClient(SBMLClient):
-    available_node_labels = (
-        "Pathway",
-        "Compartment",
-        "Reaction",
-        "Compound",
-        "GeneProduct",
-        "RDF",
-        "GeneProductComplex",
-        "GeneProductSet",
-        "Citation",
-        "Taxa",
-    )
-
     metacyc_default_cyphers = {
         "reactions": _reactions_dat_cypher,
         "compounds": _compounds_dat_cypher,
@@ -201,6 +188,8 @@ class MetacycClient(SBMLClient):
         rxn_dat = parser.read_dat_file(parser.input_files["reactions"])
 
         rxn_nodes = parser.collect_reactions_dat_nodes(all_rxns, rxn_dat)
+        self._set_metaid_constraints("Pathway")
+        self._set_metaid_constraints("Citation")
         self.create_nodes(
             "reactions.dat",
             rxn_nodes,
@@ -231,6 +220,10 @@ class MetacycClient(SBMLClient):
         pw_nodes, comp_rxn_nodes = parser.collect_pathways_dat_nodes(
             all_pws, pw_dat, rxn_dat
         )
+        for n in pw_nodes:
+            if "species" in n or "taxonomicRange" in n:
+                self._set_metaid_constraints("Taxa")
+                break
         self._fix_composite_reaction_nodes(comp_rxn_nodes)
 
         # Annotate regular pathway nodes
@@ -354,7 +347,10 @@ class MetacycClient(SBMLClient):
         logger.info(f"Annotating with {parser.input_files['classes']}")
         cls_dat = parser.read_dat_file(parser.input_files["classes"])
         all_cco = self.get_all_nodes("Compartment", "name")
-        all_taxon = self.get_all_nodes("Taxa", "metaId")
+        if "Taxa" in self.available_node_labels:
+            all_taxon = self.get_all_nodes("Taxa", "metaId")
+        else:
+            all_taxon = []
 
         cco_nodes, taxa_nodes = parser.collect_classes_dat_nodes(
             cls_dat, all_cco, all_taxon
@@ -404,7 +400,8 @@ class MetacycClient(SBMLClient):
             desc: see :meth:`create_nodes`.
         """
         if node_label not in self.available_node_labels:
-            raise ValueError(f"Invalid label: {node_label}")
+            logger.warning(f"Invalid label: {node_label}")
+            return
 
         query = f"""
         UNWIND $batch_nodes AS n

@@ -123,7 +123,9 @@ class SBMLParser:
 
         return nodes
 
-    def collect_reactions(self, reactions: Iterable[libsbml.Reaction]):
+    def collect_reactions(
+        self, reactions: Iterable[libsbml.Reaction]
+    ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
         nodes = []
         for r in tqdm(reactions, desc="Reactions"):
             r: libsbml.Reaction
@@ -149,7 +151,9 @@ class SBMLParser:
         return nodes
 
     @staticmethod
-    def collect_groups(groups: Iterable[libsbml.Group]):
+    def collect_groups(
+        groups: Iterable[libsbml.Group],
+    ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
         return [
             {
                 "metaId": g.getId(),
@@ -193,7 +197,7 @@ class SBMLParser:
     def _get_reaction_compounds(
         self,
         compounds: List[libsbml.SpeciesReference],
-    ):
+    ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
         """Link reactants or products to a reaction.
 
         Args:
