@@ -36,7 +36,7 @@ UNWIND $batch_nodes AS n
   FOREACH (rdf IN n.rdf |
     CREATE (r:RDF)
     SET r = rdf.rdf
-    MERGE (r)<-[rel:hasRDF]-(c)
+    MERGE (r)<-[rel:hasRDF]-(gp)
       ON CREATE SET rel.bioQualifier = rdf.bioQual
   );
 """
