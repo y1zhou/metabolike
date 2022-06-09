@@ -28,6 +28,11 @@ jobs:
         run: |
           python -m pip install -e .[test]
           pytest --cov=./ --cov-report=xml
+        env:
+          NEO4J_URI: ${{ secrets.NEO4J_URI }}
+          NEO4J_USERNAME: ${{ secrets.NEO4J_USERNAME }}
+          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+          NEO4J_DATABASE_NAME: neo4j
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
