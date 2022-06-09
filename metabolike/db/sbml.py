@@ -94,7 +94,7 @@ UNWIND $batch_nodes AS n
   MERGE (g:Group {metaId: n.metaId})
     ON CREATE SET g += n.props
   FOREACH (member IN n.members |
-    MERGE (m {metaId: member})
+    MERGE (m:Reaction {metaId: member})
     MERGE (g)-[:hasGroupMember]->(m)
   );
 """
@@ -140,6 +140,7 @@ class SBMLClient(Neo4jClient):
         database: str = "neo4j",
         create_db: bool = True,
         drop_if_exists: bool = False,
+        reaction_groups: bool = True,
     ):
         """
         Create Neo4j database.
@@ -149,6 +150,9 @@ class SBMLClient(Neo4jClient):
             create_db: If False, does not create the database. This is useful
              for running on neo4j AuraDB when database creation is not allowed.
             drop_if_exists: See :meth:`.create`.
+            reaction_groups: Assume all ``group`` nodes are groups of ``Reaction``
+                nodes. This assumption greatly speeds up the creation of the
+                graph.
         """
         super().__init__(uri, neo4j_user, neo4j_password, database)
 
@@ -156,6 +160,8 @@ class SBMLClient(Neo4jClient):
         # Create database
         if create_db:
             self.create(force=drop_if_exists)
+
+        self.reaction_groups = reaction_groups
 
     def sbml_to_graph(self, parser: SBMLParser):
         """
@@ -325,10 +331,14 @@ class SBMLClient(Neo4jClient):
             self._set_metaid_constraints("Group")
             group_nodes = parser.collect_groups(groups.getListOfGroups())
 
+            cypher = self.default_cyphers["Group"]
+            if not self.reaction_groups:
+                cypher = cypher.replace("m:Reaction", "m")
+
             self.create_nodes(
                 "Group",
                 group_nodes,
-                self.default_cyphers["Group"],
+                cypher,
                 batch_size=10,
                 progress_bar=True,
             )
