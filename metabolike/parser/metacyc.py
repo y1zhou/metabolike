@@ -333,7 +333,7 @@ class MetacycParser(SBMLParser):
         or some dashes within author names, e.g. ``PUB-CHIH-CHING95``.
 
         Args:
-            cit_id: The citation ``metaId`` property.
+            cit_ids: The citation ``metaId`` properties.
             pub_dat: The publication.dat data.
         """
         # TODO: deal with evidence frames. Evidence frames are in the form of
@@ -481,7 +481,7 @@ class MetacycParser(SBMLParser):
             return rxn_id
 
         if match_canonical_id := re.match(
-            r"((TRANS-)?(RXN[A-Z\d]*)-\d+)|([A-Z\d.\-\+]+RXN)", rxn_id
+            r"((TRANS-)?(RXN[A-Z\d]*)-\d+)|([A-Z\d.\-+]+RXN)", rxn_id
         ):
             return match_canonical_id[0]
         else:
@@ -574,7 +574,7 @@ class MetacycParser(SBMLParser):
         if s[0] != "(":  # single pathway ID
             return {}
 
-        if re.fullmatch(r"\([^\s]+\)", s):  # single reaction ID
+        if re.fullmatch(r"\(\S+\)", s):  # single reaction ID
             return {}
 
         s = s.replace('"', "")
@@ -602,10 +602,10 @@ class MetacycParser(SBMLParser):
             compounds.
         """
         m = re.compile(
-            r"\(([^\(]+) "  # reaction ID
-            r"\(:LEFT-PRIMARIES ([^\)]+)\) "  # left primary compounds
+            r"\(([^(]+) "  # reaction ID
+            r"\(:LEFT-PRIMARIES ([^)]+)\) "  # left primary compounds
             r"\(:DIRECTION :(L2R|R2L)\) "  # reaction direction
-            r"\(:RIGHT-PRIMARIES ([^\)]+)\)\)"
+            r"\(:RIGHT-PRIMARIES ([^)]+)\)\)"
         )
         if not (res := m.fullmatch(s)):
             # Sometimes there's no left/right primaries and only a direction
@@ -668,7 +668,7 @@ class MetacycParser(SBMLParser):
             because non-canonical pathway IDs are dropped.
         """
         # Extract the compound ID at the beginning of the string
-        cpd_id_rgx = re.compile(r"^\(([^\s]+) ")
+        cpd_id_rgx = re.compile(r"^\((\S+) ")
         if not (res := cpd_id_rgx.match(s)):
             logging.warning(f"Pathway links string doesn't have a compound: {s}")
             return "", [], ""
