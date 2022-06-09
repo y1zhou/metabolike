@@ -60,5 +60,6 @@ include = ["doc/"]
 exclude = ["doc/*.html", "tests/", ".github/", ".readthedocs.yaml"]
 
 [tool.pdm]
+version = { from = "metabolike/__init__.py" }
 excludes = ["doc/*.html", "tests/", ".github/", ".readthedocs.yaml"]
 includes = ["doc/"]

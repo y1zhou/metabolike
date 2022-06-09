@@ -1,0 +1,8 @@
+version: '3'
+
+services:
+  metabolike:
+    build: .
+    env_file:
+      - .env
+
