@@ -48,7 +48,7 @@ def test_read_smiles_dat(mc: MetacycParser):
 def test_find_rxn_canonical_id(mc: MetacycParser):
     doc = mc.read_sbml(mc.sbml_file)
     model = doc.getModel()
-    rxn_ids = [x.getMetaId() for x in model.getListOfReactions()]
+    rxn_ids = [x.getId() for x in model.getListOfReactions()]
 
     # Valid reaction IDs
     assert mc._find_rxn_canonical_id("RXN-15513", rxn_ids) == "RXN-15513"

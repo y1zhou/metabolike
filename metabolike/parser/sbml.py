@@ -76,8 +76,7 @@ class SBMLParser:
         compartments: Iterable[libsbml.Compartment],
     ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
         return [
-            {"metaId": c.getMetaId(), "props": {"name": c.getName()}}
-            for c in compartments
+            {"metaId": c.getId(), "props": {"name": c.getName()}} for c in compartments
         ]
 
     def collect_compounds(
@@ -87,16 +86,18 @@ class SBMLParser:
         nodes = []
         for c in tqdm(compounds, desc="Compounds"):
             node = {
-                "metaId": c.getMetaId(),
+                "metaId": c.getId(),
                 "props": {
                     "name": c.getName(),
-                    "chemicalFormula": c.getPlugin("fbc").getChemicalFormula(),
                     "boundaryCondition": c.getBoundaryCondition(),
                     "hasOnlySubstanceUnits": c.getHasOnlySubstanceUnits(),
                     "constant": c.getConstant(),
                 },
                 "compartment": c.getCompartment(),
             }
+            if (fbc := c.getPlugin("fbc")) is not None:
+                node["props"]["chemicalFormula"] = fbc.getChemicalFormula()
+
             cvterms: List[libsbml.CVTerm] = c.getCVTerms()
             node["rdf"] = [self._cvterm_to_rdf(cvterm) for cvterm in cvterms]
 
@@ -110,7 +111,7 @@ class SBMLParser:
         nodes = []
         for gp in tqdm(gene_prods, desc="GeneProducts"):
             node = {
-                "metaId": gp.getMetaId(),
+                "metaId": gp.getId(),
                 "props": {
                     "name": gp.getName(),
                     "label": gp.getLabel(),
@@ -130,7 +131,7 @@ class SBMLParser:
         for r in tqdm(reactions, desc="Reactions"):
             r: libsbml.Reaction
             node = {
-                "metaId": r.getMetaId(),
+                "metaId": r.getId(),
                 "props": {
                     "name": r.getName(),
                     "fast": r.getFast(),
@@ -153,7 +154,7 @@ class SBMLParser:
     @staticmethod
     def collect_groups(
         groups: Iterable[libsbml.Group],
-    ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
+    ) -> List[Dict[str, Union[str, Dict[str, str], List[str]]]]:
         return [
             {
                 "metaId": g.getId(),
@@ -227,15 +228,7 @@ class SBMLParser:
         #. fbc:or -> {fbc:and -> GeneProductRef, GeneProductRef}
 
         Args:
-            node: The GeneProductAssociation child node to add.
-            source_id: The MetaCyc ID of the source node. This should be the
-                MetaCyc ID of the ``Reaction`` node
-            source_label: The label of the source node.
-            edge_type: The type of edge to add. Should be one of
-                ``hasGeneProduct``, ``hasComponent``, or ``hasMember``.
-            node_index: The index of the current node. This is used to construct
-                the ``metaId`` of the ``GeneProductComplex`` and
-                ``GeneProductSet`` nodes.
+            reactions: An iterable of SBML reactions.
         """
         # We need to know the metaId of children of each geneSet / geneComplex.
         # Also need to name the geneSet / geneComplex nodes.
@@ -246,7 +239,7 @@ class SBMLParser:
         # For each reaction, we store its associated gene products
         reaction_genes = {}
         for r in tqdm(reactions, desc="Associated GeneProduct"):
-            mcid = r.getMetaId()
+            mcid = r.getId()
             gpa = r.getPlugin("fbc").getGeneProductAssociation()
             if gpa is not None:
                 gpa: libsbml.GeneProductAssociation
@@ -300,7 +293,7 @@ class SBMLParser:
                 gene_set = self._parse_gene_product_set(g, gene_sets, gene_complexes)
                 components.add(gene_set)
             else:
-                raise ValueError(node.getMetaId())
+                raise ValueError(node.getId())
         if components:
             return self._add_gene_product_group(
                 components, gene_complexes, "GeneProductComplex"
@@ -323,7 +316,7 @@ class SBMLParser:
                 )
                 members.add(gene_complex)
             else:
-                raise ValueError(node.getMetaId())
+                raise ValueError(node.getId())
         if members:
             return self._add_gene_product_group(members, gene_sets, "GeneProductSet")
 
