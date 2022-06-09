@@ -1,27 +1,8 @@
-from os import environ
 from typing import Callable
 
-import pytest
 from metabolike.db.neo4j import Neo4jClient
 from neo4j import Neo4jDriver
 from pytest_mock import MockerFixture
-
-
-@pytest.fixture(name="db")
-def neo4j_connection():
-    uri = environ.get("NEO4J_URI", "neo4j+s://demo.neo4jlabs.com")
-    username = environ.get("NEO4J_USERNAME", "movies")
-    password = environ.get("NEO4J_PASSWORD", "movies")
-    database = environ.get("NEO4J_DATABASE_NAME", "movies")
-
-    db = Neo4jClient(
-        uri=uri,
-        neo4j_user=username,
-        neo4j_password=password,
-        database=database,
-    )
-    yield db
-    db.close()
 
 
 def test_neo4j_connection(mocker: MockerFixture, db: Neo4jClient):
