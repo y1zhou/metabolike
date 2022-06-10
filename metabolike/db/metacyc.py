@@ -8,7 +8,6 @@ from .sbml import SBMLClient
 
 logger = logging.getLogger(__name__)
 
-
 _reactions_dat_cypher = """
 UNWIND $batch_nodes AS n
   MERGE (r:Reaction {name: n.name})
@@ -353,7 +352,7 @@ class MetacycClient(SBMLClient):
         self.add_props_to_nodes("Taxa", "metaId", taxa_nodes, "Taxa names")
 
     def get_all_nodes(self, label: str, prop: str) -> List[str]:
-        """Fetch an property of nodes with a certain label."""
+        """Fetch a property of nodes with a certain label."""
         if label not in self.available_node_labels:
             raise ValueError(f"Invalid label: {label}")
         # TODO: check for valid properties

@@ -146,7 +146,6 @@ class SBMLClient(Neo4jClient):
         Create Neo4j database.
 
         Args:
-            session: :class:`neo4j.Session` object.
             create_db: If False, does not create the database. This is useful
              for running on neo4j AuraDB when database creation is not allowed.
             drop_if_exists: See :meth:`.create`.
@@ -224,6 +223,7 @@ class SBMLClient(Neo4jClient):
             nodes: List of properties of the nodes.
             query: Cypher query to create the nodes.
             batch_size: Number of nodes to create in each batch.
+            progress_bar: Show progress bar for slow queries.
         """
         logger.info(f"Creating {desc} nodes")
 

@@ -57,7 +57,7 @@ class Neo4jClient:
         """Helper function to write to the database. Ignores returned output.
 
         Args:
-            query: Query to write to the database.
+            cypher: Query to write to the database.
             **kwargs: Keyword arguments to pass to :meth:`BaseDB.run`.
         """
         with self.driver.session(database=self.database) as ss:
@@ -68,7 +68,7 @@ class Neo4jClient:
         query into a list of dictionaries.
 
         Args:
-            query: Query to read from the database.
+            cypher: Query to read from the database.
             **kwargs: Parameters to pass to the Cypher query.
         """
         with self.driver.session(database=self.database) as ss:

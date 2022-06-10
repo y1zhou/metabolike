@@ -109,7 +109,7 @@ def test_text_to_tree_transferred(brenda_data):
 
 
 def test_text_to_tree_references(brenda_data):
-    """Test the references grammar."""
+    """Test the references' grammar."""
     text = (
         brenda_data.query("ID == '1.1.1.1' & field == 'REFERENCE'")
         .filter(["description"])

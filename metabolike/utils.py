@@ -33,8 +33,8 @@ def chunk(itr: Iterable, chunk_size: int) -> Iterable:
     Ref: https://stackoverflow.com/a/71572942/5925357
     """
     itr = iter(itr)
-    while slice := list(islice(itr, chunk_size)):
-        yield slice
+    while slice_ := list(islice(itr, chunk_size)):
+        yield slice_
 
 
 def snake_to_camel(s: str, sep: str = "-") -> str:
@@ -53,7 +53,7 @@ def snake_to_camel(s: str, sep: str = "-") -> str:
 
 
 def add_kv_to_dict(
-    d: Dict[str, Any], k: str, v: Any, as_list: bool = False
+        d: Dict[str, Any], k: str, v: Any, as_list: bool = False
 ) -> Dict[str, Any]:
     """Add a key-value pair to a dictionary.
 
@@ -61,6 +61,7 @@ def add_kv_to_dict(
         d: Dictionary to add the key-value pair to.
         k: Key to add.
         v: Value to add.
+        as_list: If True, the value is appended to the list identified by ``k``.
 
     Returns:
         Dictionary with the key-value pair added. If the key already exists,

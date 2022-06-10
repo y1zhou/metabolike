@@ -29,7 +29,7 @@ given in the original paper only the organism is given.
 
 import logging
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Iterable, Optional
 
 import orjson
 import pandas as pd
@@ -158,7 +158,7 @@ def _get_parser_from_field(field: str) -> Optional[Lark]:
         return None
 
     elif field == "REFERENCE":
-        grammar = fr"""
+        grammar = rf"""
             {BASE_GRAMMAR}
             entry      : _ACRONYM ref_id citation [_WS] pubmed [_WS paper_stat] _NL
             citation   : /.+(?={{Pubmed:)/
@@ -170,7 +170,7 @@ def _get_parser_from_field(field: str) -> Optional[Lark]:
         t = RefTreeTransformer()
 
     elif field in FIELD_WITH_REACTIONS:
-        grammar = fr"""
+        grammar = rf"""
             {BASE_GRAMMAR}
             entry: _ACRONYM [protein_id] reaction [commentary] [[_WS] more_commentary] [[_WS] reversibility] [[_WS] ref_id] _NL
 
@@ -185,7 +185,7 @@ def _get_parser_from_field(field: str) -> Optional[Lark]:
         t = ReactionTreeTransformer()
 
     elif field in FIELD_WITH_SPECIFIC_INFO:
-        grammar = fr"""
+        grammar = rf"""
             {BASE_GRAMMAR}
             entry      : _ACRONYM protein_id description substrate [_WS commentary] [_WS] ref_id _NL
 
@@ -196,7 +196,7 @@ def _get_parser_from_field(field: str) -> Optional[Lark]:
         t = SpecificInfoTreeTransformer()
 
     elif field in FIELD_COMMENTARY_ONLY:
-        grammar = fr"""
+        grammar = rf"""
             {BASE_GRAMMAR}
             entry      : _ACRONYM protein_id _WS [description] ref_id _NL
             %override description: /\(.*\)/ _WS
@@ -208,7 +208,7 @@ def _get_parser_from_field(field: str) -> Optional[Lark]:
         # All other cases can be parsed with the generic grammar.
         # Replace placeholder with actual acronym, and import tokens to be
         # transformed in BaseTransformer.
-        grammar = fr"""
+        grammar = rf"""
             {BASE_GRAMMAR}
             %extend CHAR: "{{" | "}}" // Appears in ENGINEERING and INHIBITORS
 
@@ -333,7 +333,6 @@ def parse_brenda(
     cache: bool = False,
     ec_nums: Optional[Iterable[str]] = None,
 ) -> Dict[str, Any]:
-
     """Parse the BRENDA text file into a dict.
 
     This implmentation focuses on extracting information from the text file,

@@ -27,8 +27,8 @@ def test_read(db: Neo4jClient):
 
 def test_read_tx(db: Neo4jClient):
     def tx_func(tx, num_nodes=10):
-        res = tx.run("MATCH (n) RETURN n LIMIT $num_nodes", num_nodes=num_nodes)
-        return [x.data() for x in res]
+        resp = tx.run("MATCH (n) RETURN n LIMIT $num_nodes", num_nodes=num_nodes)
+        return [x.data() for x in resp]
 
     res = db.read_tx(tx_func)
     assert len(res) == 10

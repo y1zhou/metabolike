@@ -14,7 +14,7 @@ def get_bkms_tarball(filepath: str, extract: bool = True) -> None:
     stop separated format (Excel, OpenOffice). The table contains actual data of
     BRENDA (release 2021.2, only reactions with naturally occuring substrates),
     MetaCyc (version 24.5), SABIO-RK (07/02/2021) and KEGG data, downloaded on
-    the 23th of April 2012. Downloading more recent KEGG data cannot be offered
+    the 23rd of April 2012. Downloading more recent KEGG data cannot be offered
     because a KEGG license agreement would be necessary.
 
     Args:
@@ -54,7 +54,7 @@ def read_bkms(filepath: str, clean: bool = True) -> pd.DataFrame:
     BRENDA takes EC numbers as identifiers, so we need entries with non-empty
     ``EC_Number`` and ``Reaction_ID_MetaCyc`` columns. There is a
     ``Reaction_ID_BRENDA`` column that's sometimes non-empty when the EC number
-    is missing, but the field is not documented and it's not clear how it can be
+    is missing, but the field is not documented, and it's not clear how it can be
     mapped to an entry in the BRENDA text file.
 
     To be extra conservative, we only keep entries with non-empty

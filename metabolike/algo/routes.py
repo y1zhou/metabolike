@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -132,7 +132,7 @@ def get_fba_info_of_pathways(db: Neo4jClient, pathway_ids: List[str]):
     # Get gene associations
     rxn_genes = {}
     for rxn in all_rxns:
-        if genes := self.get_genes_of_reaction(rxn):
+        if genes := get_genes_of_reaction(db, rxn):
             rxn_genes[rxn] = generate_gene_reaction_rule(genes)
 
     return df, rxn_genes
@@ -248,7 +248,7 @@ def get_reaction_route_between_compounds(
     c1: str,
     c2: str,
     only_pathway_reactions: bool = True,
-    ignore_node_mcids: List[str] = [],
+    ignore_node_metaids: List[str] = [],
     num_routes: int = 2,
     max_hops: int = 10,
 ):
@@ -260,7 +260,7 @@ def get_reaction_route_between_compounds(
         c1: The first compound metaId.
         c2: The second compound metaId.
         only_pathway_reactions: If True, only follow reactions in pathways.
-        ignore_node_mcids: A list of metaIds to ignore.
+        ignore_node_metaids: A list of metaIds to ignore.
         num_routes: The number of routes to return.
         max_hops: The maximum number of hops to follow. When argument
             ``only_pathway_reactions`` is False, this is doubled to account

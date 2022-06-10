@@ -20,7 +20,6 @@ class SBMLParser:
     * SBML FAQ: https://synonym.caltech.edu/documents/faq
 
     Args:
-        neo4j: A :class:`.SBMLClient` instance.
         sbml: The path to the MetaCyc SBML file to convert.
 
     Attributes:
@@ -195,8 +194,8 @@ class SBMLParser:
 
         return {"bioQual": bio_qual, "rdf": props}
 
+    @staticmethod
     def _get_reaction_compounds(
-        self,
         compounds: List[libsbml.SpeciesReference],
     ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
         """Link reactants or products to a reaction.
