@@ -314,13 +314,49 @@ def get_reaction_route_between_compounds(
         """
     return db.read(
         query,
-        ignore_nodes=ignore_node_mcids,
+        ignore_nodes=ignore_node_metaids,
         c1=c1,
         c2=c2,
         num_routes=num_routes,
         max_hops=max_hops * 2,
     )
 
+
+def find_compound_sink(
+    db: Neo4jClient,
+    compound_id: str,
+    expressed_genes: List[str],
+    max_hops: int = 10,
+):
+    """
+    Find how a compound is consumed. Genes are either expressed or unexpressed,
+    so this is a rather binary view of the metabolic network.
+
+    Args:
+        db: Database client.
+        compound_id: The metaId of the compound of interest.
+        expressed_genes: A list of genes that are considered expressed.
+        max_hops: The maximum number of downstream compounds before stopping.
+    """
+    return db.read(
+        """
+        // List of considered genes
+        MATCH (r:Reaction)-[:hasGeneProduct|hasMember|hasComponent*]->(gp:geneProduct)
+        WHERE gp.id IN $genes
+        WITH COLLECT(r) as valid_rxns
+        MATCH (c:Compound {metaId: $cpd_id})<-[l:hasLeft|hasRight]-(r:Reaction)
+        // keep reversible reactions and reactions that consume the cpd
+        WHERE NOT (
+            type(l) = 'hasRight' AND
+            r.reactionDirection CONTAINS 'left_to_right'
+        )
+        WITH r, c
+        RETURN r, c
+        """,
+        cpd_id=compound_id,
+        genes=expressed_genes,
+        max_hops=max_hops,
+    )
 
 
 def get_all_reactions_related_to_compound(
