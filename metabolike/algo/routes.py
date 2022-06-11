@@ -1,4 +1,4 @@
-from typing import Dict, List, Set, Tuple
+from typing import Dict, Iterable, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -220,7 +220,7 @@ def get_cpd_view_of_pathway(
     )
 
 
-def get_high_degree_compound_nodes(db: Neo4jClient, degree: int = 60):
+def get_high_degree_compound_nodes(db: Neo4jClient, degree: int = 60) -> List[str]:
     """
     Get all compound nodes with a high degree, i.e. with a lot of edges to
     ``Reaction`` nodes. Including these nodes in many cases would pollute
@@ -232,15 +232,16 @@ def get_high_degree_compound_nodes(db: Neo4jClient, degree: int = 60):
     Returns:
         A list of mcID of compound nodes.
     """
-    return db.read(
+    res = db.read(
         """
         MATCH (c:Compound)<-[:hasLeft|hasRight]-(r:Reaction)
         WITH c.metaId as cpd, COUNT(*) AS cnt
         WHERE cnt >= $degree
-        RETURN COLLECT(cpd);
+        RETURN COLLECT(cpd) AS cpds;
         """,
         degree=degree,
     )
+    return res[0]["cpds"]
 
 
 def get_reaction_route_between_compounds(
@@ -322,40 +323,101 @@ def get_reaction_route_between_compounds(
     )
 
 
+def get_table_of_gene_products(db: Neo4jClient, rdf_fields: Dict[str, str] = None):
+    """
+    Retrieves all reaction-associated gene products.
+    Args:
+        db: A Neo4j client connected to the graph database.
+        rdf_fields: Properties of the RDF nodes, and the desired output name.
+          For example, {"ncbigene": "entrez"} would extract the ``ncbigene``
+          property from the RDF nodes and output it in the ``entrez`` column.
+
+    Returns:
+        A list of entries with the reaction ID, the metaId of the gene, the
+        gene symbol, and other fields from RDF nodes whenever available.
+    """
+    query = """
+        MATCH (r:Reaction)-[:hasGeneProduct|hasMember|hasComponent*]->(gp:GeneProduct)
+        WHERE NOT gp:GeneProductSet OR gp:GeneProductComplex
+        WITH r.metaId AS rxn_id, gp
+        OPTIONAL MATCH (gp)-[:hasRDF {bioQualifier: 'isEncodedBy'}]->(rdf:RDF)
+        RETURN rxn_id, gp.metaId AS gene_id, gp.name AS gene
+    """
+    if rdf_fields:
+        for field, col in rdf_fields.items():
+            query += f", rdf.{field} AS {col}"
+    return db.read(query)
+
+
 def find_compound_sink(
     db: Neo4jClient,
     compound_id: str,
-    expressed_genes: List[str],
-    max_hops: int = 10,
+    expressed_genes: Iterable[str],
+    max_level: int = 20
 ):
     """
     Find how a compound is consumed. Genes are either expressed or unexpressed,
     so this is a rather binary view of the metabolic network.
 
+    When searching for routes, we start from the compound of interest, and
+    expand to other compounds via reactions that are:
+
+    * TODO: reversible, or
+    * (physiol_)left_to_right, with the compound of interest on the left.
+
+    Whenever we encounter a reaction that's catalyzed by an unexpressed enzyme,
+    we stop the path search. Reactions that are not catalyzed by enzymes are
+    always included in the search.
+
+    For details on how the optional parameters are used, see:
+    https://neo4j.com/labs/apoc/4.4/overview/apoc.path/apoc.path.expandConfig/
+
+    TODO: distinguish ``geneProductSet`` and ``geneProductComplex``.
+
     Args:
-        db: Database client.
+        db: A Neo4j client connected to the graph database.
         compound_id: The metaId of the compound of interest.
         expressed_genes: A list of genes that are considered expressed.
-        max_hops: The maximum number of downstream compounds before stopping.
+        max_level: The maximum number of hops in the traversal.
+
+    Returns:
+        Paths to sinks of the given metabolite.
     """
+    # We want to keep reactions wo/ genes, and reactions w/ expressed genes
+    all_genes = get_table_of_gene_products(db)
+    valid_genes = set(expressed_genes)
+    bad_rxns = [x["rxn_id"] for x in all_genes if x["gene"] not in valid_genes]
+    bad_cpds = get_high_degree_compound_nodes(db)
+    ignore_nodes = bad_rxns + bad_cpds
+
     return db.read(
         """
-        // List of considered genes
-        MATCH (r:Reaction)-[:hasGeneProduct|hasMember|hasComponent*]->(gp:geneProduct)
-        WHERE gp.id IN $genes
-        WITH COLLECT(r) as valid_rxns
+        MATCH (n)
+        WHERE n.metaId IN $bad_nodes
+        WITH COLLECT(n) AS ns
+        
         MATCH (c:Compound {metaId: $cpd_id})<-[l:hasLeft|hasRight]-(r:Reaction)
-        // keep reversible reactions and reactions that consume the cpd
-        WHERE NOT (
+        WHERE (NOT r IN ns) AND NOT (
+           // keep reversible reactions and reactions that consume the cpd
             type(l) = 'hasRight' AND
             r.reactionDirection CONTAINS 'left_to_right'
         )
-        WITH r, c
-        RETURN r, c
+        
+        //MATCH (c:Compound {metaId: $cpd_id})
+        CALL apoc.path.expandConfig(r, {
+            sequence: "Reaction,hasRight>,Compound,<hasLeft",
+            blacklistNodes: ns,
+            bfs: true,
+            minLevel: 2,
+            maxLevel: $max_hops
+        })
+        YIELD path
+        RETURN path, length(path) AS hops
+        ORDER BY hops; 
         """,
         cpd_id=compound_id,
-        genes=expressed_genes,
-        max_hops=max_hops,
+        bad_nodes=ignore_nodes,
+        max_hops=max_level
     )
 
 
