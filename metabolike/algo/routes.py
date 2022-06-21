@@ -349,11 +349,11 @@ def get_table_of_gene_products(db: Neo4jClient, rdf_fields: Dict[str, str] = Non
     return db.read(query)
 
 
-def find_compound_sink(
+def find_compound_outflux_routes(
     db: Neo4jClient,
     compound_id: str,
     expressed_genes: Iterable[str],
-    max_level: int = 20
+    max_level: int = 10
 ):
     """
     Find how a compound is consumed. Genes are either expressed or unexpressed,
@@ -396,23 +396,17 @@ def find_compound_sink(
         WHERE n.metaId IN $bad_nodes
         WITH COLLECT(n) AS ns
         
-        MATCH (c:Compound {metaId: $cpd_id})<-[l:hasLeft|hasRight]-(r:Reaction)
-        WHERE (NOT r IN ns) AND NOT (
-           // keep reversible reactions and reactions that consume the cpd
-            type(l) = 'hasRight' AND
-            r.reactionDirection CONTAINS 'left_to_right'
-        )
-        
-        //MATCH (c:Compound {metaId: $cpd_id})
-        CALL apoc.path.expandConfig(r, {
-            sequence: "Reaction,hasRight>,Compound,<hasLeft",
+        MATCH (c:Compound {metaId: $cpd_id})
+        CALL apoc.path.expandConfig(c, {
+            beginSequenceAtStart: false,
+            sequence: "<hasLeft,Reaction,hasRight>,Compound,<hasLeft",
             blacklistNodes: ns,
-            bfs: true,
+            bfs: false,
             minLevel: 2,
             maxLevel: $max_hops
         })
         YIELD path
-        RETURN path, length(path) AS hops
+        RETURN c, path, length(path) AS hops
         ORDER BY hops; 
         """,
         cpd_id=compound_id,
