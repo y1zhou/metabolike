@@ -352,8 +352,9 @@ def get_table_of_gene_products(db: Neo4jClient, rdf_fields: Dict[str, str] = Non
 def find_compound_outflux_routes(
     db: Neo4jClient,
     compound_id: str,
-    expressed_genes: Iterable[str],
-    max_level: int = 10
+    expressed_genes: Iterable[str] = None,
+    drop_nodes: List[str] = None,
+    max_level: int = 10,
 ):
     """
     Find how a compound is consumed. Genes are either expressed or unexpressed,
@@ -377,23 +378,35 @@ def find_compound_outflux_routes(
     Args:
         db: A Neo4j client connected to the graph database.
         compound_id: The metaId of the compound of interest.
-        expressed_genes: A list of genes that are considered expressed.
+        expressed_genes: A list of genes that are considered expressed. If not
+          given, all genes are considered expressed.
+        drop_nodes: The metaId or name of blacklisted Reaction/Compound nodes.
         max_level: The maximum number of hops in the traversal.
 
     Returns:
         Paths to sinks of the given metabolite.
     """
     # We want to keep reactions wo/ genes, and reactions w/ expressed genes
-    all_genes = get_table_of_gene_products(db)
-    valid_genes = set(expressed_genes)
-    bad_rxns = [x["rxn_id"] for x in all_genes if x["gene"] not in valid_genes]
-    bad_cpds = get_high_degree_compound_nodes(db)
-    ignore_nodes = bad_rxns + bad_cpds
+    ignore_nodes = get_high_degree_compound_nodes(db)
 
-    return db.read(
+    if expressed_genes is not None:
+        all_genes = get_table_of_gene_products(db)
+        valid_genes = set(expressed_genes)
+        bad_rxns = [x["rxn_id"] for x in all_genes if x["gene"] not in valid_genes]
+        ignore_nodes += bad_rxns
+
+    if drop_nodes is not None:
+        ignore_nodes += drop_nodes
+
+    # Get a list of possible routes, where each route is represented by a list
+    # of sequential nodes (dicts) of Compound->Reaction->Compound->Reaction...
+    routes: list[dict[str, list[dict[str, str]]]] = db.read(
         """
         MATCH (n)
-        WHERE n.metaId IN $bad_nodes
+        WHERE (n:Compound OR n:Reaction) AND (
+            (n.metaId IN $bad_nodes) OR
+            (n.name IN $bad_nodes)
+        )
         WITH COLLECT(n) AS ns
         
         MATCH (c:Compound {metaId: $cpd_id})
@@ -401,18 +414,41 @@ def find_compound_outflux_routes(
             beginSequenceAtStart: false,
             sequence: "<hasLeft,Reaction,hasRight>,Compound,<hasLeft",
             blacklistNodes: ns,
+            uniqueness: "NODE_PATH",
             bfs: false,
             minLevel: 2,
             maxLevel: $max_hops
         })
         YIELD path
-        RETURN c, path, length(path) AS hops
-        ORDER BY hops; 
+        RETURN [x in nodes(path) | {name: x.name, id: x.metaId, nodeType: labels(x)[0]}] AS route; 
         """,
         cpd_id=compound_id,
         bad_nodes=ignore_nodes,
-        max_hops=max_level
+        max_hops=max_level,
     )
+    routes = list(routes)
+
+    # When end metabolites don't have consuming reactions, their producing
+    # reaction appears but the Compound nodes are missing in the path.
+    terminal_rxns = {}
+    for i, p in enumerate(routes):
+        if p["route"][-1]["nodeType"] == "Reaction":
+            terminal_rxns[str(i)] = p["route"][-1]["id"]
+
+    terminal_cpds = db.read(
+        """
+        UNWIND keys($rxn_ids) AS rxn_idx
+        MATCH (r:Reaction {metaId: $rxn_ids[rxn_idx]})-[:hasRight]->(c:Compound)
+        WHERE NOT c.metaId IN $bad_nodes
+        RETURN rxn_idx, {name: c.name, id: c.metaId} AS cpd;
+        """,
+        rxn_ids=terminal_rxns,
+        bad_nodes=ignore_nodes,
+    )
+    for n in terminal_cpds:
+        routes[int(n["rxn_idx"])]["route"].append(n["cpd"])
+
+    return routes
 
 
 def get_all_reactions_related_to_compound(
