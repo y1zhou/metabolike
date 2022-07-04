@@ -1,7 +1,10 @@
+import logging
 from typing import Dict, Set
 
 import pandas as pd
 from metabolike.db import Neo4jClient
+
+logger = logging.getLogger(__name__)
 
 
 def get_all_gene_products(db: Neo4jClient) -> Set[str]:
@@ -43,16 +46,6 @@ def get_table_of_gene_products(db: Neo4jClient, rdf_fields: Dict[str, str] = Non
 
 
 class ReactionGeneMap:
-    """
-
-    Attributes:
-        database_connection: Connection to the Neo4j database.
-        rxn_exp: expression levels of each reaction.
-        expression_levels: gene expression data.
-        gene_groups: parent-child mapping of gene product sets and complexes.
-        gene_id_map: mapping between gene metaId and gene name.
-    """
-
     def __init__(
         self,
         database_connection: Neo4jClient,
@@ -62,6 +55,15 @@ class ReactionGeneMap:
         gene_set_reduce_func: callable = max,
         gene_complex_reduce_func: callable = min,
     ):
+        """
+
+        Attributes:
+            database_connection: Connection to the Neo4j database.
+            rxn_exp: expression levels of each reaction.
+            expression_levels: gene expression data.
+            gene_groups: parent-child mapping of gene product sets and complexes.
+            gene_id_map: mapping between gene metaId and gene name.
+        """
 
         self.db = database_connection
         self.gene_exp = expression_levels
@@ -85,7 +87,10 @@ class ReactionGeneMap:
         rxn_genes = self._get_top_level_rxn_gene_mapping()
 
         for rxn, gene in rxn_genes.items():
-            if gene_name := self.gene_id_map.get(gene):  # not None or ""
+            # GeneProductSet or GeneProductComplex
+            if gene in self._valid_gene_groups:
+                self.rxn_exp[rxn] = self.get_gene_expression(gene)
+            elif gene_name := self.gene_id_map.get(gene):  # not None or ""
                 self.rxn_exp[rxn] = self.get_gene_expression(gene_name)
 
     def get_gene_expression(self, gene_name: str):
@@ -95,7 +100,7 @@ class ReactionGeneMap:
             return self.calc_reaction_gene_group_expression(gene_name)
         else:
             # raise ValueError(f"Unknown gene product {gene_name}")
-            print(gene_name)
+            logger.warning(f"Unknown gene product {gene_name}")
 
     def calc_reaction_gene_group_expression(self, gene_group_id: str):
         """
@@ -111,6 +116,9 @@ class ReactionGeneMap:
             for gene_id in gene_ids
             if (gene_name := self.gene_id_map.get(gene_id))
         ]
+        res = [x for x in res if x is not None]
+        if not res:
+            return 0.0
 
         if group_type == "Set":
             return self._set_func(res)
