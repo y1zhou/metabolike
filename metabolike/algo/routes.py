@@ -1,10 +1,16 @@
+from __future__ import annotations
+
+import logging
 from typing import Dict, Iterable, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
-from metabolike.algo.omics import get_table_of_gene_products
+from metabolike.algo.omics import ReactionGeneMap, get_table_of_gene_products
 from metabolike.db import Neo4jClient
 from metabolike.utils import generate_gene_reaction_rule
+from rdkit import Chem, DataStructs
+
+logger = logging.getLogger(__name__)
 
 # TODO: refactor this with get_high_degree_compound_nodes()
 COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
@@ -327,9 +333,13 @@ def get_reaction_route_between_compounds(
 def find_compound_outflux_routes(
     db: Neo4jClient,
     compound_id: str,
+    reaction_gene_expression: ReactionGeneMap,
     expressed_genes: Iterable[str] = None,
-    drop_nodes: List[str] = None,
+    drop_nodes: list[str] = None,
     max_level: int = 10,
+    expression_coef: float = 1.0,
+    structure_similarity_coef: float = 10.0,
+    route_length_coef: float = 0.5,
 ):
     """
     Find how a compound is consumed. Genes are either expressed or unexpressed,
@@ -348,24 +358,27 @@ def find_compound_outflux_routes(
     For details on how the optional parameters are used, see:
     https://neo4j.com/labs/apoc/4.4/overview/apoc.path/apoc.path.expandConfig/
 
-    TODO: distinguish ``geneProductSet`` and ``geneProductComplex``.
-
     Args:
         db: A Neo4j client connected to the graph database.
         compound_id: The metaId of the compound of interest.
+        reaction_gene_expression: Expression levels of the reactions.
         expressed_genes: A list of genes that are considered expressed. If not
           given, all genes are considered expressed.
         drop_nodes: The metaId or name of blacklisted Reaction/Compound nodes.
         max_level: The maximum number of hops in the traversal.
+        expression_coef: Score coefficient for route expression level.
+        structure_similarity_coef: Score coefficient for metabolite similarity
+          score.
+        route_length_coef: Score coefficient for length of route.
 
     Returns:
         Paths to sinks of the given metabolite.
     """
     # We want to keep reactions wo/ genes, and reactions w/ expressed genes
     ignore_nodes = get_high_degree_compound_nodes(db)
+    all_genes = get_table_of_gene_products(db)
 
     if expressed_genes is not None:
-        all_genes = get_table_of_gene_products(db)
         valid_genes = set(expressed_genes)
         bad_rxns = [x["rxn_id"] for x in all_genes if x["gene"] not in valid_genes]
         ignore_nodes += bad_rxns
@@ -408,6 +421,7 @@ def find_compound_outflux_routes(
     terminal_rxns = {}
     for i, p in enumerate(routes):
         if p["route"][-1]["nodeType"] == "Reaction":
+            # Neo4j can't deal with int keys
             terminal_rxns[str(i)] = p["route"][-1]["id"]
 
     terminal_cpds = db.read(
@@ -421,9 +435,68 @@ def find_compound_outflux_routes(
         bad_nodes=ignore_nodes,
     )
     for n in terminal_cpds:
+        n["cpd"]["nodeType"] = "Compound"
         routes[int(n["rxn_idx"])]["route"].append(n["cpd"])
 
-    return routes
+    # Another case is when the end metabolite is in `ignore_nodes`.
+    # These end reactions are dropped.
+    routes = [r for r in routes if r["route"][-1]["nodeType"] != "Reaction"]
+
+    # Get genes associated with each route
+    rxns_in_route = {
+        str(i): {x["id"] for j, x in enumerate(r["route"]) if j % 2 != 0}
+        for i, r in enumerate(routes)
+    }
+    route_expression_levels = [
+        reaction_gene_expression.get_route_expression(v) for v in rxns_in_route.values()
+    ]
+
+    # Get start and end metabolite structures of each route
+    terminal_cpds = [x["route"][-1]["id"] for x in routes]
+    query_cpds = list(set(terminal_cpds))
+    query_cpds.append(compound_id)
+    terminal_cpd_structs = db.read(
+        """
+        MATCH (c:Compound)
+        WHERE c.metaId IN $cpds 
+        RETURN c{.metaId, .smiles}
+        """,
+        cpds=query_cpds,
+    )
+    cpd_structs = {n["c"]["metaId"]: n["c"]["smiles"] for n in terminal_cpd_structs}
+    input_cpd_struct = cpd_structs[compound_id]
+    route_struct_scores = [
+        calc_tanimoto_similarity(input_cpd_struct, cpd_structs[x])
+        for x in terminal_cpds
+    ]
+
+    # Calculate the final score of each route
+    route_lengths = [len(r["route"]) // 2 for r in routes]
+    route_scores = []
+    for e, s, l in zip(route_expression_levels, route_struct_scores, route_lengths):
+        score = expression_coef * e + route_length_coef * l
+        if s is not None:
+            score += structure_similarity_coef * s
+        route_scores.append(score)
+
+    res = [{"score": s, "route": r["route"]} for r, s in zip(routes, route_scores)]
+    res = sorted(res, key=lambda x: x["score"], reverse=True)
+    return res
+
+
+def calc_tanimoto_similarity(smiles1: str, smiles2: str) -> float | None:
+    if smiles1 is None or smiles2 is None:
+        return None
+    try:
+        mol1 = Chem.MolFromSmiles(smiles1)
+        mol2 = Chem.MolFromSmiles(smiles2)
+        fp1 = Chem.RDKFingerprint(mol1)
+        fp2 = Chem.RDKFingerprint(mol2)
+        return DataStructs.TanimotoSimilarity(fp1, fp2)
+    except Exception as e:
+        # e.g. 'CC(=O)SC[C@@H](C(=O)[a protein])N[a protein]'
+        logger.error(e)
+        return None
 
 
 def get_all_reactions_related_to_compound(
