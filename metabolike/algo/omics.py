@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Set
+from typing import Dict, Iterable, Set
 
 import pandas as pd
 from metabolike.db import Neo4jClient
@@ -126,6 +126,24 @@ class ReactionGeneMap:
             return self._complex_func(res)
         else:
             raise ValueError(f"Unknown gene group type: {group_type}")
+
+    def get_route_expression(self, rxn_ids: Iterable[str]) -> float:
+        """
+        Sums up total expression levels of the reaction route, and divide
+        the value by the number of reactions.
+
+        Args:
+            rxn_ids: The metaId fields of the reactions.
+
+        Returns:
+            The averaged expression level.
+        """
+        res = 0.0
+        for rxn_id in rxn_ids:
+            if (gene_exp := self.rxn_exp.get(rxn_id)) is not None:
+                res += gene_exp
+
+        return res / len(rxn_ids)
 
     def _get_top_level_rxn_gene_mapping(self):
         """
