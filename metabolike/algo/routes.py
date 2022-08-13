@@ -386,6 +386,12 @@ def find_compound_outflux_routes(
     if drop_nodes is not None:
         ignore_nodes += drop_nodes
 
+    if compound_id in ignore_nodes:
+        ignore_nodes.remove(compound_id)
+        logger.warning(
+            "This may be slow as the compound is in ignore_nodes. Searching for some ubiquitous chemical?"
+        )
+
     # Get a list of possible routes, where each route is represented by a list
     # of sequential nodes (dicts) of Compound->Reaction->Compound->Reaction...
     routes: list[dict[str, list[dict[str, str]]]] = db.read(
@@ -408,7 +414,7 @@ def find_compound_outflux_routes(
             maxLevel: $max_hops
         })
         YIELD path
-        RETURN [x in nodes(path) | {name: x.name, id: x.metaId, nodeType: labels(x)[0]}] AS route; 
+        RETURN [x in nodes(path) | {name: x.name, id: x.metaId, nodeType: labels(x)[0]}] AS route;
         """,
         cpd_id=compound_id,
         bad_nodes=ignore_nodes,
