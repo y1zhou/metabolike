@@ -5,10 +5,11 @@ from typing import Dict, Iterable, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
+from rdkit import Chem, DataStructs
+
 from metabolike.algo.omics import ReactionGeneMap, get_table_of_gene_products
 from metabolike.db import Neo4jClient
 from metabolike.utils import generate_gene_reaction_rule
-from rdkit import Chem, DataStructs
 
 logger = logging.getLogger(__name__)
 
@@ -227,7 +228,7 @@ def get_cpd_view_of_pathway(
     )
 
 
-def get_high_degree_compound_nodes(db: Neo4jClient, degree: int = 60) -> List[str]:
+def get_high_degree_compound_nodes(db: Neo4jClient, degree: int = 45) -> List[str]:
     """
     Get all compound nodes with a high degree, i.e. with a lot of edges to
     ``Reaction`` nodes. Including these nodes in many cases would pollute
