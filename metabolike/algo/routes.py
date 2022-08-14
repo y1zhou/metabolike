@@ -486,7 +486,22 @@ def find_compound_outflux_routes(
             score += structure_similarity_coef * s
         route_scores.append(score)
 
-    res = [{"score": s, "route": r["route"]} for r, s in zip(routes, route_scores)]
+    # Save genes in each route
+    route_genes = []
+    for r in routes:
+        r_genes = set()
+        for step in r["route"]:
+            if step["nodeType"] == "Reaction":
+                if step_genes := reaction_gene_expression.reaction_gp_mapping.get(
+                    step["id"]
+                ):
+                    r_genes |= step_genes
+        route_genes.append(r_genes)
+
+    res = [
+        {"score": s, "genes": g, "route": r["route"]}
+        for r, s, g in zip(routes, route_scores, route_genes)
+    ]
     res = sorted(res, key=lambda x: x["score"], reverse=True)
     return res
 
