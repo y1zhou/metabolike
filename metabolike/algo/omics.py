@@ -2,6 +2,7 @@ import logging
 from typing import Dict, Iterable, Set
 
 import pandas as pd
+
 from metabolike.db import Neo4jClient
 
 logger = logging.getLogger(__name__)
@@ -85,28 +86,46 @@ class ReactionGeneMap:
 
         # Setup reaction expression levels
         rxn_genes = self._get_top_level_rxn_gene_mapping()
+        self.reaction_gp_mapping = {}
 
         for rxn, gene in rxn_genes.items():
             # GeneProductSet or GeneProductComplex
             if gene in self._valid_gene_groups:
+                self.reaction_gp_mapping[rxn] = self.get_all_genes_in_group(gene)
                 self.rxn_exp[rxn] = self.get_gene_expression(gene)
             elif gene_name := self.gene_id_map.get(gene):  # not None or ""
+                self.reaction_gp_mapping[rxn] = {gene_name}
                 self.rxn_exp[rxn] = self.get_gene_expression(gene_name)
+
+    def get_all_genes_in_group(self, gene: str):
+        if gene in self.gene_exp:
+            return {gene}
+        elif gene in self._valid_gene_groups:
+            res = set()
+            genes = self.gene_groups.loc[self.gene_groups["group_id"] == gene, :]
+            gene_ids = genes["members"].values
+            for g in gene_ids:
+                if gene_name := self.gene_id_map.get(g):
+                    if maybe_gene_name := self.get_all_genes_in_group(gene_name):
+                        res.union(maybe_gene_name)
+
+            return res
 
     def get_gene_expression(self, gene_name: str):
         if (gene_exp := self.gene_exp.get(gene_name)) is not None:
             return gene_exp
         elif gene_name in self._valid_gene_groups:
             return self.calc_reaction_gene_group_expression(gene_name)
-        else:
-            # raise ValueError(f"Unknown gene product {gene_name}")
-            logger.warning(f"Unknown gene product {gene_name}")
+        # else:
+        #     # raise ValueError(f"Unknown gene product {gene_name}")
+        #     logger.warning(f"Unknown gene product {gene_name}")
 
     def calc_reaction_gene_group_expression(self, gene_group_id: str):
         """
         Calculate the expression level of a given gene product set or
         complex node.
         """
+        # TODO: make use of self.get_all_genes_in_group()
         genes = self.gene_groups.loc[self.gene_groups["group_id"] == gene_group_id, :]
         gene_ids = genes["members"].values
         group_type = genes["group_type"].values[0]
