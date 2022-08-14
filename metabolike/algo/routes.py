@@ -340,7 +340,7 @@ def find_compound_outflux_routes(
     max_level: int = 10,
     expression_coef: float = 1.0,
     structure_similarity_coef: float = 10.0,
-    route_length_coef: float = 0.5,
+    route_length_coef: float = 0.0,
 ):
     """
     Find how a compound is consumed. Genes are either expressed or unexpressed,
