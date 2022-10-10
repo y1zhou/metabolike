@@ -1,3 +1,5 @@
+from difflib import get_close_matches
+
 import pandas as pd
 
 from metabolike.db import Neo4jClient
@@ -57,6 +59,41 @@ class CompoundMap:
             .query("value.notna()")
             .explode("value")
             .drop_duplicates()
+            .assign(value_lowercase=lambda r: r["value"].str.lower())
         )
 
         return metaid_to_biocyc, res_long
+
+    def search_compound_biocyc_id(self, query: str, **kwargs):
+        """Returns the compound biocyc ID if it exists."""
+        res = {"query": query, "is_fuzzy_match": False}
+
+        # Direct return if query is a biocyc ID
+        if query in self.id_table["biocyc"]:
+            res["hits"] = [query]
+            return res
+
+        # Try exact matches first
+        exact_hits = self.compound_exact_match(query)
+        if exact_hits:
+            res["hits"] = exact_hits
+            return res
+
+        # Try fuzzy search if there's no exact biocyc ID matches
+        value_matches = get_close_matches(query, self.cpds["value_lowercase"], **kwargs)
+        if value_matches:
+            hits = [x for v in value_matches for x in self.compound_exact_match(v)]
+            res["hits"] = list(set(hits))
+            res["is_fuzzy_match"] = True
+            return res
+
+        res["hits"] = []
+        return res
+
+    def compound_exact_match(self, query: str):
+        """Finds biocyc IDs corresponding to the query."""
+        res = self.cpds.query("value_lowercase == @query")
+
+        # Return biocyc ID directly if there's an exact match
+        if res.shape[0] != 0:
+            return list(set(res["biocyc"]))
