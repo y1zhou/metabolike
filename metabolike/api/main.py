@@ -1,3 +1,7 @@
+"""
+This is NOT usable now. In the future this sub-package will be its own package
+that serves the function of proving a web-API for metabolike.
+"""
 import logging
 
 from fastapi import FastAPI
