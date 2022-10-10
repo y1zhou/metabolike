@@ -460,8 +460,7 @@ def find_compound_outflux_routes(
 
     # Get start and end metabolite structures of each route
     terminal_cpds = [x["route"][-1]["id"] for x in routes]
-    query_cpds = list(set(terminal_cpds))
-    query_cpds.append(compound_id)
+    query_cpds = list(set(terminal_cpds).union(compound_id))
     terminal_cpd_structs = db.read(
         """
         MATCH (c:Compound)
