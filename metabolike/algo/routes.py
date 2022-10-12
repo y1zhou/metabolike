@@ -470,7 +470,7 @@ def find_compound_outflux_routes(
         cpds=query_cpds,
     )
     cpd_structs = {n["c"]["metaId"]: n["c"]["smiles"] for n in terminal_cpd_structs}
-    if compound_id in cpd_structs:
+    if (structure_similarity_coef > 0.0) and (compound_id in cpd_structs):
         input_cpd_struct = cpd_structs[compound_id]
         route_struct_scores = [
             calc_tanimoto_similarity(input_cpd_struct, cpd_structs[x])
