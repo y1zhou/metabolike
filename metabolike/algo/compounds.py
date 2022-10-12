@@ -80,7 +80,9 @@ class CompoundMap:
             return res
 
         # Try fuzzy search if there's no exact biocyc ID matches
-        value_matches = get_close_matches(query, self.cpds["value_lowercase"], **kwargs)
+        value_matches = get_close_matches(
+            query.lower(), self.cpds["value_lowercase"], **kwargs
+        )
         if value_matches:
             hits = [x for v in value_matches for x in self.compound_exact_match(v)]
             res["hits"] = list(set(hits))
