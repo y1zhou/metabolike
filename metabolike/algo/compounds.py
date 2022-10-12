@@ -99,3 +99,18 @@ class CompoundMap:
         # Return biocyc ID directly if there's an exact match
         if res.shape[0] != 0:
             return list(set(res["biocyc"]))
+
+    def search_compound_compartment(self, query: str):
+        """Given a biocyc ID, return compartments it is in."""
+        res = self.id_table.loc[self.id_table.biocyc == query, "compartment"]
+        return list(set(res.values))
+
+    def search_compound_metaid_in_compartment(
+        self, query: str, compartment: str = "cytosol"
+    ):
+        res = (
+            self.id_table.query("biocyc == @query")
+            .query("compartment == @compartment")
+            .metaId
+        )
+        return res.tolist()[0]
