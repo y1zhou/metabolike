@@ -26,12 +26,13 @@ con = Neo4jClient(
     neo4j_password=neo4j_password,
     database=neo4j_database,
 )
+
+# Load dict of all compounds in grap
 cpds = CompoundMap(con)
 all_cpds = np.concatenate(
-    [cpds.id_table["metaId"], cpds.cpds.loc[cpds.cpds["key_id"] == "name", "value"]],
+    [cpds.cpds.loc[cpds.cpds["key_id"] == "name", "value"], cpds.id_table["metaId"]],
     axis=0,
 )
-# all_cpds = np.unique(all_cpds)
 
 # Load gene expression data
 expression_file = os.environ.get("METABOLIKE_EXP", "./tests/data/transcriptomics.json")
@@ -53,7 +54,7 @@ with st.sidebar:
         "Max number of reaction steps", min_value=0, max_value=30, value=15, step=1
     )
     max_num_routes = st.slider(
-        "Max number of routes to return", min_value=1, max_value=1000, step=1
+        "Max number of routes to return", min_value=1, max_value=200, value=20, step=1
     )
     ignore_nodes = st.multiselect(
         "Compounds to ignore",  # TODO: support reaction nodes
@@ -83,6 +84,13 @@ with st.sidebar:
 if debug:
     st.subheader("Expression levels")
     st.dataframe(pd.DataFrame({"logFC": st.session_state.gene_exp}))
+
+
+@st.cache
+def download_df(df):
+    # IMPORTANT: Cache the conversion to prevent computation on every rerun
+    return df.to_csv().encode("utf-8")
+
 
 # Find compounds
 st.subheader("Route search")
@@ -118,7 +126,7 @@ if cpd_query:
             for r in routes:
                 r["genes"] = "|".join(list(r["genes"]))
 
-            st.dataframe(
+            res = (
                 pd.DataFrame(routes)
                 .assign(
                     chain=lambda df: df["route"].apply(
@@ -129,8 +137,18 @@ if cpd_query:
                 )
                 .drop(columns="route")
                 .drop_duplicates()
-                .head(max_num_routes),
-                use_container_width=True,
+                .head(max_num_routes)
+            )
+
+            st.dataframe(res, use_container_width=True)
+
+            # Provide download link
+            csv = download_df(res)
+            st.download_button(
+                label="Download data as CSV",
+                data=csv,
+                file_name=f"{cpd_id}-route-search.csv",
+                mime="text/csv",
             )
 
 con.close()
