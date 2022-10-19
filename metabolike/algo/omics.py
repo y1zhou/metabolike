@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Iterable, Set
+from typing import Dict, Iterable, Sequence, Set
 
 import pandas as pd
 
@@ -50,7 +50,8 @@ class ReactionGeneMap:
     def __init__(
         self,
         database_connection: Neo4jClient,
-        expression_levels: dict[str, float],
+        gene_ids: Sequence[str],
+        expression_levels: Sequence[float],
         gene_groups: pd.DataFrame | None = None,
         gene_id_map: pd.DataFrame | None = None,
         gene_set_reduce_func: callable = max,
@@ -61,13 +62,17 @@ class ReactionGeneMap:
         Attributes:
             database_connection: Connection to the Neo4j database.
             rxn_exp: expression levels of each reaction.
+            gene_ids: A list-like of strings contains gene identifiers.
             expression_levels: gene expression data.
             gene_groups: parent-child mapping of gene product sets and complexes.
             gene_id_map: mapping between gene metaId and gene name.
         """
 
         self.db = database_connection
-        self.gene_exp = expression_levels
+        self.gene_exp = {
+            gene_id: exp_level
+            for gene_id, exp_level in zip(gene_ids, expression_levels)
+        }
         self.rxn_exp: dict[str, float] = {}
 
         if gene_groups is None:
