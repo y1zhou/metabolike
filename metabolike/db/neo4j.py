@@ -33,7 +33,9 @@ class Neo4jClient:
             raise RuntimeError("Could not connect to Neo4j")
         self.driver: Union[Neo4jDriver, BoltDriver] = driver
         self.database = database
-        # logger.debug(self.driver.verify_connectivity())
+
+        _connected = self.driver.get_server_info()
+        logger.debug(f"Connected to {_connected.address}")
 
     def close(self):
         self.driver.close()

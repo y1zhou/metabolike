@@ -1,9 +1,17 @@
-from typing import Dict, List, Set, Tuple
+from __future__ import annotations
+
+import logging
+from typing import Dict, Iterable, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
+from rdkit import Chem, DataStructs
+
+from metabolike.algo.omics import ReactionGeneMap, get_table_of_gene_products
 from metabolike.db import Neo4jClient
 from metabolike.utils import generate_gene_reaction_rule
+
+logger = logging.getLogger(__name__)
 
 # TODO: refactor this with get_high_degree_compound_nodes()
 COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
@@ -220,7 +228,7 @@ def get_cpd_view_of_pathway(
     )
 
 
-def get_high_degree_compound_nodes(db: Neo4jClient, degree: int = 60):
+def get_high_degree_compound_nodes(db: Neo4jClient, degree: int = 45) -> List[str]:
     """
     Get all compound nodes with a high degree, i.e. with a lot of edges to
     ``Reaction`` nodes. Including these nodes in many cases would pollute
@@ -232,15 +240,16 @@ def get_high_degree_compound_nodes(db: Neo4jClient, degree: int = 60):
     Returns:
         A list of mcID of compound nodes.
     """
-    return db.read(
+    res = db.read(
         """
         MATCH (c:Compound)<-[:hasLeft|hasRight]-(r:Reaction)
         WITH c.metaId as cpd, COUNT(*) AS cnt
         WHERE cnt >= $degree
-        RETURN COLLECT(cpd);
+        RETURN COLLECT(cpd) AS cpds;
         """,
         degree=degree,
     )
+    return res[0]["cpds"]
 
 
 def get_reaction_route_between_compounds(
@@ -322,41 +331,198 @@ def get_reaction_route_between_compounds(
     )
 
 
-def find_compound_sink(
+def find_compound_outflux_routes(
     db: Neo4jClient,
     compound_id: str,
-    expressed_genes: List[str],
-    max_hops: int = 10,
+    reaction_gene_expression: ReactionGeneMap,
+    expressed_genes: Iterable[str] = None,
+    drop_nodes: list[str] = None,
+    max_level: int = 10,
+    expression_coef: float = 1.0,
+    structure_similarity_coef: float = 10.0,
+    route_length_coef: float = 0.0,
 ):
     """
     Find how a compound is consumed. Genes are either expressed or unexpressed,
     so this is a rather binary view of the metabolic network.
 
+    When searching for routes, we start from the compound of interest, and
+    expand to other compounds via reactions that are:
+
+    * TODO: reversible, or
+    * (physiol_)left_to_right, with the compound of interest on the left.
+
+    Whenever we encounter a reaction that's catalyzed by an unexpressed enzyme,
+    we stop the path search. Reactions that are not catalyzed by enzymes are
+    always included in the search.
+
+    For details on how the optional parameters are used, see:
+    https://neo4j.com/labs/apoc/4.4/overview/apoc.path/apoc.path.expandConfig/
+
     Args:
-        db: Database client.
+        db: A Neo4j client connected to the graph database.
         compound_id: The metaId of the compound of interest.
-        expressed_genes: A list of genes that are considered expressed.
-        max_hops: The maximum number of downstream compounds before stopping.
+        reaction_gene_expression: Expression levels of the reactions.
+        expressed_genes: A list of genes that are considered expressed. If not
+          given, all genes are considered expressed.
+        drop_nodes: The metaId or name of blacklisted Reaction/Compound nodes.
+        max_level: The maximum number of hops in the traversal.
+        expression_coef: Score coefficient for route expression level.
+        structure_similarity_coef: Score coefficient for metabolite similarity
+          score.
+        route_length_coef: Score coefficient for length of route.
+
+    Returns:
+        Paths to sinks of the given metabolite.
     """
-    return db.read(
-        """
-        // List of considered genes
-        MATCH (r:Reaction)-[:hasGeneProduct|hasMember|hasComponent*]->(gp:geneProduct)
-        WHERE gp.id IN $genes
-        WITH COLLECT(r) as valid_rxns
-        MATCH (c:Compound {metaId: $cpd_id})<-[l:hasLeft|hasRight]-(r:Reaction)
-        // keep reversible reactions and reactions that consume the cpd
-        WHERE NOT (
-            type(l) = 'hasRight' AND
-            r.reactionDirection CONTAINS 'left_to_right'
+    # We want to keep reactions wo/ genes, and reactions w/ expressed genes
+    ignore_nodes = get_high_degree_compound_nodes(db)
+    all_genes = get_table_of_gene_products(db)
+
+    if expressed_genes is not None:
+        valid_genes = set(expressed_genes)
+        bad_rxns = [x["rxn_id"] for x in all_genes if x["gene"] not in valid_genes]
+        ignore_nodes += bad_rxns
+
+    if drop_nodes is not None:
+        ignore_nodes += drop_nodes
+
+    if compound_id in ignore_nodes:
+        ignore_nodes.remove(compound_id)
+        logger.warning(
+            "This may be slow as the compound is in ignore_nodes. Searching for some ubiquitous chemical?"
         )
-        WITH r, c
-        RETURN r, c
+
+    # Get a list of possible routes, where each route is represented by a list
+    # of sequential nodes (dicts) of Compound->Reaction->Compound->Reaction...
+    routes: list[dict[str, list[dict[str, str]]]] = db.read(
+        """
+        MATCH (n)
+        WHERE (n:Compound OR n:Reaction) AND (
+            (n.metaId IN $bad_nodes) OR
+            (n.name IN $bad_nodes)
+        )
+        WITH COLLECT(n) AS ns
+        
+        MATCH (c:Compound {metaId: $cpd_id})
+        CALL apoc.path.expandConfig(c, {
+            beginSequenceAtStart: false,
+            sequence: "<hasLeft,Reaction,hasRight>,Compound,<hasLeft",
+            blacklistNodes: ns,
+            uniqueness: "NODE_PATH",
+            bfs: false,
+            minLevel: 2,
+            maxLevel: $max_hops
+        })
+        YIELD path
+        RETURN [x in nodes(path) | {name: x.name, id: x.metaId, nodeType: labels(x)[0]}] AS route;
         """,
         cpd_id=compound_id,
-        genes=expressed_genes,
-        max_hops=max_hops,
+        bad_nodes=ignore_nodes,
+        max_hops=max_level,
     )
+    routes = list(routes)
+
+    # When end metabolites don't have consuming reactions, their producing
+    # reaction appears but the Compound nodes are missing in the path.
+    terminal_rxns = {}
+    for i, p in enumerate(routes):
+        if p["route"][-1]["nodeType"] == "Reaction":
+            # Neo4j can't deal with int keys
+            terminal_rxns[str(i)] = p["route"][-1]["id"]
+
+    terminal_cpds = db.read(
+        """
+        UNWIND keys($rxn_ids) AS rxn_idx
+        MATCH (r:Reaction {metaId: $rxn_ids[rxn_idx]})-[:hasRight]->(c:Compound)
+        WHERE NOT c.metaId IN $bad_nodes
+        RETURN rxn_idx, {name: c.name, id: c.metaId} AS cpd;
+        """,
+        rxn_ids=terminal_rxns,
+        bad_nodes=ignore_nodes,
+    )
+    for n in terminal_cpds:
+        n["cpd"]["nodeType"] = "Compound"
+        routes[int(n["rxn_idx"])]["route"].append(n["cpd"])
+
+    # Another case is when the end metabolite is in `ignore_nodes`.
+    # These end reactions are dropped.
+    routes = [r for r in routes if r["route"][-1]["nodeType"] != "Reaction"]
+
+    # Get genes associated with each route
+    rxns_in_route = {
+        str(i): {x["id"] for j, x in enumerate(r["route"]) if j % 2 != 0}
+        for i, r in enumerate(routes)
+    }
+    route_expression_levels = [
+        reaction_gene_expression.get_route_expression(v) for v in rxns_in_route.values()
+    ]
+
+    # Get start and end metabolite structures of each route
+    terminal_cpds = [x["route"][-1]["id"] for x in routes]
+    query_cpds = list(set(terminal_cpds).union(compound_id))
+    terminal_cpd_structs = db.read(
+        """
+        MATCH (c:Compound)
+        WHERE c.metaId IN $cpds 
+        RETURN c{.metaId, .smiles}
+        """,
+        cpds=query_cpds,
+    )
+    cpd_structs = {n["c"]["metaId"]: n["c"]["smiles"] for n in terminal_cpd_structs}
+    if (structure_similarity_coef > 0.0) and (compound_id in cpd_structs):
+        input_cpd_struct = cpd_structs[compound_id]
+        route_struct_scores = [
+            calc_tanimoto_similarity(input_cpd_struct, cpd_structs[x])
+            if x != compound_id
+            else None
+            for x in terminal_cpds
+        ]
+    else:
+        route_struct_scores = [None] * len(terminal_cpds)
+
+    # Calculate the final score of each route
+    route_lengths = [len(r["route"]) // 2 for r in routes]
+    route_scores = []
+    for e, s, l in zip(route_expression_levels, route_struct_scores, route_lengths):
+        score = expression_coef * e + route_length_coef * l
+        if s is not None:
+            score += structure_similarity_coef * s
+        route_scores.append(score)
+
+    # Save genes in each route
+    route_genes = []
+    for r in routes:
+        r_genes = set()
+        for step in r["route"]:
+            if step["nodeType"] == "Reaction":
+                if step_genes := reaction_gene_expression.reaction_gp_mapping.get(
+                    step["id"]
+                ):
+                    r_genes |= step_genes
+        route_genes.append(r_genes)
+
+    res = [
+        {"score": s, "genes": g, "route": r["route"]}
+        for r, s, g in zip(routes, route_scores, route_genes)
+    ]
+    res = sorted(res, key=lambda x: x["score"], reverse=True)
+    return res
+
+
+def calc_tanimoto_similarity(smiles1: str, smiles2: str) -> float | None:
+    if smiles1 is None or smiles2 is None:
+        return None
+    try:
+        mol1 = Chem.MolFromSmiles(smiles1)
+        mol2 = Chem.MolFromSmiles(smiles2)
+        fp1 = Chem.RDKFingerprint(mol1)
+        fp2 = Chem.RDKFingerprint(mol2)
+        return DataStructs.TanimotoSimilarity(fp1, fp2)
+    except Exception as e:
+        # e.g. 'CC(=O)SC[C@@H](C(=O)[a protein])N[a protein]'
+        logger.error(e)
+        return None
 
 
 def get_all_reactions_related_to_compound(

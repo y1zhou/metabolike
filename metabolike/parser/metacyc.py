@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import pandas as pd
-from metabolike.utils import add_kv_to_dict, snake_to_camel, validate_path
 from tqdm import tqdm
 
+from metabolike.utils import add_kv_to_dict, snake_to_camel, validate_path
 from .sbml import SBMLParser
 
 logger = logging.getLogger(__name__)
