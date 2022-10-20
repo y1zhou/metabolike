@@ -28,10 +28,13 @@ Metabolic reprogramming Knowledgebase
 
 A Python package that aggregates the data from BRENDA_ and BioCyc_ into one unified `graph database`_.
 The MetaCyc (BioCyc) database is imported to a graph database using the provided SBML file and various ``.dat`` files.
+A `Streamlit`_ app is `included in the code`_ for easy route search with both example TCGA datasets and custom CSV files.
 
 .. _BRENDA: https://brenda-enzymes.org/
 .. _BioCyc: https://biocyc.org/
 .. _graph database: https://neo4j.com/
+.. _Streamlit: https://streamlit.io/
+.. _included in the code: https://github.com/y1zhou/metabolike/blob/main/metabolike/api/main.py
 
 To-Do
 -----
