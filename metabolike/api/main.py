@@ -36,7 +36,7 @@ with st.sidebar:
         "Max number of reaction steps", min_value=0, max_value=30, value=15, step=1
     )
     max_num_routes = st.slider(
-        "Max number of routes to return", min_value=1, max_value=200, value=20, step=1
+        "Max number of routes to return", min_value=1, max_value=1000, value=20, step=1
     )
     ignore_nodes = st.multiselect(
         "Compounds to ignore",  # TODO: support reaction nodes
@@ -140,6 +140,7 @@ if st.session_state.exp_loaded:
                     reaction_gene_expression=rgm,
                     drop_nodes=ignore_nodes,
                     max_level=max_hops,
+                    max_num_routes=max_num_routes,
                     expression_coef=expression_coef,
                     structure_similarity_coef=struct_sim_coef,
                     route_length_coef=route_len_coef,

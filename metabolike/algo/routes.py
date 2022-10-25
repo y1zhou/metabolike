@@ -338,6 +338,7 @@ def find_compound_outflux_routes(
     expressed_genes: Iterable[str] = None,
     drop_nodes: list[str] = None,
     max_level: int = 10,
+    max_num_routes: int = 1000,
     expression_coef: float = 1.0,
     structure_similarity_coef: float = 10.0,
     route_length_coef: float = 0.0,
@@ -367,6 +368,7 @@ def find_compound_outflux_routes(
           given, all genes are considered expressed.
         drop_nodes: The metaId or name of blacklisted Reaction/Compound nodes.
         max_level: The maximum number of hops in the traversal.
+        max_num_routes: The maximum number of routes to return.
         expression_coef: Score coefficient for route expression level.
         structure_similarity_coef: Score coefficient for metabolite similarity
           score.
@@ -377,10 +379,10 @@ def find_compound_outflux_routes(
     """
     # We want to keep reactions wo/ genes, and reactions w/ expressed genes
     ignore_nodes = get_high_degree_compound_nodes(db)
-    all_genes = get_table_of_gene_products(db)
 
     if expressed_genes is not None:
         valid_genes = set(expressed_genes)
+        all_genes = get_table_of_gene_products(db)
         bad_rxns = [x["rxn_id"] for x in all_genes if x["gene"] not in valid_genes]
         ignore_nodes += bad_rxns
 
@@ -412,7 +414,8 @@ def find_compound_outflux_routes(
             uniqueness: "NODE_PATH",
             bfs: false,
             minLevel: 2,
-            maxLevel: $max_hops
+            maxLevel: $max_hops,
+            limit: $max_num_routes
         })
         YIELD path
         RETURN [x in nodes(path) | {name: x.name, id: x.metaId, nodeType: labels(x)[0]}] AS route;
@@ -420,6 +423,7 @@ def find_compound_outflux_routes(
         cpd_id=compound_id,
         bad_nodes=ignore_nodes,
         max_hops=max_level,
+        max_num_routes=max_num_routes,
     )
     routes = list(routes)
 
