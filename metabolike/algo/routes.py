@@ -460,7 +460,7 @@ def find_compound_outflux_routes(
 
     # Get start and end metabolite structures of each route
     terminal_cpds = [x["route"][-1]["id"] for x in routes]
-    query_cpds = list(set(terminal_cpds).union(compound_id))
+    query_cpds = list(set(terminal_cpds).union([compound_id]))
     terminal_cpd_structs = db.read(
         """
         MATCH (c:Compound)
@@ -503,8 +503,20 @@ def find_compound_outflux_routes(
         route_genes.append(r_genes)
 
     res = [
-        {"score": s, "genes": g, "route": r["route"]}
-        for r, s, g in zip(routes, route_scores, route_genes)
+        {
+            "score": s,
+            "genes": g,
+            "route": r["route"],
+            "expression_level": exp,
+            "tanimoto_similarity": struct,
+        }
+        for r, s, g, exp, struct in zip(
+            routes,
+            route_scores,
+            route_genes,
+            route_expression_levels,
+            route_struct_scores,
+        )
     ]
     res = sorted(res, key=lambda x: x["score"], reverse=True)
     return res
