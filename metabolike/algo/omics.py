@@ -112,7 +112,7 @@ class ReactionGeneMap:
             for g in gene_ids:
                 if gene_name := self.gene_id_map.get(g):
                     if maybe_gene_name := self.get_all_genes_in_group(gene_name):
-                        res.union(maybe_gene_name)
+                        res = res.union(maybe_gene_name)
 
             return res
 
