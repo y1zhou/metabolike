@@ -46,21 +46,21 @@ with st.sidebar:
 
     st.subheader("Route search weights")
     expression_coef = st.slider(
-        "Expression level", min_value=0.0, max_value=1.0, value=1.0, step=0.01
+        "Expression level", min_value=-1.0, max_value=1.0, value=1.0, step=0.05
     )
     struct_sim_coef = st.slider(
         "End metabolite structure similarity",
-        min_value=0.0,
+        min_value=-1.0,
         max_value=1.0,
-        value=0.5,
-        step=0.01,
+        value=1.0,
+        step=0.05,
     )
     route_len_coef = st.slider(
         "Number of reactions in route",
-        min_value=0.0,
+        min_value=-1.0,
         max_value=1.0,
         value=0.0,
-        step=0.01,
+        step=0.1,
     )
 
     st.subheader("Route search options")
@@ -147,13 +147,13 @@ if st.session_state.exp_loaded:
                 )
 
             if routes:
-                num_routes = min(len(routes), max_num_routes)
-                st.success(
-                    f"Found {len(routes)} routes in total, returning top {num_routes}."
-                )
+                if debug:
+                    st.write(routes)
+                st.success(f"Found {len(routes)} routes.")
                 for r in routes:
                     r["genes"] = "|".join(list(r["genes"]))
 
+                sort_ascending = route_mode == "Lowest scores"
                 res = (
                     pd.DataFrame(routes)
                     .assign(
@@ -164,8 +164,7 @@ if st.session_state.exp_loaded:
                         )
                     )
                     .drop(columns="route")
-                    .drop_duplicates()
-                    .head(max_num_routes)
+                    .sort_values("score", ascending=False)
                 )
 
                 st.dataframe(res, use_container_width=True)
@@ -178,5 +177,7 @@ if st.session_state.exp_loaded:
                     file_name=f"{cpd_id}-route-search.csv",
                     mime="text/csv",
                 )
+            else:
+                st.warning("Didn't find any routes.")
 
 con.close()
