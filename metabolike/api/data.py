@@ -2,8 +2,10 @@ import os
 
 import pandas as pd
 import streamlit as st
+from streamlit_agraph import Edge, Node
 
 from metabolike.algo.compounds import CompoundMap
+from metabolike.algo.omics import ReactionGeneMap
 from metabolike.db import Neo4jClient
 
 TCGA = (
@@ -62,3 +64,72 @@ def download_tcga_data(tcga_project: str):
 def download_df(df):
     # IMPORTANT: Cache the conversion to prevent computation on every rerun
     return df.to_csv().encode("utf-8")
+
+
+def routes_to_graph(
+    routes, rgm: ReactionGeneMap, pos_color="#FF4B4B", neg_color="#002941"
+):
+    """
+    Generates a graph object used by streamlit for visualizing the routes.
+    Duplicated reaction nodes are dropped but edges are preserved.
+    Edge widths are proportional to the highest-scoring route they belong to.
+    """
+    nodes, edges = {}, {}
+    max_score, min_score = -float("inf"), float("inf")
+
+    for route_id, route in enumerate(routes):
+        # Save max/min scores for later scaling
+        max_score = max(max_score, abs(route["score"]))
+        min_score = min(min_score, abs(route["score"]))
+
+        # Iterate over all nodes
+        r = route["route"]
+        route_color = pos_color if route["score"] > 0 else neg_color
+        for i, step in enumerate(r):
+            # compound->reaction->compound|compounds->reaction->...
+            if step["nodeType"] == "Compound":
+                # Default state for new nodes
+                if step["id"] not in nodes:
+                    n = Node(
+                        id=step["id"],
+                        label=step["name"],
+                        size=6,
+                        shape="dot",
+                        color="#EA9C70",
+                    )
+                    nodes[step["id"]] = n
+                # TODO: color nodes based on structural similarity?
+
+            elif step["nodeType"] == "Reaction":
+                n_src = r[i - 1]["id"]
+                _ = edges.setdefault(n_src, {})
+
+                k = i + 1
+                while k < len(r) and r[k]["nodeType"] == "Compound":
+                    n_tgt = r[k]["id"]
+
+                    if n_tgt not in edges[n_src]:
+                        rxn_exp = rgm.rxn_exp.get(step["id"])
+                        if rxn_exp is None:
+                            rxn_exp = route["score"]
+                        edges[n_src][n_tgt] = Edge(
+                            source=n_src,
+                            target=n_tgt,
+                            title=f"route {route_id}: {step['name']}",
+                            value=abs(rxn_exp),
+                            color=route_color,
+                        )
+
+                    k += 1
+
+            else:
+                raise ValueError(f"Unknown node type {step['nodeType']}")
+
+    # Scale edge widths
+    final_edges = [x for n in edges.values() for x in n.values()]
+    scaling_factor = max_score - min_score
+    for e in final_edges:
+        e.value = (e.value - min_score) / scaling_factor
+        e.value = min(e.value, 0.75)
+
+    return list(nodes.values()), final_edges

@@ -6,6 +6,7 @@ that serves the function of proving a streamlit app for route searching.
 import numpy as np
 import pandas as pd
 import streamlit as st
+from streamlit_agraph import Config, agraph
 
 from metabolike.algo.omics import ReactionGeneMap
 from metabolike.algo.routes import find_compound_outflux_routes
@@ -15,6 +16,7 @@ from metabolike.api.data import (
     download_tcga_data,
     get_compound_map,
     neo4j_db,
+    routes_to_graph,
 )
 
 st.set_page_config(layout="wide")
@@ -73,6 +75,8 @@ col1, col2 = st.columns([2, 3], gap="large")
 
 if "exp_loaded" not in st.session_state:
     st.session_state.exp_loaded = False
+if "route_loaded" not in st.session_state:
+    st.session_state.route_loaded = False
 with col1:
     tcga = st.selectbox(
         "You can test the route search function with a TCGA example dataset:",
@@ -114,9 +118,6 @@ if st.session_state.exp_loaded:
     rgm = ReactionGeneMap(con, gene_ids, exp_levels)
     st.success("Expression data loaded!")
 
-    if st.button("Start again"):
-        st.session_state.exp_loaded = False
-
     if debug:
         st.dataframe(st.session_state.gene_exp)
 
@@ -134,6 +135,9 @@ if st.session_state.exp_loaded:
         cpd_metaid = cpds.search_compound_metaid_in_compartment(cpd_id, compartment)
 
         if st.button("Route search"):
+            st.session_state.route_loaded = True
+
+        if st.session_state.route_loaded:
             with st.spinner(f"Searching routes starting from {cpd_metaid}"):
                 routes = find_compound_outflux_routes(
                     db=con,
@@ -196,7 +200,28 @@ if st.session_state.exp_loaded:
                         use_container_width=True,
                     )
 
+                # Visualize routes as a network graph
+                nodes, edges = routes_to_graph(routes, rgm)
+                for n in nodes:
+                    if n.id == cpd_metaid:
+                        n.size = 15
+                if debug:
+                    st.write(
+                        [
+                            {"from": e.source, "to": e.to, "width": e.value}
+                            for e in edges
+                        ]
+                    )
+
+                config = Config(
+                    width=1000,
+                    height=800,
+                    staticGraphWithDragAndDrop=True,
+                    collapsible=False,
+                )
+                agraph(nodes=nodes, edges=edges, config=config)
             else:
                 st.warning("Didn't find any routes.")
+
 
 con.close()
