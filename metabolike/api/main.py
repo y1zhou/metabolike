@@ -17,6 +17,7 @@ from metabolike.api.data import (
     neo4j_db,
 )
 
+st.set_page_config(layout="wide")
 st.title("Route search with metabolike")
 
 # Connect to Neo4j database
@@ -31,6 +32,9 @@ all_cpds = np.concatenate(
 
 # Configs for route search
 with st.sidebar:
+    st.subheader("General settings")
+    debug = st.checkbox("Debug mode", value=False)
+
     st.subheader("Resource limits")
     max_hops = st.slider(
         "Max number of reaction steps", min_value=0, max_value=30, value=15, step=1
@@ -63,15 +67,8 @@ with st.sidebar:
         step=0.1,
     )
 
-    st.subheader("Route search options")
-    route_mode = st.radio(
-        "Top routes", options=("Highest scores", "Lowest scores"), horizontal=True
-    )
-    debug = st.checkbox("Debug mode", value=False)
-
-
 # Load expression dataset
-st.subheader("Load expression data")
+st.subheader("1. Load expression data")
 col1, col2 = st.columns([2, 3], gap="large")
 
 if "exp_loaded" not in st.session_state:
@@ -107,6 +104,7 @@ if st.button("Load dataset"):
             st.session_state.score_col = "Score"
     st.session_state.exp_loaded = True
 
+
 if st.session_state.exp_loaded:
     if debug:
         st.write("Gene ID column: ", st.session_state.gene_id_col)
@@ -116,11 +114,14 @@ if st.session_state.exp_loaded:
     rgm = ReactionGeneMap(con, gene_ids, exp_levels)
     st.success("Expression data loaded!")
 
+    if st.button("Start again"):
+        st.session_state.exp_loaded = False
+
     if debug:
         st.dataframe(st.session_state.gene_exp)
 
     # Find compounds
-    st.subheader("Route search")
+    st.subheader("2. Pick a compound")
     cpd_query = st.text_input("Enter compound keyword:")
     if cpd_query:
         biocyc_ids = cpds.search_compound_biocyc_id(cpd_query)
@@ -147,27 +148,24 @@ if st.session_state.exp_loaded:
                 )
 
             if routes:
+                st.subheader("3. Inspect routes")
                 if debug:
                     st.write(routes)
                 st.success(f"Found {len(routes)} routes.")
                 for r in routes:
                     r["genes"] = "|".join(list(r["genes"]))
 
-                sort_ascending = route_mode == "Lowest scores"
                 res = (
                     pd.DataFrame(routes)
                     .assign(
-                        chain=lambda df: df["route"].apply(
+                        route=lambda df: df["route"].apply(
                             lambda r: " -> ".join(
                                 x["name"] for x in r if x["nodeType"] == "Compound"
                             )
                         )
                     )
-                    .drop(columns="route")
-                    .sort_values("score", ascending=False)
+                    .sort_values("tanimoto_similarity", ascending=False)
                 )
-
-                st.dataframe(res, use_container_width=True)
 
                 # Provide download link
                 csv = download_df(res)
@@ -177,6 +175,27 @@ if st.session_state.exp_loaded:
                     file_name=f"{cpd_id}-route-search.csv",
                     mime="text/csv",
                 )
+
+                # Show up/down-regulated routes separately
+                l, r = st.columns(2)
+                with l:
+                    st.write("Up-regulated routes:")
+                    st.dataframe(
+                        res.query("score > 0").sort_values("score", ascending=False),
+                        # .style.highlight_max(axis=0, color="#FF4B4B"),
+                        use_container_width=True,
+                    )
+
+                with r:
+                    st.write("Down-regulated routes:")
+                    st.dataframe(
+                        res.query("score < 0")
+                        .sort_values("score")
+                        .assign(score=lambda x: -x["score"]),
+                        # .style.highlight_max(axis=0, color="#FF4B4B"),
+                        use_container_width=True,
+                    )
+
             else:
                 st.warning("Didn't find any routes.")
 

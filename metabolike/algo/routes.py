@@ -455,7 +455,7 @@ def find_compound_outflux_routes(
 
     # Get genes associated with each route
     rxns_in_route = {
-        str(i): {x["id"] for j, x in enumerate(r["route"]) if j % 2 != 0}
+        str(i): {x["id"] for x in r["route"] if x["nodeType"] == "Reaction"}
         for i, r in enumerate(routes)
     }
     route_expression_levels = [
@@ -486,13 +486,16 @@ def find_compound_outflux_routes(
         route_struct_scores = [None] * len(terminal_cpds)
 
     # Calculate the final score of each route
-    route_lengths = [len(r["route"]) // 2 for r in routes]
+    route_lengths = [
+        len([x for x in r["route"] if x["nodeType"] == "Compound"]) for r in routes
+    ]
     route_scores = []
     for e, s, l in zip(route_expression_levels, route_struct_scores, route_lengths):
-        score = expression_coef * e + route_length_coef * l
+        score_sign = 1.0 if e > 0 else -1.0
+        score = expression_coef * abs(e) + route_length_coef * l
         if s is not None:
             score += structure_similarity_coef * s
-        route_scores.append(score)
+        route_scores.append(score_sign * score)
 
     # Save genes in each route
     route_genes = []
