@@ -19,6 +19,8 @@ watch:
 nav:
   - Home:
       - index.md
+      - usage/installation.md
+      - usage/getting_started.md
   # defer to gen-files + literate-nav
   - API references: reference/
 

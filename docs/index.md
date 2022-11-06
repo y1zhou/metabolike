@@ -11,33 +11,3 @@ app is [included in the
 code](https://github.com/y1zhou/metabolike/blob/main/metabolike/api/main.py)
 for easy route search with both example TCGA datasets and custom CSV
 files.
-
-## Project layout
-
-```yaml
-metabolike: # (1)
-  algo:
-    - compounds.py
-    - omics.py
-    - routes.py
-  api:
-    - data.py
-    - main.py # (2)
-  db:
-    - metacyc.py
-    - neo4j.py
-    - sbml.py
-  parser:
-     - bkms_react.py
-     - brenda.py
-     - brenda_transformer.py
-     - metacyc.py
-     - sbml.py
-```
-
-1. Top-level models include `config.py`, `main.py`, and `utils.py`.
-2. The streamlit app entrypoint.
-
-![Schema of the MetaCyc database](_static/metabolike_schema.svg){ align=center }
-
-<figcaption>Schema of the MetaCyc database</figcaption>
