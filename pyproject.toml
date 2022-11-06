@@ -5,7 +5,7 @@ build-backend = "flit_core.buildapi"
 [project]
 name = "metabolike"
 authors = [{ name = "Yi Zhou", email = "metabolike@y1zhou.com" }]
-readme = "README.rst"
+readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.8,<4"
 keywords = ["bioinformatics", "metabolic-pathway", "network", "graph-database"]
@@ -55,8 +55,8 @@ test = [
     "hypothesis>=6.47.0",
     "pytest-dotenv>=0.5.2",
 ]
-doc = ["sphinx", "sphinx_rtd_theme", "sphinx-autodoc-typehints"]
-dev = ["black>=22.3.0"]
+doc = ["mkdocs-material", "mkdocstrings[python]>=0.18", "mkdocs-gen-files", "mkdocs-literate-nav"]
+dev = ["black>=22.3.0", "pre-commit", "metabolike[test,doc]"]
 
 
 [tool.flit.sdist]
