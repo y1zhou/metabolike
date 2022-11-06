@@ -52,9 +52,7 @@ def snake_to_camel(s: str, sep: str = "-") -> str:
     return "".join(s_camel)
 
 
-def add_kv_to_dict(
-        d: Dict[str, Any], k: str, v: Any, as_list: bool = False
-) -> Dict[str, Any]:
+def add_kv_to_dict(d: Dict[str, Any], k: str, v: Any, as_list: bool = False) -> Dict[str, Any]:
     """Add a key-value pair to a dictionary.
 
     Args:
@@ -87,7 +85,7 @@ def generate_gene_reaction_rule(genes: List[Tuple[Dict[str, str], Dict[str, str]
 
     # GeneProductSet could contain genes or complexes
     res_complex, res_genes = {}, []
-    for l, r in genes[1:]:
+    for l, r in genes[1:]:  # noqa: E741 - left and right
         # Everything in the set
         if l["label"] == "GeneProductSet":
             # GeneProductSet -> GeneProduct

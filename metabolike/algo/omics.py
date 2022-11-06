@@ -70,8 +70,7 @@ class ReactionGeneMap:
 
         self.db = database_connection
         self.gene_exp = {
-            gene_id: exp_level
-            for gene_id, exp_level in zip(gene_ids, expression_levels)
+            gene_id: exp_level for gene_id, exp_level in zip(gene_ids, expression_levels)
         }
         self.rxn_exp: dict[str, float] = {}
 
@@ -126,10 +125,7 @@ class ReactionGeneMap:
         #     logger.warning(f"Unknown gene product {gene_name}")
 
     def calc_reaction_gene_group_expression(self, gene_group_id: str):
-        """
-        Calculate the expression level of a given gene product set or
-        complex node.
-        """
+        """Calculate the expression level of a given gene product set or complex node."""
         # TODO: make use of self.get_all_genes_in_group()
         genes = self.gene_groups.loc[self.gene_groups["group_id"] == gene_group_id, :]
         gene_ids = genes["members"].values
@@ -152,9 +148,8 @@ class ReactionGeneMap:
             raise ValueError(f"Unknown gene group type: {group_type}")
 
     def get_route_expression(self, rxn_ids: Iterable[str]) -> float:
-        """
-        Sums up total expression levels of the reaction route, and divide
-        the value by the number of reactions.
+        """Sums up total expression levels of the reaction route, and divide the value by the
+        number of reactions.
 
         Args:
             rxn_ids: The metaId fields of the reactions.
@@ -170,9 +165,9 @@ class ReactionGeneMap:
         return res / len(rxn_ids)
 
     def _get_top_level_rxn_gene_mapping(self):
-        """
-        Get unique reaction -> gene product mappings. The "gene" column could
-        be GeneProduct, GeneProductSet, or GeneProductComplex nodes.
+        """Get unique reaction -> gene product mappings.
+
+        The "gene" column could be GeneProduct, GeneProductSet, or GeneProductComplex nodes.
         """
         rxn2gene = self.db.read(
             """

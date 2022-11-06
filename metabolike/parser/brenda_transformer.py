@@ -52,9 +52,7 @@ class GenericTreeTransformer(BaseTransformer):
 
 
 class ReactionTreeTransformer(GenericTreeTransformer):
-    """
-    Commentary in ``(...)`` are on substrates, and in ``|...|`` on products.
-    """
+    """Commentary in ``(...)`` are on substrates, and in ``|...|`` on products."""
 
     def reaction(self, children: List[Token]) -> Token:
         """Parse the reaction in the description node.
@@ -83,9 +81,7 @@ class ReactionTreeTransformer(GenericTreeTransformer):
         return Token("commentary_product", children)
 
     def reversibility(self, children: List[Token]) -> Token:
-        """
-        ``r`` for reversible, ``ir`` for irreversible, ``?`` for unknown.
-        """
+        """``r`` for reversible, ``ir`` for irreversible, ``?`` for unknown."""
         x = children[0].value
         x = x.replace("{", "")
         x = x.replace("}", "")

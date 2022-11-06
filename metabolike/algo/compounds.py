@@ -11,8 +11,7 @@ class CompoundMap:
         self.id_table, self.cpds = self.get_all_compounds()
 
     def get_all_compounds(self):
-        """
-        See https://biocyc.org/PGDBConceptsGuide.shtml#TAG:__tex2page_toc_TAG:__tex2page_sec_4.4
+        """See https://biocyc.org/PGDBConceptsGuide.shtml#TAG:__tex2page_toc_TAG:__tex2page_sec_4.4
         for detailed descriptions.
 
         Returns:
@@ -80,9 +79,7 @@ class CompoundMap:
             return res
 
         # Try fuzzy search if there's no exact biocyc ID matches
-        value_matches = get_close_matches(
-            query.lower(), self.cpds["value_lowercase"], **kwargs
-        )
+        value_matches = get_close_matches(query.lower(), self.cpds["value_lowercase"], **kwargs)
         if value_matches:
             hits = [x for v in value_matches for x in self.compound_exact_match(v)]
             res["hits"] = list(set(hits))
@@ -105,12 +102,6 @@ class CompoundMap:
         res = self.id_table.loc[self.id_table.biocyc == query, "compartment"]
         return list(set(res.values))
 
-    def search_compound_metaid_in_compartment(
-        self, query: str, compartment: str = "cytosol"
-    ):
-        res = (
-            self.id_table.query("biocyc == @query")
-            .query("compartment == @compartment")
-            .metaId
-        )
+    def search_compound_metaid_in_compartment(self, query: str, compartment: str = "cytosol"):
+        res = self.id_table.query("biocyc == @query").query("compartment == @compartment").metaId
         return res.tolist()[0]

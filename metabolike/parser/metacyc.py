@@ -8,15 +8,15 @@ import pandas as pd
 from tqdm import tqdm
 
 from metabolike.utils import add_kv_to_dict, snake_to_camel, validate_path
+
 from .sbml import SBMLParser
 
 logger = logging.getLogger(__name__)
 
 
 class MetacycParser(SBMLParser):
-    """
-    Converting MetaCyc files to a Neo4j database.
-    Documentation on the MetaCyc files and format FAQs can be found at:
+    """Converting MetaCyc files to a Neo4j database. Documentation on the MetaCyc files and format
+    FAQs can be found at:
 
     * MetaCyc data files download: https://metacyc.org/downloads.shtml
     * MetaCyc file formats: http://bioinformatics.ai.sri.com/ptools/flatfile-format.html
@@ -89,9 +89,8 @@ class MetacycParser(SBMLParser):
     def collect_reactions_dat_nodes(
         self, rxn_ids: Iterable[str], rxn_dat: Dict[str, List[List[str]]]
     ):
-        """
-        Parse entries from the reaction attribute-value file, and prepare
-        nodes to add the graph database in one transaction.
+        """Parse entries from the reaction attribute-value file, and prepare nodes to add the graph
+        database in one transaction.
 
         Args:
             rxn_ids: Reaction *full* ``metaId``s.
@@ -196,9 +195,8 @@ class MetacycParser(SBMLParser):
         return pw_nodes, comp_rxn_nodes
 
     def fix_pathway_nodes(self, pw_nodes: List[Dict[str, Any]], all_rxns: Set[str]):
-        """
-        Some fields in the list of ``Pathway`` nodes require preprocessing
-         before being fed into the database. Specifically:
+        """Some fields in the list of ``Pathway`` nodes require preprocessing before being fed into
+        the database. Specifically:
 
         * ``predecessors`` contains a list of reaction IDs wrapped in
          parentheses. We need to extract the first ID as the target reaction,
@@ -418,9 +416,9 @@ class MetacycParser(SBMLParser):
     def read_dat_file(filepath: Union[str, Path]) -> Dict[str, List[List[str]]]:
         # `rb` to bypass the 0xa9 character
         with open(filepath, "rb") as f:
-            lines = [l.decode("utf-8", "ignore").strip() for l in f]
+            lines = [line.decode("utf-8", "ignore").strip() for line in f]
             # Also remove empty lines and comments on the top of the file
-            lines = [l for l in lines if l and (not l.startswith("#"))]
+            lines = [line for line in lines if line and (not line.startswith("#"))]
 
         # Split entries based on `//`
         docs: Dict[str, List[List[str]]] = {}
@@ -435,7 +433,7 @@ class MetacycParser(SBMLParser):
             doc = doc_txt.split("\n")
 
             # Split key-attribute pairs
-            doc = [l.split(" - ", maxsplit=1) for l in doc]
+            doc = [line.split(" - ", maxsplit=1) for line in doc]
             uniq_id = doc[0][1]
 
             # Remove empty values like "SYNONYMS - " in ORG-6026
@@ -630,11 +628,10 @@ class MetacycParser(SBMLParser):
 
     @staticmethod
     def _parse_pathway_links(s: str) -> Tuple[str, List[str], str]:
-        """
-        Parse ``PATHWAY-LINKS`` from the ``pathways.dat`` file. This connects
-        the ``Pathway`` nodes in the graph through shared ``Compound`` nodes.
-        The format of the input string has several possibilities. The simplest
-        is when the pathway points to one or more target pathways:
+        """Parse ``PATHWAY-LINKS`` from the ``pathways.dat`` file. This connects the ``Pathway``
+        nodes in the graph through shared ``Compound`` nodes. The format of the input string has
+        several possibilities. The simplest is when the pathway points to one or more target
+        pathways:
 
             (<compound-id> <target-pathway-ids ...>)
 

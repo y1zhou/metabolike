@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Iterable, List
 
 import numpy as np
 import pandas as pd
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 COMMON_COMPOUNDS = ["ATP", "ADP", "H+", "NADH", "NAD+", "H2O", "phosphate"]
 
 
-def get_all_ec_numbers(db: Neo4jClient) -> Set[str]:
+def get_all_ec_numbers(db: Neo4jClient) -> set[str]:
     ec = db.read(
         """
         MATCH (r:Reaction)-[:hasRDF {bioQualifier: 'is'}]->(rdf:RDF)
@@ -30,8 +30,7 @@ def get_all_ec_numbers(db: Neo4jClient) -> Set[str]:
 
 
 def get_view_of_pathway(db: Neo4jClient, pathway_id: str):
-    """
-    Get the view of a pathway.
+    """Get the view of a pathway.
 
     Args:
         pathway_id: The pathway ID.
@@ -75,10 +74,8 @@ def get_view_of_pathway(db: Neo4jClient, pathway_id: str):
     return [x["node"] for x in nodes], [x["edge"] for x in edges]
 
 
-def get_fba_info_of_pathways(db: Neo4jClient, pathway_ids: List[str]):
-    """
-    Retrieve the information of a pathway relevant to flux balance analysis.
-    """
+def get_fba_info_of_pathways(db: Neo4jClient, pathway_ids: list[str]):
+    """Retrieve the information of a pathway relevant to flux balance analysis."""
     q = db.read(
         """
     MATCH (p:Pathway)-[:hasReaction]->(r:Reaction)-[l:hasLeft|hasRight]->(c:Compound)-[:hasCompartment]->(cpt:Compartment)
@@ -115,9 +112,7 @@ def get_fba_info_of_pathways(db: Neo4jClient, pathway_ids: List[str]):
     all_rxns = df.reaction_id.unique()  # used for getting genes later
 
     # Fix stoichiometry so that side can be dropped
-    df.stoichiometry = np.where(
-        df.side == "hasLeft", -df.stoichiometry, df.stoichiometry
-    )
+    df.stoichiometry = np.where(df.side == "hasLeft", -df.stoichiometry, df.stoichiometry)
 
     # Fix missing values
     df.reaction_id = df.reaction_name
@@ -148,16 +143,13 @@ def get_fba_info_of_pathways(db: Neo4jClient, pathway_ids: List[str]):
 
 def get_genes_of_reaction(
     db: Neo4jClient, reaction_id: str
-) -> List[Tuple[Dict[str, str], Dict[str, str]]]:
-    """
-    Given a reaction metaId, return the gene products associated with it in
-    the form of a list of (source, target) nodes. This is because certain
-    reactions are associated with ``GeneProductSet`` or
-    ``GeneProductComplex`` nodes, which represent ``OR`` and ``AND``
+) -> list[tuple[dict[str, str], dict[str, str]]]:
+    """Given a reaction metaId, return the gene products associated with it in the form of a list
+    of (source, target) nodes. This is because certain reactions are associated with
+    ``GeneProductSet`` or ``GeneProductComplex`` nodes, which represent ``OR`` and ``AND``
     relationships, respectively.
 
-    Note that ``GeneProductSet`` could contain nested ``GeneProductComplex``
-    nodes.
+    Note that ``GeneProductSet`` could contain nested ``GeneProductComplex`` nodes.
     """
     res = db.read(
         """
@@ -193,10 +185,9 @@ def get_genes_of_reaction(
 def get_cpd_view_of_pathway(
     db: Neo4jClient,
     pathway_id: str,
-    ignore_cpds: List[str] = COMMON_COMPOUNDS,
+    ignore_cpds: list[str] = COMMON_COMPOUNDS,
 ):
-    """
-    Get the view of a pathway with primary compounds linked by reactions.
+    """Get the view of a pathway with primary compounds linked by reactions.
 
     Args:
         pathway_id: The pathway metaId or name.
@@ -228,11 +219,10 @@ def get_cpd_view_of_pathway(
     )
 
 
-def get_high_degree_compound_nodes(db: Neo4jClient, degree: int = 45) -> List[str]:
-    """
-    Get all compound nodes with a high degree, i.e. with a lot of edges to
-    ``Reaction`` nodes. Including these nodes in many cases would pollute
-    the graph with too many outgoing relationships.
+def get_high_degree_compound_nodes(db: Neo4jClient, degree: int = 45) -> list[str]:
+    """Get all compound nodes with a high degree, i.e. with a lot of edges to ``Reaction`` nodes.
+    Including these nodes in many cases would pollute the graph with too many outgoing
+    relationships.
 
     Args:
         degree: The degree threshold.
@@ -257,13 +247,12 @@ def get_reaction_route_between_compounds(
     c1: str,
     c2: str,
     only_pathway_reactions: bool = True,
-    ignore_node_metaids: List[str] = [],
+    ignore_node_metaids: list[str] = [],
     num_routes: int = 2,
     max_hops: int = 10,
 ):
-    """
-    The function has two modes: one for following pre-defined pathways, and
-    one for following any chain of reactions between two compounds.
+    """The function has two modes: one for following pre-defined pathways, and one for following
+    any chain of reactions between two compounds.
 
     Args:
         c1: The first compound metaId.
@@ -343,9 +332,8 @@ def find_compound_outflux_routes(
     structure_similarity_coef: float = 10.0,
     route_length_coef: float = 0.0,
 ):
-    """
-    Find how a compound is consumed. Genes are either expressed or unexpressed,
-    so this is a rather binary view of the metabolic network.
+    """Find how a compound is consumed. Genes are either expressed or unexpressed, so this is a
+    rather binary view of the metabolic network.
 
     When searching for routes, we start from the compound of interest, and
     expand to other compounds via reactions that are:
@@ -405,14 +393,14 @@ def find_compound_outflux_routes(
             (n.name IN $bad_nodes)
         )
         WITH COLLECT(n) AS ns
-        
+
         MATCH (c:Compound {metaId: $cpd_id})
         CALL apoc.path.expandConfig(c, {
             beginSequenceAtStart: false,
             sequence: "<hasLeft,Reaction,hasRight>,Compound,<hasLeft",
             blacklistNodes: ns,
             uniqueness: "NODE_PATH",
-            bfs: false,
+            bfs: true,
             minLevel: 2,
             maxLevel: $max_hops,
             limit: $max_num_routes
@@ -468,7 +456,7 @@ def find_compound_outflux_routes(
     terminal_cpd_structs = db.read(
         """
         MATCH (c:Compound)
-        WHERE c.metaId IN $cpds 
+        WHERE c.metaId IN $cpds
         RETURN c{.metaId, .smiles}
         """,
         cpds=query_cpds,
@@ -486,11 +474,9 @@ def find_compound_outflux_routes(
         route_struct_scores = [None] * len(terminal_cpds)
 
     # Calculate the final score of each route
-    route_lengths = [
-        len([x for x in r["route"] if x["nodeType"] == "Compound"]) for r in routes
-    ]
+    route_lengths = [len([x for x in r["route"] if x["nodeType"] == "Compound"]) for r in routes]
     route_scores = []
-    for e, s, l in zip(route_expression_levels, route_struct_scores, route_lengths):
+    for e, s, l in zip(route_expression_levels, route_struct_scores, route_lengths):  # noqa: E741
         score_sign = 1.0 if e > 0 else -1.0
         score = expression_coef * abs(e) + route_length_coef * l
         if s is not None:
@@ -503,9 +489,7 @@ def find_compound_outflux_routes(
         r_genes = set()
         for step in r["route"]:
             if step["nodeType"] == "Reaction":
-                if step_genes := reaction_gene_expression.reaction_gp_mapping.get(
-                    step["id"]
-                ):
+                if step_genes := reaction_gene_expression.reaction_gp_mapping.get(step["id"]):
                     r_genes |= step_genes
         route_genes.append(r_genes)
 
@@ -544,9 +528,7 @@ def calc_tanimoto_similarity(smiles1: str, smiles2: str) -> float | None:
         return None
 
 
-def get_all_reactions_related_to_compound(
-    db: Neo4jClient, cpd_name: str
-) -> pd.DataFrame:
+def get_all_reactions_related_to_compound(db: Neo4jClient, cpd_name: str) -> pd.DataFrame:
     q = db.read(
         """
         MATCH (r:Reaction)-[l:hasLeft|hasRight]->(c:Compound {name: $cpd_name})
@@ -572,9 +554,7 @@ def get_all_reactions_related_to_compound(
     res["is_transport_reaction"] = res["reaction_types"].map(
         lambda v: any(x.startswith("TR-") for x in v)
     )
-    res.replace(
-        {"compound_on_side": {"hasLeft": "left", "hasRight": "right"}}, inplace=True
-    )
+    res.replace({"compound_on_side": {"hasLeft": "left", "hasRight": "right"}}, inplace=True)
 
     res.drop(columns=["reaction_types"], inplace=True)
     res.sort_values(

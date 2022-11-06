@@ -1,8 +1,9 @@
 from typing import Callable
 
-from metabolike.db.neo4j import Neo4jClient
 from neo4j import Neo4jDriver
 from pytest_mock import MockerFixture
+
+from metabolike.db.neo4j import Neo4jClient
 
 
 def test_neo4j_connection(mocker: MockerFixture, db: Neo4jClient):

@@ -4,16 +4,16 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Set, Tuple, Union
 
 import libsbml
-from metabolike.utils import add_kv_to_dict, validate_path
 from tqdm import tqdm
+
+from metabolike.utils import add_kv_to_dict, validate_path
 
 logger = logging.getLogger(__name__)
 
 
 class SBMLParser:
-    """
-    Converting MetaCyc files to a Neo4j database.
-    Documentation on the MetaCyc files and format FAQs can be found at:
+    """Converting MetaCyc files to a Neo4j database. Documentation on the MetaCyc files and format
+    FAQs can be found at:
 
     * MetaCyc data files download: https://metacyc.org/downloads.shtml
     * MetaCyc file formats: http://bioinformatics.ai.sri.com/ptools/flatfile-format.html
@@ -74,9 +74,7 @@ class SBMLParser:
     def collect_compartments(
         compartments: Iterable[libsbml.Compartment],
     ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
-        return [
-            {"metaId": c.getId(), "props": {"name": c.getName()}} for c in compartments
-        ]
+        return [{"metaId": c.getId(), "props": {"name": c.getName()}} for c in compartments]
 
     def collect_compounds(
         self,
@@ -182,10 +180,7 @@ class SBMLParser:
         # Get the biological qualifier type of the terms
         bio_qual = self._bio_qualifiers[cvterm.getBiologicalQualifierType()]
         # Get the content of each RDF term
-        uris = [
-            self._split_uri(cvterm.getResourceURI(i))
-            for i in range(cvterm.getNumResources())
-        ]
+        uris = [self._split_uri(cvterm.getResourceURI(i)) for i in range(cvterm.getNumResources())]
 
         props: Dict[str, Union[str, List[str]]] = {}
         for resource, identifier in uris:
@@ -214,12 +209,9 @@ class SBMLParser:
             for cpd in compounds
         ]
 
-    def collect_reaction_gene_product_links(
-        self, reactions: Iterable[libsbml.Reaction]
-    ):
-        """
-        Add gene products to a reaction. This could be complicated where the
-        child nodes could be:
+    def collect_reaction_gene_product_links(self, reactions: Iterable[libsbml.Reaction]):
+        """Add gene products to a reaction. This could be complicated where the child nodes could
+        be:
 
         #. GeneProductRef
         #. fbc:or -> GeneProductRef
@@ -255,8 +247,7 @@ class SBMLParser:
         gene_sets: Dict[str, Set[str]],
         gene_complexes: Dict[str, Set[str]],
     ):
-        """
-        Get unique gene product sets/complexes from a GeneProductAssociation.
+        """Get unique gene product sets/complexes from a GeneProductAssociation.
 
         Returns:
             The metaId of the associated gene product node of the reaction.
@@ -265,13 +256,9 @@ class SBMLParser:
             # Add the gene product to the reaction
             reaction_link_id = node.getGeneProduct()
         elif isinstance(node, libsbml.FbcAnd):
-            reaction_link_id = self._parse_gene_product_complex(
-                node, gene_sets, gene_complexes
-            )
+            reaction_link_id = self._parse_gene_product_complex(node, gene_sets, gene_complexes)
         elif isinstance(node, libsbml.FbcOr):
-            reaction_link_id = self._parse_gene_product_set(
-                node, gene_sets, gene_complexes
-            )
+            reaction_link_id = self._parse_gene_product_set(node, gene_sets, gene_complexes)
         else:
             raise ValueError(f"Unhandled GeneProductAssociation type {type(node)}")
 
@@ -294,9 +281,7 @@ class SBMLParser:
             else:
                 raise ValueError(node.getId())
         if components:
-            return self._add_gene_product_group(
-                components, gene_complexes, "GeneProductComplex"
-            )
+            return self._add_gene_product_group(components, gene_complexes, "GeneProductComplex")
 
     def _parse_gene_product_set(
         self,
@@ -310,9 +295,7 @@ class SBMLParser:
             if isinstance(member, libsbml.GeneProductRef):
                 members.add(member.getGeneProduct())
             elif isinstance(member, libsbml.FbcAnd):
-                gene_complex = self._parse_gene_product_complex(
-                    member, gene_sets, gene_complexes
-                )
+                gene_complex = self._parse_gene_product_complex(member, gene_sets, gene_complexes)
                 members.add(gene_complex)
             else:
                 raise ValueError(node.getId())
@@ -320,12 +303,8 @@ class SBMLParser:
             return self._add_gene_product_group(members, gene_sets, "GeneProductSet")
 
     @staticmethod
-    def _add_gene_product_group(
-        ids: Set[str], gene_group: Dict[str, Set[str]], group_type: str
-    ):
-        """
-        Add a set of genes to a dict of gene sets / complexes.
-        """
+    def _add_gene_product_group(ids: Set[str], gene_group: Dict[str, Set[str]], group_type: str):
+        """Add a set of genes to a dict of gene sets / complexes."""
         ids.discard(None)
         for k, v in gene_group.items():
             if ids == v:

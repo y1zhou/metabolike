@@ -21,7 +21,7 @@ class Neo4jClient:
         database: str, name of the database to use.
     """
 
-    def __init__(
+    def __init__(  # nosec B107 - default password is okay here
         self,
         uri: str = "neo4j://localhost:7687",
         neo4j_user: str = "neo4j",
@@ -66,8 +66,8 @@ class Neo4jClient:
             ss.write_transaction(lambda tx: tx.run(cypher, **kwargs))
 
     def read(self, cypher: str, **kwargs) -> List[Dict[str, Any]]:
-        """Helper function to read from the database. Streams all records in the
-        query into a list of dictionaries.
+        """Helper function to read from the database. Streams all records in the query into a list
+        of dictionaries.
 
         Args:
             cypher: Query to read from the database.

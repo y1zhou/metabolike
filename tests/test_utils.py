@@ -1,4 +1,5 @@
 import pytest
+
 from metabolike.utils import (
     add_kv_to_dict,
     chunk,
@@ -100,6 +101,4 @@ def test_generate_gene_reaction_rule():
         (gp_complex, gp_nodes[2]),
         (gp_complex, gp_nodes[3]),
     ]
-    assert (
-        generate_gene_reaction_rule(rule) == "gene-0 or gene-1 or ( gene-2 and gene-3 )"
-    )
+    assert generate_gene_reaction_rule(rule) == "gene-0 or gene-1 or ( gene-2 and gene-3 )"

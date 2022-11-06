@@ -1,6 +1,7 @@
 import libsbml
 import pytest
 from libsbml import Model, SBMLDocument
+
 from metabolike.parser import SBMLParser
 
 
@@ -120,15 +121,11 @@ def test_collect_reactions(sbml_parser: SBMLParser, sbml_model: Model):
     assert nodes[0] == {
         "metaId": "RXN__45__15513",
         "props": {"name": "RXN-15513", "fast": False, "reversible": True},
-        "rdf": [
-            {"bioQual": "is", "rdf": {"biocyc": "RXN-15513", "ecCode": ["5.4.2.11"]}}
-        ],
+        "rdf": [{"bioQual": "is", "rdf": {"biocyc": "RXN-15513", "ecCode": ["5.4.2.11"]}}],
         "reactants": [
             {"cpdId": "_2__45__PG_c", "props": {"stoichiometry": 1.0, "constant": True}}
         ],
-        "products": [
-            {"cpdId": "G3P_c", "props": {"stoichiometry": 1.0, "constant": True}}
-        ],
+        "products": [{"cpdId": "G3P_c", "props": {"stoichiometry": 1.0, "constant": True}}],
     }
 
 
@@ -160,9 +157,7 @@ def set_node():
     return n
 
 
-def test_collect_reaction_gene_product_links(
-    sbml_parser: SBMLParser, sbml_model: Model
-):
+def test_collect_reaction_gene_product_links(sbml_parser: SBMLParser, sbml_model: Model):
     reactions = sbml_model.getListOfReactions()
     (
         rxn_genes,
@@ -193,9 +188,7 @@ def test_parse_gene_association_nodes(
     assert gene_sets == {}
     assert gene_complexes == {}
 
-    res = sbml_parser._parse_gene_association_nodes(
-        complex_node, gene_sets, gene_complexes
-    )
+    res = sbml_parser._parse_gene_association_nodes(complex_node, gene_sets, gene_complexes)
     assert res == "GeneProductComplex0"
     assert len(gene_sets) == 1
     assert len(gene_complexes) == 1
@@ -213,15 +206,11 @@ def test_parse_gene_association_nodes(
         )
 
 
-def test_parse_gene_product_complex(
-    sbml_parser: SBMLParser, complex_node: libsbml.FbcAnd
-):
+def test_parse_gene_product_complex(sbml_parser: SBMLParser, complex_node: libsbml.FbcAnd):
     gene_sets, gene_complexes = {}, {}
 
     assert (
-        sbml_parser._parse_gene_product_complex(
-            libsbml.FbcAnd(), gene_sets, gene_complexes
-        )
+        sbml_parser._parse_gene_product_complex(libsbml.FbcAnd(), gene_sets, gene_complexes)
         is None
     )
 
@@ -241,10 +230,7 @@ def test_parse_gene_product_complex(
 
 def test_parse_gene_product_set(sbml_parser: SBMLParser, set_node: libsbml.FbcOr):
     gene_sets, gene_complexes = {}, {}
-    assert (
-        sbml_parser._parse_gene_product_set(libsbml.FbcOr(), gene_sets, gene_complexes)
-        is None
-    )
+    assert sbml_parser._parse_gene_product_set(libsbml.FbcOr(), gene_sets, gene_complexes) is None
 
     k = sbml_parser._parse_gene_product_set(set_node, gene_sets, gene_complexes)
     assert k == "GeneProductSet0"

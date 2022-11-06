@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 import pandas.testing as pdt
 import pytest
+
 from metabolike.parser.brenda import (
     _get_parser_from_field,
     _read_brenda,
@@ -49,9 +50,7 @@ def test_read_brenda(brenda_data):
     # Test that the dataframe is read correctly
     assert isinstance(brenda_data, pd.DataFrame)
     assert brenda_data.shape == (57, 3)
-    pdt.assert_index_equal(
-        brenda_data.columns, pd.Index(["ID", "field", "description"])
-    )
+    pdt.assert_index_equal(brenda_data.columns, pd.Index(["ID", "field", "description"]))
 
     # DataFrame columns should match the expected values
     assert brenda_data["ID"].str.match(r"^(\d+\.){3}\d+$").all()

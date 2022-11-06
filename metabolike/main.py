@@ -7,7 +7,6 @@ import uvicorn
 from .config import load_config
 from .db import MetacycClient
 from .parser import MetacycParser
-from .parser.brenda import parse_brenda
 
 logging.basicConfig(
     format="[%(levelname)s] %(asctime)s - %(name)s:%(lineno)s:%(funcName)s - %(message)s",
@@ -20,9 +19,7 @@ app = typer.Typer()
 
 @app.command()
 def setup(
-    config_file: str = typer.Option(
-        ..., "--config", "-c", help="Path to the configuration file."
-    ),
+    config_file: str = typer.Option(..., "--config", "-c", help="Path to the configuration file."),
     create_db: bool = typer.Option(
         True, help="When database creation is not allowed, set this to False."
     ),
@@ -66,7 +63,7 @@ def serve():
     """
     uvicorn.run(
         "metabolike.api.main:app",
-        host="0.0.0.0",
+        host="127.0.0.1",
         port=8000,
         log_level="info",
         proxy_headers=True,
