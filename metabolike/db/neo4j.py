@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Callable, Dict, List, Union
+from collections.abc import Callable
+from typing import Any, Union
 
 from neo4j import BoltDriver, GraphDatabase, Neo4jDriver
 
@@ -10,15 +11,15 @@ class Neo4jClient:
     """setup Neo4j driver.
 
     Args:
-        uri: URI of the Neo4j server. Defaults to ``neo4j://localhost:7687``.
-         For more details, see :class:`neo4j.driver.Driver`.
-        neo4j_user: Neo4j user. Defaults to "neo4j".
-        neo4j_password: Neo4j password. Defaults to "neo4j".
-        database: Name of the database. Defaults to "neo4j".
+        uri: URI of the Neo4j server. Defaults to `neo4j://localhost:7687`.
+            For more details, see [neo4j.driver.Driver](https://neo4j.com/docs/api/python-driver/current/api.html).
+        neo4j_user: Neo4j username.
+        neo4j_password: Neo4j password.
+        database: Name of the database.
 
     Attributes:
-        driver: :class:`neo4j.Neo4jDriver` or :class:`neo4j.BoltDriver`.
-        database: str, name of the database to use.
+        driver: `neo4j.Neo4jDriver` or `neo4j.BoltDriver`.
+        database: name of the database to use.
     """
 
     def __init__(  # nosec B107 - default password is okay here
@@ -32,7 +33,7 @@ class Neo4jClient:
         if not driver:
             raise RuntimeError("Could not connect to Neo4j")
         self.driver: Union[Neo4jDriver, BoltDriver] = driver
-        self.database = database
+        self.database: str = database
 
         _connected = self.driver.get_server_info()
         logger.debug(f"Connected to {_connected.address}")
@@ -65,7 +66,7 @@ class Neo4jClient:
         with self.driver.session(database=self.database) as ss:
             ss.write_transaction(lambda tx: tx.run(cypher, **kwargs))
 
-    def read(self, cypher: str, **kwargs) -> List[Dict[str, Any]]:
+    def read(self, cypher: str, **kwargs) -> list[dict[str, Any]]:
         """Helper function to read from the database. Streams all records in the query into a list
         of dictionaries.
 
@@ -76,13 +77,13 @@ class Neo4jClient:
         with self.driver.session(database=self.database) as ss:
             return ss.read_transaction(lambda tx: tx.run(cypher, **kwargs).data())
 
-    def read_tx(self, tx_func: Callable, **kwargs) -> List[Any]:
+    def read_tx(self, tx_func: Callable, **kwargs) -> list[Any]:
         """Helper function to read from the database.
 
         Args:
             tx_func: A transaction function to run.
             **kwargs: Keyword arguments to pass to ``tx_func`` or parameters for
-             the Cypher query.
+                the Cypher query.
         """
         with self.driver.session(database=self.database) as ss:
             return ss.read_transaction(tx_func, **kwargs)

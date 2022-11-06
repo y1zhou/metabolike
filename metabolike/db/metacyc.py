@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from tqdm import tqdm
 
@@ -161,7 +161,7 @@ class MetacycClient(SBMLClient):
 
     def _reactions_dat_to_graph(
         self, parser: MetacycParser
-    ) -> Optional[Dict[str, List[List[str]]]]:
+    ) -> Optional[dict[str, list[list[str]]]]:
         """Parse the ``reactions.dat`` file and:
 
         * Add properties to ``Reaction`` nodes.
@@ -195,7 +195,7 @@ class MetacycClient(SBMLClient):
         self._fix_reaction_direction()
         return rxn_dat
 
-    def _pathways_to_graph(self, rxn_dat: Dict[str, List[List[str]]], parser: MetacycParser):
+    def _pathways_to_graph(self, rxn_dat: dict[str, list[list[str]]], parser: MetacycParser):
         """Parse the ``pathways.dat`` file.
 
         For details, see :meth:`setup`.
@@ -242,7 +242,7 @@ class MetacycClient(SBMLClient):
                 for v in pw_links:
                     self._link_pathway_to_pathway(pw_id, v["pathways"], v["direction"], v["cpd"])
 
-    def _fix_composite_reaction_nodes(self, comp_rxn_nodes: List[Dict[str, Any]]):
+    def _fix_composite_reaction_nodes(self, comp_rxn_nodes: list[dict[str, Any]]):
         """Composite reaction nodes are just aggregated reactions. We need to change the label of
         these nodes from ``Pathway`` to ``Reaction``, and also correct their directions.
 
@@ -339,7 +339,7 @@ class MetacycClient(SBMLClient):
         self.add_props_to_nodes("Compartment", "name", cco_nodes, "Compartment names")
         self.add_props_to_nodes("Taxa", "metaId", taxa_nodes, "Taxa names")
 
-    def get_all_nodes(self, label: str, prop: str) -> List[str]:
+    def get_all_nodes(self, label: str, prop: str) -> list[str]:
         """Fetch a property of nodes with a certain label."""
         if label not in self.available_node_labels:
             raise ValueError(f"Invalid label: {label}")
@@ -352,7 +352,7 @@ class MetacycClient(SBMLClient):
         )
         return [n["prop"] for n in res]
 
-    def get_all_compounds(self) -> List[Tuple[str, str]]:
+    def get_all_compounds(self) -> list[tuple[str, str]]:
         """Fetch all ``Compound`` nodes.
 
         All Compound node with RDF have BioCyc IDs.
@@ -369,7 +369,7 @@ class MetacycClient(SBMLClient):
         self,
         node_label: str,
         node_prop_key: str,
-        nodes: List[Dict[str, Any]],
+        nodes: list[dict[str, Any]],
         desc: str,
         **kwargs,
     ):
@@ -392,7 +392,7 @@ class MetacycClient(SBMLClient):
         """
         self.create_nodes(desc, nodes, query, **kwargs)
 
-    def _link_pathway_to_pathway(self, pw: str, pws: List[str], direction: str, cpd: str):
+    def _link_pathway_to_pathway(self, pw: str, pws: list[str], direction: str, cpd: str):
         """Connect a ``Pathway`` to a list of other ``Pathway``s. The ``Compound`` that is involved
         in both sides of the connection is specified in the relationship.
 
@@ -431,7 +431,7 @@ class MetacycClient(SBMLClient):
     def _link_reaction_to_primary_compound(
         self,
         reaction_id: str,
-        compound_ids: List[str],
+        compound_ids: list[str],
         pathway_id: str,
         side: str,
     ):

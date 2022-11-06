@@ -1,8 +1,9 @@
 import logging
 import re
+from collections.abc import Iterable
 from itertools import groupby
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, Optional, Union
 
 import pandas as pd
 from tqdm import tqdm
@@ -27,28 +28,28 @@ class MetacycParser(SBMLParser):
     Args:
         sbml: The path to the SBML file.
         reactions: The path to the ``reaction.dat`` file. If given,
-         the file will be parsed and extra annotation on ``Reaction`` nodes will
-         be added.
+            the file will be parsed and extra annotation on ``Reaction`` nodes will
+            be added.
         atom_mapping: The path to the ``atom-mappings-smiles.dat`` file. If
-         given, the file will be parsed and chemical reactions in the ``SMILES``
-         format will be added to the ``Reaction`` nodes.
+             given, the file will be parsed and chemical reactions in the ``SMILES``
+             format will be added to the ``Reaction`` nodes.
         pathways: The path to the ``pathway.dat`` file. If given, the file will
-         be parsed and pathway links will be added to the ``Reaction`` nodes.
+            be parsed and pathway links will be added to the ``Reaction`` nodes.
         compounds: The path to the ``compound.dat`` file. If given, the file
-         will be parsed and annotations on ``Compound`` nodes will be added.
+            will be parsed and annotations on ``Compound`` nodes will be added.
         publications: The path to the ``publication.dat`` file. If given, the
-         file will be parsed and annotations on ``Citation`` nodes will be added.
+            file will be parsed and annotations on ``Citation`` nodes will be added.
         classes: The path to the ``class.dat`` file. If given, the file will be
-         parsed and annotations on ``Compartment``, ``Taxa``, and ``Compound``
-         nodes will be added.
+            parsed and annotations on ``Compartment``, ``Taxa``, and ``Compound``
+            nodes will be added.
 
     Attributes:
         sbml_file: Filepath to the input SBML file.
         input_files: A dictionary of the paths to the input ``.dat`` files.
         missing_ids: A dictionary of sets of IDs that were not found in the
-         input files. This is helpful for collecting IDs that appear to be in
-         one class but are actually in another. :meth:`._report_missing_ids` can
-         be used to print them out.
+            input files. This is helpful for collecting IDs that appear to be in
+            one class but are actually in another. :meth:`._report_missing_ids` can
+            be used to print them out.
     """
 
     def __init__(
@@ -76,7 +77,7 @@ class MetacycParser(SBMLParser):
         logger.info(f"Input files: {self.input_files}")
 
         # Placeholder for missing IDs in the dat files
-        self.missing_ids: Dict[str, Set[str]] = {
+        self.missing_ids: dict[str, set[str]] = {
             "reactions": set(),
             "atom_mappings": set(),
             "pathways": set(),
@@ -87,20 +88,19 @@ class MetacycParser(SBMLParser):
         }
 
     def collect_reactions_dat_nodes(
-        self, rxn_ids: Iterable[str], rxn_dat: Dict[str, List[List[str]]]
-    ):
+        self, rxn_ids: Iterable[str], rxn_dat: dict[str, list[list[str]]]
+    ) -> list[dict[str, Any]]:
         """Parse entries from the reaction attribute-value file, and prepare nodes to add the graph
         database in one transaction.
 
         Args:
-            rxn_ids: Reaction *full* ``metaId``s.
-            rxn_dat: Output of :meth:`_read_dat_file` for the
-             ``reaction.dat`` file.
+            rxn_ids: Reaction *full* `metaId`s.
+            rxn_dat: Output of [self.read_dat_file]() for the `reaction.dat` file.
 
         Returns:
             A list of dictionaries, each of which contains the information
         """
-        nodes: List[Dict[str, Any]] = []
+        nodes: list[dict[str, Any]] = []
         for rxn_id in rxn_ids:
             canonical_id = self._find_rxn_canonical_id(rxn_id, rxn_dat.keys())
             if canonical_id not in rxn_dat:
@@ -133,8 +133,8 @@ class MetacycParser(SBMLParser):
     def collect_pathways_dat_nodes(
         self,
         all_pws: Iterable[str],
-        pw_dat: Dict[str, List[List[str]]],
-        rxn_dat: Dict[str, List[List[str]]],
+        pw_dat: dict[str, list[list[str]]],
+        rxn_dat: dict[str, list[list[str]]],
     ):
         pw_nodes = []
         comp_rxn_nodes = []
@@ -142,7 +142,7 @@ class MetacycParser(SBMLParser):
 
         # We can't iterate all_pws directly because during the parsing process
         # we may add new (super-)pathways to the queue
-        queue: Set[str] = set(all_pws)
+        queue: set[str] = set(all_pws)
         while queue:
             pw_id = queue.pop()
             # Skip if the pathway is already processed
@@ -194,7 +194,7 @@ class MetacycParser(SBMLParser):
 
         return pw_nodes, comp_rxn_nodes
 
-    def fix_pathway_nodes(self, pw_nodes: List[Dict[str, Any]], all_rxns: Set[str]):
+    def fix_pathway_nodes(self, pw_nodes: list[dict[str, Any]], all_rxns: set[str]):
         """Some fields in the list of ``Pathway`` nodes require preprocessing before being fed into
         the database. Specifically:
 
@@ -215,7 +215,7 @@ class MetacycParser(SBMLParser):
         """
         for i, n in enumerate(pw_nodes):
             if predecessors := n.get("predecessors"):
-                predecessors: List[str]
+                predecessors: list[str]
                 new_pred = []
                 for v in predecessors:
                     if pred := self._parse_pathway_predecessors(v, all_rxns):
@@ -224,7 +224,7 @@ class MetacycParser(SBMLParser):
                 pw_nodes[i]["predecessors"] = new_pred
 
             if rxn_layout := n.get("reactionLayout"):
-                rxn_layout: List[str]
+                rxn_layout: list[str]
                 rxn_prim_cpds = []
                 for v in rxn_layout:
                     rxn_id, d = self._parse_reaction_layout(v)
@@ -234,7 +234,7 @@ class MetacycParser(SBMLParser):
                 pw_nodes[i]["reactionLayout"] = rxn_prim_cpds
 
             if pw_links := n.get("pathwayLinks"):
-                pw_links: List[str]
+                pw_links: list[str]
                 conn_pathways = []
                 for v in pw_links:
                     cpd_id, pw_ids, direction = self._parse_pathway_links(v)
@@ -248,13 +248,13 @@ class MetacycParser(SBMLParser):
         return pw_nodes
 
     def collect_atom_mapping_dat_nodes(
-        self, rxn_ids: Iterable[str], smiles: Dict[str, str]
-    ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
+        self, rxn_ids: Iterable[str], smiles: dict[str, str]
+    ) -> list[dict[str, Union[str, dict[str, str]]]]:
         """
         Args:
             rxn_ids: The reaction name from the graph database.
             smiles: The reaction ID -> SMILES dictionary from the atom
-             mapping file.
+                mapping file.
         """
         nodes = []
         for rxn_id in tqdm(rxn_ids, desc="atom_mapping.dat file"):
@@ -271,7 +271,7 @@ class MetacycParser(SBMLParser):
         return nodes
 
     def collect_compounds_dat_nodes(
-        self, all_cpds: List[Tuple[str, str]], cpd_dat: Dict[str, List[List[str]]]
+        self, all_cpds: list[tuple[str, str]], cpd_dat: dict[str, list[list[str]]]
     ):
         nodes = []
         for cpd, biocyc in tqdm(all_cpds, desc="compounds.dat file"):
@@ -317,7 +317,7 @@ class MetacycParser(SBMLParser):
         return nodes
 
     def collect_citation_dat_nodes(
-        self, cit_ids: Iterable[str], pub_dat: Dict[str, List[List[str]]]
+        self, cit_ids: Iterable[str], pub_dat: dict[str, list[list[str]]]
     ):
         """Annotate a citation node with data from the publication.dat file.
 
@@ -372,7 +372,7 @@ class MetacycParser(SBMLParser):
 
     def collect_classes_dat_nodes(
         self,
-        class_dat: Dict[str, List[List[str]]],
+        class_dat: dict[str, list[list[str]]],
         cco_ids: Iterable[str],
         taxa_ids: Iterable[str],
     ):
@@ -413,7 +413,7 @@ class MetacycParser(SBMLParser):
         return cco_nodes, taxa_nodes
 
     @staticmethod
-    def read_dat_file(filepath: Union[str, Path]) -> Dict[str, List[List[str]]]:
+    def read_dat_file(filepath: Union[str, Path]) -> dict[str, list[list[str]]]:
         # `rb` to bypass the 0xa9 character
         with open(filepath, "rb") as f:
             lines = [line.decode("utf-8", "ignore").strip() for line in f]
@@ -421,7 +421,7 @@ class MetacycParser(SBMLParser):
             lines = [line for line in lines if line and (not line.startswith("#"))]
 
         # Split entries based on `//`
-        docs: Dict[str, List[List[str]]] = {}
+        docs: dict[str, list[list[str]]] = {}
         for k, g in groupby(lines, key=lambda x: x != "//"):
             if not k:
                 continue
@@ -444,7 +444,7 @@ class MetacycParser(SBMLParser):
         return docs
 
     @staticmethod
-    def read_smiles_dat(filepath: Path) -> Dict[str, str]:
+    def read_smiles_dat(filepath: Path) -> dict[str, str]:
         smiles_df = pd.read_table(
             filepath,
             sep="\t",
@@ -487,15 +487,15 @@ class MetacycParser(SBMLParser):
 
     def _dat_entry_to_node(
         self,
-        node: Dict[str, Any],
-        lines: List[List[str]],
-        props_str_keys: Set[str] = set(),
-        props_list_keys: Set[str] = set(),
-        node_str_keys: Set[str] = set(),
-        node_list_keys: Set[str] = set(),
+        node: dict[str, Any],
+        lines: list[list[str]],
+        props_str_keys: set[str] = set(),
+        props_list_keys: set[str] = set(),
+        node_str_keys: set[str] = set(),
+        node_list_keys: set[str] = set(),
         prop_num_keys: Iterable[str] = set(),
         prop_enum_keys: Iterable[str] = set(),
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         node.setdefault("props", {})
         for k, v in lines:
             if k in props_list_keys:
@@ -518,8 +518,8 @@ class MetacycParser(SBMLParser):
 
     @staticmethod
     def _clean_props(
-        props: Dict[str, Any], num_fields: Iterable[str], enum_fields: Iterable[str]
-    ) -> Dict[str, Any]:
+        props: dict[str, Any], num_fields: Iterable[str], enum_fields: Iterable[str]
+    ) -> dict[str, Any]:
         """Normalize properties to be used in Cypher.
 
         Args:
@@ -553,8 +553,8 @@ class MetacycParser(SBMLParser):
 
     @staticmethod
     def _parse_pathway_predecessors(
-        s: str, all_rxns: Set[str]
-    ) -> Dict[str, Union[str, List[str]]]:
+        s: str, all_rxns: set[str]
+    ) -> dict[str, Union[str, list[str]]]:
         """Parse the pathway predecessors.
 
         In most cases the string takes the form of:
@@ -584,7 +584,7 @@ class MetacycParser(SBMLParser):
         return {"r1": r1, "r2": r2}
 
     @staticmethod
-    def _parse_reaction_layout(s: str) -> Tuple[str, Dict[str, List[str]]]:
+    def _parse_reaction_layout(s: str) -> tuple[str, dict[str, list[str]]]:
         """Parse the reaction layout from the ``reactions.dat`` file.
 
         The attribute has the following format: ``(<rxn-id> (:LEFT-PRIMARIES
@@ -627,7 +627,7 @@ class MetacycParser(SBMLParser):
         return rxn_id, d
 
     @staticmethod
-    def _parse_pathway_links(s: str) -> Tuple[str, List[str], str]:
+    def _parse_pathway_links(s: str) -> tuple[str, list[str], str]:
         """Parse ``PATHWAY-LINKS`` from the ``pathways.dat`` file. This connects the ``Pathway``
         nodes in the graph through shared ``Compound`` nodes. The format of the input string has
         several possibilities. The simplest is when the pathway points to one or more target
@@ -673,7 +673,7 @@ class MetacycParser(SBMLParser):
         s = s[res.end() : -1]  # remove cpd ID and closing parenthesis
 
         # Extract pathway links recursively
-        pathways: List[str] = []
+        pathways: list[str] = []
         direction = ""
         pw_id = r"\"[^\"]+\"|[^\s]+"
         directed_pw_rgx = re.compile(rf"\(({pw_id}) \. :(INCOMING|OUTGOING)\)")

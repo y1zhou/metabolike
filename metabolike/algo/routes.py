@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Iterable, List
+from collections.abc import Iterable
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -29,7 +30,9 @@ def get_all_ec_numbers(db: Neo4jClient) -> set[str]:
     return {n["ec"] for n in ec}
 
 
-def get_view_of_pathway(db: Neo4jClient, pathway_id: str):
+def get_view_of_pathway(
+    db: Neo4jClient, pathway_id: str
+) -> tuple[list[dict[str, Any]], list[dict, str, Any]]:
     """Get the view of a pathway.
 
     Args:
@@ -250,7 +253,7 @@ def get_reaction_route_between_compounds(
     ignore_node_metaids: list[str] = [],
     num_routes: int = 2,
     max_hops: int = 10,
-):
+) -> list[dict[str, Any]]:
     """The function has two modes: one for following pre-defined pathways, and one for following
     any chain of reactions between two compounds.
 
@@ -331,7 +334,7 @@ def find_compound_outflux_routes(
     expression_coef: float = 1.0,
     structure_similarity_coef: float = 10.0,
     route_length_coef: float = 0.0,
-):
+) -> list[dict[str, Any]]:
     """Find how a compound is consumed. Genes are either expressed or unexpressed, so this is a
     rather binary view of the metabolic network.
 
@@ -353,13 +356,13 @@ def find_compound_outflux_routes(
         compound_id: The metaId of the compound of interest.
         reaction_gene_expression: Expression levels of the reactions.
         expressed_genes: A list of genes that are considered expressed. If not
-          given, all genes are considered expressed.
+            given, all genes are considered expressed.
         drop_nodes: The metaId or name of blacklisted Reaction/Compound nodes.
         max_level: The maximum number of hops in the traversal.
         max_num_routes: The maximum number of routes to return.
         expression_coef: Score coefficient for route expression level.
         structure_similarity_coef: Score coefficient for metabolite similarity
-          score.
+            score.
         route_length_coef: Score coefficient for length of route.
 
     Returns:

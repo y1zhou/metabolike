@@ -1,5 +1,6 @@
 import logging
-from typing import Dict, Iterable, Sequence, Set
+from collections.abc import Iterable
+from typing import Any
 
 import pandas as pd
 
@@ -8,7 +9,7 @@ from metabolike.db import Neo4jClient
 logger = logging.getLogger(__name__)
 
 
-def get_all_gene_products(db: Neo4jClient) -> Set[str]:
+def get_all_gene_products(db: Neo4jClient) -> set[str]:
     ec = db.read(
         """
         MATCH (r:Reaction)-[:hasRDF {bioQualifier: 'is'}]->(rdf:RDF)
@@ -20,18 +21,20 @@ def get_all_gene_products(db: Neo4jClient) -> Set[str]:
     return {n["ec"] for n in ec}
 
 
-def get_table_of_gene_products(db: Neo4jClient, rdf_fields: Dict[str, str] = None):
+def get_table_of_gene_products(
+    db: Neo4jClient, rdf_fields: dict[str, str] = None
+) -> list[dict[str, Any]]:
     """
     Retrieves all reaction-associated gene products.
     Args:
         db: A Neo4j client connected to the graph database.
         rdf_fields: Properties of the RDF nodes, and the desired output name.
-          For example, {"ncbigene": "entrez"} would extract the ``ncbigene``
-          property from the RDF nodes and output it in the ``entrez`` column.
+            For example, {"ncbigene": "entrez"} would extract the ``ncbigene``
+            property from the RDF nodes and output it in the ``entrez`` column.
 
     Returns:
         A list of entries with the reaction ID, the metaId of the gene, the
-          gene symbol, and other fields from RDF nodes whenever available.
+        gene symbol, and other fields from RDF nodes whenever available.
     """
     query = """
         MATCH (r:Reaction)-[:hasGeneProduct|hasMember|hasComponent*]->(gp:GeneProduct)
@@ -50,8 +53,8 @@ class ReactionGeneMap:
     def __init__(
         self,
         database_connection: Neo4jClient,
-        gene_ids: Sequence[str],
-        expression_levels: Sequence[float],
+        gene_ids: Iterable[str],
+        expression_levels: Iterable[float],
         gene_groups: pd.DataFrame | None = None,
         gene_id_map: pd.DataFrame | None = None,
         gene_set_reduce_func: callable = max,

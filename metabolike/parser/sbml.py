@@ -1,7 +1,8 @@
 import logging
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, List, Set, Tuple, Union
+from typing import Union
 
 import libsbml
 from tqdm import tqdm
@@ -15,16 +16,14 @@ class SBMLParser:
     """Converting MetaCyc files to a Neo4j database. Documentation on the MetaCyc files and format
     FAQs can be found at:
 
-    * MetaCyc data files download: https://metacyc.org/downloads.shtml
-    * MetaCyc file formats: http://bioinformatics.ai.sri.com/ptools/flatfile-format.html
-    * SBML FAQ: https://synonym.caltech.edu/documents/faq
+    * [MetaCyc data files download](https://metacyc.org/downloads.shtml)
+    * [MetaCyc file formats](http://bioinformatics.ai.sri.com/ptools/flatfile-format.html)
+    * [SBML FAQ](https://synonym.caltech.edu/documents/faq)
 
     Args:
         sbml: The path to the MetaCyc SBML file to convert.
 
     Attributes:
-        db: A :class:`.SBMLClient` instance. This is connected to neo4j and used
-        to perform all database operations. Should be closed after use.
         sbml_file: Filepath to the input SBML file.
     """
 
@@ -73,13 +72,13 @@ class SBMLParser:
     @staticmethod
     def collect_compartments(
         compartments: Iterable[libsbml.Compartment],
-    ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
+    ) -> list[dict[str, Union[str, dict[str, str]]]]:
         return [{"metaId": c.getId(), "props": {"name": c.getName()}} for c in compartments]
 
     def collect_compounds(
         self,
         compounds: Iterable[libsbml.Species],
-    ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
+    ) -> list[dict[str, Union[str, dict[str, str]]]]:
         nodes = []
         for c in tqdm(compounds, desc="Compounds"):
             node = {
@@ -95,7 +94,7 @@ class SBMLParser:
             if (fbc := c.getPlugin("fbc")) is not None:
                 node["props"]["chemicalFormula"] = fbc.getChemicalFormula()
 
-            cvterms: List[libsbml.CVTerm] = c.getCVTerms()
+            cvterms: list[libsbml.CVTerm] = c.getCVTerms()
             node["rdf"] = [self._cvterm_to_rdf(cvterm) for cvterm in cvterms]
 
             nodes.append(node)
@@ -104,7 +103,7 @@ class SBMLParser:
 
     def collect_gene_products(
         self, gene_prods: Iterable[libsbml.GeneProduct]
-    ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
+    ) -> list[dict[str, Union[str, dict[str, str]]]]:
         nodes = []
         for gp in tqdm(gene_prods, desc="GeneProducts"):
             node = {
@@ -114,7 +113,7 @@ class SBMLParser:
                     "label": gp.getLabel(),
                 },
             }
-            cvterms: List[libsbml.CVTerm] = gp.getCVTerms()
+            cvterms: list[libsbml.CVTerm] = gp.getCVTerms()
             node["rdf"] = [self._cvterm_to_rdf(cvterm) for cvterm in cvterms]
 
             nodes.append(node)
@@ -123,7 +122,7 @@ class SBMLParser:
 
     def collect_reactions(
         self, reactions: Iterable[libsbml.Reaction]
-    ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
+    ) -> list[dict[str, Union[str, dict[str, str]]]]:
         nodes = []
         for r in tqdm(reactions, desc="Reactions"):
             r: libsbml.Reaction
@@ -135,7 +134,7 @@ class SBMLParser:
                     "reversible": r.getReversible(),
                 },
             }
-            cvterms: List[libsbml.CVTerm] = r.getCVTerms()
+            cvterms: list[libsbml.CVTerm] = r.getCVTerms()
             node["rdf"] = [self._cvterm_to_rdf(cvterm) for cvterm in cvterms]
 
             # Add reactants and products
@@ -151,7 +150,7 @@ class SBMLParser:
     @staticmethod
     def collect_groups(
         groups: Iterable[libsbml.Group],
-    ) -> List[Dict[str, Union[str, Dict[str, str], List[str]]]]:
+    ) -> list[dict[str, Union[str, dict[str, str], list[str]]]]:
         return [
             {
                 "metaId": g.getId(),
@@ -166,7 +165,7 @@ class SBMLParser:
 
     def _cvterm_to_rdf(
         self, cvterm: libsbml.CVTerm
-    ) -> Dict[str, Union[str, Dict[str, Union[str, List[str]]]]]:
+    ) -> dict[str, Union[str, dict[str, Union[str, list[str]]]]]:
         """Convert a CVTerm to RDF node.
 
         RDF in Annotation are in the form of triples:
@@ -182,7 +181,7 @@ class SBMLParser:
         # Get the content of each RDF term
         uris = [self._split_uri(cvterm.getResourceURI(i)) for i in range(cvterm.getNumResources())]
 
-        props: Dict[str, Union[str, List[str]]] = {}
+        props: dict[str, Union[str, list[str]]] = {}
         for resource, identifier in uris:
             is_list_resource = resource == "ec-code"
             add_kv_to_dict(props, resource, identifier, as_list=is_list_resource)
@@ -191,8 +190,8 @@ class SBMLParser:
 
     @staticmethod
     def _get_reaction_compounds(
-        compounds: List[libsbml.SpeciesReference],
-    ) -> List[Dict[str, Union[str, Dict[str, str]]]]:
+        compounds: list[libsbml.SpeciesReference],
+    ) -> list[dict[str, Union[str, dict[str, str]]]]:
         """Link reactants or products to a reaction.
 
         Args:
@@ -224,8 +223,8 @@ class SBMLParser:
         # We need to know the metaId of children of each geneSet / geneComplex.
         # Also need to name the geneSet / geneComplex nodes.
         # Note that the same set/complex can catalyze multiple reactions.
-        gene_sets: Dict[str, Set[str]] = {}
-        gene_complexes: Dict[str, Set[str]] = {}
+        gene_sets: dict[str, set[str]] = {}
+        gene_complexes: dict[str, set[str]] = {}
 
         # For each reaction, we store its associated gene products
         reaction_genes = {}
@@ -244,8 +243,8 @@ class SBMLParser:
     def _parse_gene_association_nodes(
         self,
         node: Union[libsbml.GeneProductRef, libsbml.FbcAnd, libsbml.FbcOr],
-        gene_sets: Dict[str, Set[str]],
-        gene_complexes: Dict[str, Set[str]],
+        gene_sets: dict[str, set[str]],
+        gene_complexes: dict[str, set[str]],
     ):
         """Get unique gene product sets/complexes from a GeneProductAssociation.
 
@@ -267,8 +266,8 @@ class SBMLParser:
     def _parse_gene_product_complex(
         self,
         node: libsbml.FbcAnd,
-        gene_sets: Dict[str, Set[str]],
-        gene_complexes: Dict[str, Set[str]],
+        gene_sets: dict[str, set[str]],
+        gene_complexes: dict[str, set[str]],
     ):
         components = set()
         for i in range(node.getNumAssociations()):
@@ -286,8 +285,8 @@ class SBMLParser:
     def _parse_gene_product_set(
         self,
         node: libsbml.FbcOr,
-        gene_sets: Dict[str, Set[str]],
-        gene_complexes: Dict[str, Set[str]],
+        gene_sets: dict[str, set[str]],
+        gene_complexes: dict[str, set[str]],
     ):
         members = set()
         for i in range(node.getNumAssociations()):
@@ -303,7 +302,7 @@ class SBMLParser:
             return self._add_gene_product_group(members, gene_sets, "GeneProductSet")
 
     @staticmethod
-    def _add_gene_product_group(ids: Set[str], gene_group: Dict[str, Set[str]], group_type: str):
+    def _add_gene_product_group(ids: set[str], gene_group: dict[str, set[str]], group_type: str):
         """Add a set of genes to a dict of gene sets / complexes."""
         ids.discard(None)
         for k, v in gene_group.items():
@@ -315,7 +314,7 @@ class SBMLParser:
         return new_k
 
     @staticmethod
-    def _split_uri(uri: str) -> Tuple[str, str]:
+    def _split_uri(uri: str) -> tuple[str, str]:
         """Split a URI into a namespace and an annotation term.
 
         Args:

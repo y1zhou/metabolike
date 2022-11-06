@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Dict, List
 
 import pytest
 
@@ -86,7 +85,7 @@ def test_clean_props(mc: MetacycParser):
     }
 
 
-def test_dat_entry_to_node(mc: MetacycParser, rxn_dat: Dict[str, List[List[str]]]):
+def test_dat_entry_to_node(mc: MetacycParser, rxn_dat: dict[str, list[list[str]]]):
     node = {"name": "RXN-15513", "props": {"canonicalId": "RXN-15513"}}
     lines = rxn_dat["RXN-15513"]
 
@@ -243,7 +242,7 @@ def test_parse_pathway_links(mc: MetacycParser):
     assert direction == "OUTGOING"
 
 
-def test_collect_reactions_dat_nodes(mc: MetacycParser, rxn_dat: Dict[str, List[List[str]]]):
+def test_collect_reactions_dat_nodes(mc: MetacycParser, rxn_dat: dict[str, list[list[str]]]):
     rxn_ids = ["RXN-15513", "F16BDEPHOS-RXN"]
     rxn_nodes = mc.collect_reactions_dat_nodes(rxn_ids, rxn_dat)
     assert isinstance(rxn_nodes, list)
@@ -259,7 +258,7 @@ def test_collect_reactions_dat_nodes(mc: MetacycParser, rxn_dat: Dict[str, List[
     assert len(mc.missing_ids["reactions"]) == 1
 
 
-def test_collect_pathways_dat_nodes(mc: MetacycParser, rxn_dat: Dict[str, List[List[str]]]):
+def test_collect_pathways_dat_nodes(mc: MetacycParser, rxn_dat: dict[str, list[list[str]]]):
     pw_dat = mc.read_dat_file(mc.input_files["pathways"])
     pws = ["PWY-3801", "PWY-3801"]
     pw_nodes, comp_rxn_nodes = mc.collect_pathways_dat_nodes(pws, pw_dat, rxn_dat)

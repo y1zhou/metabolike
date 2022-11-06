@@ -1,4 +1,4 @@
-from typing import Callable
+from collections.abc import Callable
 
 from neo4j import Neo4jDriver
 from pytest_mock import MockerFixture

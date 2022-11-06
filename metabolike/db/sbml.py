@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Dict, Iterable, List, Union
+from collections.abc import Iterable
+from typing import Any, Union
 
 from libsbml import FbcModelPlugin, GroupsModelPlugin, Model, Reaction
 from tqdm import tqdm
@@ -107,7 +108,7 @@ class SBMLClient(Neo4jClient):
 
     Args:
         uri: URI of the Neo4j server. Defaults to ``neo4j://localhost:7687``.
-         For more details, see :class:`neo4j.driver.Driver`.
+            For more details, see :class:`neo4j.driver.Driver`.
         neo4j_user: Neo4j user. Defaults to ``neo4j``.
         neo4j_password: Neo4j password. Defaults to ``neo4j``.
         database: Name of the database. Defaults to ``neo4j``.
@@ -118,7 +119,7 @@ class SBMLClient(Neo4jClient):
         driver: :class:`neo4j.Neo4jDriver` or :class:`neo4j.BoltDriver`.
         database: str, name of the database to use.
         available_node_labels: tuple of strings indicating the possible node
-         labels in the graph.
+            labels in the graph.
     """
 
     default_cyphers = {
@@ -146,7 +147,7 @@ class SBMLClient(Neo4jClient):
 
         Args:
             create_db: If False, does not create the database. This is useful
-             for running on neo4j AuraDB when database creation is not allowed.
+                for running on neo4j AuraDB when database creation is not allowed.
             drop_if_exists: See :meth:`.create`.
             reaction_groups: Assume all ``group`` nodes are groups of ``Reaction``
                 nodes. This assumption greatly speeds up the creation of the
@@ -203,7 +204,7 @@ class SBMLClient(Neo4jClient):
     def create_nodes(
         self,
         desc: str,
-        nodes: List[Dict[str, Any]],
+        nodes: list[dict[str, Any]],
         query: str,
         batch_size: int = 1000,
         progress_bar: bool = False,
@@ -242,16 +243,16 @@ class SBMLClient(Neo4jClient):
 
         logger.info(f"Created {len(nodes)} {desc} nodes")
 
-    def _compartments_to_graph(self, compartments: List[Dict[str, Union[str, Dict[str, str]]]]):
+    def _compartments_to_graph(self, compartments: list[dict[str, Union[str, dict[str, str]]]]):
         self._set_metaid_constraints("Compartment")
         self.create_nodes("Compartment", compartments, self.default_cyphers["Compartment"])
 
-    def _compounds_to_graph(self, compounds: List[Dict[str, Union[str, Dict[str, str]]]]):
+    def _compounds_to_graph(self, compounds: list[dict[str, Union[str, dict[str, str]]]]):
         self._set_metaid_constraints("Compound")
         self._check_rdf_nodes(compounds)
         self.create_nodes("Compound", compounds, self.default_cyphers["Compound"])
 
-    def _reactions_to_graph(self, reactions: List[Dict[str, Union[str, Dict[str, str]]]]):
+    def _reactions_to_graph(self, reactions: list[dict[str, Union[str, dict[str, str]]]]):
         self._set_metaid_constraints("Reaction")
         self._check_rdf_nodes(reactions)
         self.create_nodes(
