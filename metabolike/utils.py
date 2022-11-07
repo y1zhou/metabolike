@@ -1,7 +1,8 @@
 import logging
+from collections.abc import Iterable
 from itertools import islice
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, overload
+from typing import Any, Optional, Union, overload
 
 logger = logging.getLogger(__name__)
 
@@ -52,16 +53,14 @@ def snake_to_camel(s: str, sep: str = "-") -> str:
     return "".join(s_camel)
 
 
-def add_kv_to_dict(
-        d: Dict[str, Any], k: str, v: Any, as_list: bool = False
-) -> Dict[str, Any]:
+def add_kv_to_dict(d: dict[str, Any], k: str, v: Any, as_list: bool = False) -> dict[str, Any]:
     """Add a key-value pair to a dictionary.
 
     Args:
         d: Dictionary to add the key-value pair to.
         k: Key to add.
         v: Value to add.
-        as_list: If True, the value is appended to the list identified by ``k``.
+        as_list: If True, the value is appended to the list identified by `k`.
 
     Returns:
         Dictionary with the key-value pair added. If the key already exists,
@@ -76,7 +75,7 @@ def add_kv_to_dict(
     return d
 
 
-def generate_gene_reaction_rule(genes: List[Tuple[Dict[str, str], Dict[str, str]]]):
+def generate_gene_reaction_rule(genes: list[tuple[dict[str, str], dict[str, str]]]):
     # Return directly if it's just one gene
     if len(genes) == 1:
         return genes[0][1]["name"]
@@ -87,7 +86,7 @@ def generate_gene_reaction_rule(genes: List[Tuple[Dict[str, str], Dict[str, str]
 
     # GeneProductSet could contain genes or complexes
     res_complex, res_genes = {}, []
-    for l, r in genes[1:]:
+    for l, r in genes[1:]:  # noqa: E741 - left and right
         # Everything in the set
         if l["label"] == "GeneProductSet":
             # GeneProductSet -> GeneProduct

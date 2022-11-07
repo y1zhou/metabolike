@@ -1,4 +1,6 @@
+"""Data structures for storing all compounds from the Neo4j graph."""
 from difflib import get_close_matches
+from typing import Union
 
 import pandas as pd
 
@@ -10,15 +12,14 @@ class CompoundMap:
         self.db = db
         self.id_table, self.cpds = self.get_all_compounds()
 
-    def get_all_compounds(self):
-        """
-        See https://biocyc.org/PGDBConceptsGuide.shtml#TAG:__tex2page_toc_TAG:__tex2page_sec_4.4
-        for detailed descriptions.
+    def get_all_compounds(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """See the [BioCyc concepts guide](https://biocyc.org/PGDBConceptsGuide.shtml#TAG:__tex2pag
+        e_toc_TAG:__tex2page_sec_4.4) for detailed descriptions.
 
         Returns:
-            A tuple of two ``pandas.DataFrame``.
-              One with columns ``metaId``, ``compartment``, and ``biocyc``;
-              One with columns ``biocyc``, ``key_id`` and ``value``.
+            A tuple of two `pandas.DataFrame`s:
+                One with columns `metaId`, `compartment`, and `biocyc`;
+                the other with columns `biocyc`, `key_id` and `value`.
         """
         cpds = self.db.read(
             """
@@ -64,8 +65,20 @@ class CompoundMap:
 
         return metaid_to_biocyc, res_long
 
-    def search_compound_biocyc_id(self, query: str, **kwargs):
-        """Returns the compound biocyc ID if it exists."""
+    def search_compound_biocyc_id(
+        self, query: str, **kwargs
+    ) -> dict[str, Union[str, list[str], bool]]:
+        """Query for the compound BioCyc ID.
+
+        If the query doesn't have an exact full match, performs a fuzzy match and returns the top hits.
+
+        Args:
+            query: anything that resembles a BioCyc compound ID.
+            **kwargs: passed to [difflib.get_close_matches][].
+
+        Returns:
+             The compound biocyc ID if it exists.
+        """
         res = {"query": query, "is_fuzzy_match": False}
 
         # Direct return if query is a biocyc ID
@@ -80,9 +93,7 @@ class CompoundMap:
             return res
 
         # Try fuzzy search if there's no exact biocyc ID matches
-        value_matches = get_close_matches(
-            query.lower(), self.cpds["value_lowercase"], **kwargs
-        )
+        value_matches = get_close_matches(query.lower(), self.cpds["value_lowercase"], **kwargs)
         if value_matches:
             hits = [x for v in value_matches for x in self.compound_exact_match(v)]
             res["hits"] = list(set(hits))
@@ -105,12 +116,7 @@ class CompoundMap:
         res = self.id_table.loc[self.id_table.biocyc == query, "compartment"]
         return list(set(res.values))
 
-    def search_compound_metaid_in_compartment(
-        self, query: str, compartment: str = "cytosol"
-    ):
-        res = (
-            self.id_table.query("biocyc == @query")
-            .query("compartment == @compartment")
-            .metaId
-        )
+    def search_compound_metaid_in_compartment(self, query: str, compartment: str = "cytosol"):
+        """Find the first compound ID in a given compartment."""
+        res = self.id_table.query("biocyc == @query").query("compartment == @compartment").metaId
         return res.tolist()[0]

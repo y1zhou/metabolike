@@ -1,8 +1,3 @@
-"""
-This is NOT usable now. In the future this sub-package will be its own package
-that serves the function of proving a streamlit app for route searching.
-"""
-
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -84,9 +79,7 @@ with col1:
     )
 
 with col2:
-    uploaded_file = st.file_uploader(
-        "Alternatively, upload your own dataset:", type="csv"
-    )
+    uploaded_file = st.file_uploader("Alternatively, upload your own dataset:", type="csv")
 
 
 if st.button("Load dataset"):
@@ -181,8 +174,8 @@ if st.session_state.exp_loaded:
                 )
 
                 # Show up/down-regulated routes separately
-                l, r = st.columns(2)
-                with l:
+                c1, c2 = st.columns(2)
+                with c1:
                     st.write("Up-regulated routes:")
                     st.dataframe(
                         res.query("score > 0").sort_values("score", ascending=False),
@@ -190,7 +183,7 @@ if st.session_state.exp_loaded:
                         use_container_width=True,
                     )
 
-                with r:
+                with c2:
                     st.write("Down-regulated routes:")
                     st.dataframe(
                         res.query("score < 0")
@@ -206,12 +199,7 @@ if st.session_state.exp_loaded:
                     if n.id == cpd_metaid:
                         n.size = 15
                 if debug:
-                    st.write(
-                        [
-                            {"from": e.source, "to": e.to, "width": e.value}
-                            for e in edges
-                        ]
-                    )
+                    st.write([{"from": e.source, "to": e.to, "width": e.value} for e in edges])
 
                 config = Config(
                     width=1000,

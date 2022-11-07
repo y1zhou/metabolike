@@ -1,8 +1,9 @@
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
+
+from tqdm import tqdm
 
 from metabolike.parser import MetacycParser
-from tqdm import tqdm
 
 from .sbml import SBMLClient
 
@@ -160,9 +161,8 @@ class MetacycClient(SBMLClient):
 
     def _reactions_dat_to_graph(
         self, parser: MetacycParser
-    ) -> Optional[Dict[str, List[List[str]]]]:
-        """
-        Parse the ``reactions.dat`` file and:
+    ) -> Optional[dict[str, list[list[str]]]]:
+        """Parse the ``reactions.dat`` file and:
 
         * Add properties to ``Reaction`` nodes.
         * Link ``Reaction`` nodes to ``Pathway``, ``Citation``, and
@@ -195,9 +195,7 @@ class MetacycClient(SBMLClient):
         self._fix_reaction_direction()
         return rxn_dat
 
-    def _pathways_to_graph(
-        self, rxn_dat: Dict[str, List[List[str]]], parser: MetacycParser
-    ):
+    def _pathways_to_graph(self, rxn_dat: dict[str, list[list[str]]], parser: MetacycParser):
         """Parse the ``pathways.dat`` file.
 
         For details, see :meth:`setup`.
@@ -210,9 +208,7 @@ class MetacycClient(SBMLClient):
         pw_dat = parser.read_dat_file(parser.input_files["pathways"])
         all_pws = self.get_all_nodes("Pathway", "metaId")
 
-        pw_nodes, comp_rxn_nodes = parser.collect_pathways_dat_nodes(
-            all_pws, pw_dat, rxn_dat
-        )
+        pw_nodes, comp_rxn_nodes = parser.collect_pathways_dat_nodes(all_pws, pw_dat, rxn_dat)
         for n in pw_nodes:
             if "species" in n or "taxonomicRange" in n:
                 self._set_metaid_constraints("Taxa")
@@ -244,15 +240,11 @@ class MetacycClient(SBMLClient):
 
             if pw_links := node.get("pathwayLinks"):
                 for v in pw_links:
-                    self._link_pathway_to_pathway(
-                        pw_id, v["pathways"], v["direction"], v["cpd"]
-                    )
+                    self._link_pathway_to_pathway(pw_id, v["pathways"], v["direction"], v["cpd"])
 
-    def _fix_composite_reaction_nodes(self, comp_rxn_nodes: List[Dict[str, Any]]):
-        """
-        Composite reaction nodes are just aggregated reactions.
-        We need to change the label of these nodes from ``Pathway`` to
-         ``Reaction``, and also correct their directions.
+    def _fix_composite_reaction_nodes(self, comp_rxn_nodes: list[dict[str, Any]]):
+        """Composite reaction nodes are just aggregated reactions. We need to change the label of
+        these nodes from ``Pathway`` to ``Reaction``, and also correct their directions.
 
         Args:
             comp_rxn_nodes: Output of :meth:`_collect_pathways_dat_nodes`.
@@ -318,9 +310,7 @@ class MetacycClient(SBMLClient):
         if not parser.input_files["publications"]:
             logger.warning("No pubs.dat file given")
             return
-        logger.info(
-            f"Annotating publications with {parser.input_files['publications']}"
-        )
+        logger.info(f"Annotating publications with {parser.input_files['publications']}")
         pub_dat = parser.read_dat_file(parser.input_files["publications"])
 
         all_cits = self.get_all_nodes("Citation", "metaId")
@@ -330,8 +320,8 @@ class MetacycClient(SBMLClient):
     def _classes_dat_to_graph(self, parser: MetacycParser):
         """Parse the ``classes.dat`` file.
 
-        Add common name and synonyms to ``Compartment`` nodes.
-        Add common name, strain name, comment, and synonyms to ``Taxa`` nodes.
+        Add common name and synonyms to ``Compartment`` nodes. Add common name, strain name,
+        comment, and synonyms to ``Taxa`` nodes.
         """
         if not parser.input_files["classes"]:
             logger.warning("No classes.dat file given")
@@ -345,13 +335,11 @@ class MetacycClient(SBMLClient):
         else:
             all_taxon = []
 
-        cco_nodes, taxa_nodes = parser.collect_classes_dat_nodes(
-            cls_dat, all_cco, all_taxon
-        )
+        cco_nodes, taxa_nodes = parser.collect_classes_dat_nodes(cls_dat, all_cco, all_taxon)
         self.add_props_to_nodes("Compartment", "name", cco_nodes, "Compartment names")
         self.add_props_to_nodes("Taxa", "metaId", taxa_nodes, "Taxa names")
 
-    def get_all_nodes(self, label: str, prop: str) -> List[str]:
+    def get_all_nodes(self, label: str, prop: str) -> list[str]:
         """Fetch a property of nodes with a certain label."""
         if label not in self.available_node_labels:
             raise ValueError(f"Invalid label: {label}")
@@ -364,9 +352,10 @@ class MetacycClient(SBMLClient):
         )
         return [n["prop"] for n in res]
 
-    def get_all_compounds(self) -> List[Tuple[str, str]]:
-        """
-        Fetch all ``Compound`` nodes. All Compound node with RDF have BioCyc IDs.
+    def get_all_compounds(self) -> list[tuple[str, str]]:
+        """Fetch all ``Compound`` nodes.
+
+        All Compound node with RDF have BioCyc IDs.
         """
         res = self.read(
             """
@@ -380,7 +369,7 @@ class MetacycClient(SBMLClient):
         self,
         node_label: str,
         node_prop_key: str,
-        nodes: List[Dict[str, Any]],
+        nodes: list[dict[str, Any]],
         desc: str,
         **kwargs,
     ):
@@ -403,19 +392,14 @@ class MetacycClient(SBMLClient):
         """
         self.create_nodes(desc, nodes, query, **kwargs)
 
-    def _link_pathway_to_pathway(
-        self, pw: str, pws: List[str], direction: str, cpd: str
-    ):
-        """
-        Connect a ``Pathway`` to a list of other ``Pathway``s. The ``Compound``
-        that is involved in both sides of the connection is specified in the
-        relationship.
+    def _link_pathway_to_pathway(self, pw: str, pws: list[str], direction: str, cpd: str):
+        """Connect a ``Pathway`` to a list of other ``Pathway``s. The ``Compound`` that is involved
+        in both sides of the connection is specified in the relationship.
 
-        We also want to link the ``Reaction`` nodes corresponding to the
-        ``Compound`` nodes that are involved in the connection. For example, if
-        reaction ``R1`` produces compound ``C``, and reaction ``R2`` consumes
-        compound ``C``, we want to link ``R1`` and ``R2`` with a ``isRelatedEvent``
-        relationship and add the corresponding pathways as properties.
+        We also want to link the ``Reaction`` nodes corresponding to the ``Compound`` nodes that
+        are involved in the connection. For example, if reaction ``R1`` produces compound ``C``,
+        and reaction ``R2`` consumes compound ``C``, we want to link ``R1`` and ``R2`` with a
+        ``isRelatedEvent`` relationship and add the corresponding pathways as properties.
         """
         if direction == "INCOMING":
             pw_rel_type = "-[l:hasRelatedPathway]->"
@@ -447,7 +431,7 @@ class MetacycClient(SBMLClient):
     def _link_reaction_to_primary_compound(
         self,
         reaction_id: str,
-        compound_ids: List[str],
+        compound_ids: list[str],
         pathway_id: str,
         side: str,
     ):
@@ -470,13 +454,10 @@ class MetacycClient(SBMLClient):
             pw=pathway_id,
         )
 
-    def merge_nodes(
-        self, n1_label: str, n2_label: str, n1_attr: str, n2_attr: str, attr_val: str
-    ):
-        """
-        Merge two nodes with the same attribute value. Note that properties is
-        hard-coded to be "override", which means all node attributes of ``n2``
-        will be used to override the attributes of ``n1``.
+    def merge_nodes(self, n1_label: str, n2_label: str, n1_attr: str, n2_attr: str, attr_val: str):
+        """Merge two nodes with the same attribute value. Note that properties is hard-coded to be
+        "override", which means all node attributes of ``n2`` will be used to override the
+        attributes of ``n1``.
 
         Args:
             n1_label: The label of the first node.
@@ -497,12 +478,11 @@ class MetacycClient(SBMLClient):
         )
 
     def _fix_reaction_direction(self):
-        """
-        Seems like ``listOfReactants`` in the SBML file are always the true
-        reactants in irreversible reactions, no matter if they are under
-        ``LEFT`` or ``RIGHT`` in the dat file. Since the reaction nodes were all
-        populated using the SBML file, we can say all reactions are either
-        reversible or go from left to right.
+        """Seems like ``listOfReactants`` in the SBML file are always the true reactants in
+        irreversible reactions, no matter if they are under ``LEFT`` or ``RIGHT`` in the dat file.
+
+        Since the reaction nodes were all populated using the SBML file, we can say all reactions
+        are either reversible or go from left to right.
         """
         self.write(
             """
@@ -518,9 +498,7 @@ class MetacycClient(SBMLClient):
         )
 
     def _delete_bad_reaction_nodes(self):
-        """
-        Delete reaction nodes with non-canonical metaIds and all their relationships.
-        """
+        """Delete reaction nodes with non-canonical metaIds and all their relationships."""
         self.write(
             """
             MATCH (r:Reaction) WHERE r.name <> r.canonicalId
@@ -535,10 +513,10 @@ class MetacycClient(SBMLClient):
         )
 
     def _set_composite_reaction_labels(self):
-        """
-        Composite reaction nodes are labeled as ``Pathway`` and ``Reaction``.
-        The ``Pathway`` label should be removed and a ``isCompositeReaction``
-        property is added to the ``Reaction`` node.
+        """Composite reaction nodes are labeled as ``Pathway`` and ``Reaction``.
+
+        The ``Pathway`` label should be removed and a ``isCompositeReaction`` property is added to
+        the ``Reaction`` node.
         """
         self.write(
             """

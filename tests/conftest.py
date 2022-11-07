@@ -1,6 +1,7 @@
 from os import environ
 
 import pytest
+
 from metabolike.db.neo4j import Neo4jClient
 
 

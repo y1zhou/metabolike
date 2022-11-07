@@ -24,17 +24,25 @@ Protein information is given as the combination organism/Uniprot
 accession number where available. When this information is not
 given in the original paper only the organism is given.
 
-``///``	indicates the end of an EC-number specific part.
+``///`` indicates the end of an EC-number specific part.
 """
 
 import logging
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Any, Optional, Union
 
 import orjson
 import pandas as pd
 from lark import Lark
-from metabolike.parser.brenda_transformer import *
+
+from metabolike.parser.brenda_transformer import (
+    CommentaryOnlyTreeTransformer,
+    GenericTreeTransformer,
+    ReactionTreeTransformer,
+    RefTreeTransformer,
+    SpecificInfoTreeTransformer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +228,7 @@ def _get_parser_from_field(field: str) -> Optional[Lark]:
     return Lark(grammar, parser="lalr", transformer=t, maybe_placeholders=False)
 
 
-def _text_to_tree(text: str, parser: Optional[Lark]) -> List[Dict]:
+def _text_to_tree(text: str, parser: Optional[Lark]) -> list[dict]:
     if parser is None:
         # Simply return the text for TRANSFERRED_DELETED fields
         return [{"description": text}]
@@ -238,7 +246,7 @@ def _read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
         cache: Whether to cache the cleaned dataframe to a csv file
 
     Returns:
-        A :class:`pandas.DataFrame` with columns:
+        A `pandas.DataFrame` with columns:
 
            * ID: EC number, e.g. 1.1.1.1
            * field: the content of the information, e.g. protein, localization
@@ -307,12 +315,8 @@ def _read_brenda(filepath: Path, cache: bool = False) -> pd.DataFrame:
     df = df[df.description != "SN\n"]  # empty systamatic name
 
     # Remove redundant `|` in description
-    mask = df.description.str.contains(r"\|[^#]") & (
-        ~df.field.isin(FIELD_WITH_REACTIONS)
-    )
-    df.loc[mask, "description"] = df.loc[mask, "description"].str.replace(
-        "|", "", regex=False
-    )
+    mask = df.description.str.contains(r"\|[^#]") & (~df.field.isin(FIELD_WITH_REACTIONS))
+    df.loc[mask, "description"] = df.loc[mask, "description"].str.replace("|", "", regex=False)
 
     # Irregular commentary in 2.2.1.3 REACTION
     mask = (df.ID == "2.2.1.3") & (df.field == "REACTION")
@@ -332,10 +336,10 @@ def parse_brenda(
     filepath: Union[str, Path],
     cache: bool = False,
     ec_nums: Optional[Iterable[str]] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Parse the BRENDA text file into a dict.
 
-    This implmentation focuses on extracting information from the text file,
+    This implementation focuses on extracting information from the text file,
     and feeding the data into a Neo4j database. The parser is implemented
     using Lark. A series of :class:`lark.visitors.Transformer` classes are used
     to clean the data and convert it into the format required by Neo4j.
@@ -346,9 +350,8 @@ def parse_brenda(
         ec_nums: A list of EC numbers to extract.
 
     Returns:
-        A :class:`dict` with the ``description`` column from
-        :func:`read_brenda` transformed into lists of dicts stored as values,
-        and EC numbers as keys.
+        A dict with the `description` column from [read_brenda]() transformed into lists of dicts stored as values,
+            and EC numbers as keys.
     """
     filepath = Path(filepath).expanduser().resolve()
 
@@ -357,7 +360,7 @@ def parse_brenda(
     if cache_file.exists() and cache:
         logger.debug(f"Loading cached BRENDA data from {cache_file}")
         with open(cache_file, "rb") as f:
-            j: Dict[str, Any] = orjson.loads(f.read())
+            j: dict[str, Any] = orjson.loads(f.read())
 
         if ec_nums:
             logger.warning("Using cached data, some ec_nums may be missing")
@@ -372,7 +375,7 @@ def parse_brenda(
         df = df[df.ID.isin(ec_nums)]
 
     # Get parsers for each unique field
-    parsers: Dict[str, Optional[Lark]] = {"TRANSFERRED_DELETED": None}
+    parsers: dict[str, Optional[Lark]] = {"TRANSFERRED_DELETED": None}
     for field in FIELDS.keys():
         parsers[field] = _get_parser_from_field(field)
 
@@ -397,10 +400,10 @@ def parse_brenda(
     return j
 
 
-def _read_brenda_file(filepath: Path) -> List[str]:
-    """Read all non-empty lines from a file.
-    Comment lines that start with '*' are ignored. The text file should be downloaded from:
-    https://www.brenda-enzymes.org/download_brenda_without_registration.php
+def _read_brenda_file(filepath: Path) -> list[str]:
+    """Read all non-empty lines from a file. Comment lines that start with '*' are ignored. The
+    text file should be downloaded from: https://www.brenda-
+    enzymes.org/download_brenda_without_registration.php.
 
     Args:
         filepath: Path to the file
@@ -412,7 +415,7 @@ def _read_brenda_file(filepath: Path) -> List[str]:
         raise ValueError(f"Cannot open file: {str(filepath)}")
 
     res = []
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         for line in f:
             # Skip empty lines
             if line == "\n" or line[0] == "*":
@@ -427,7 +430,7 @@ def _read_brenda_file(filepath: Path) -> List[str]:
     return res
 
 
-def _separate_entries(lines: List[str]) -> pd.DataFrame:
+def _separate_entries(lines: list[str]) -> pd.DataFrame:
     """Convert list of lines to DataFrame.
 
     Args:
@@ -500,7 +503,7 @@ def _clean_ec_number(df: pd.DataFrame) -> pd.DataFrame:
         df Generated by :func:`read_brenda`.
 
     Returns:
-        :class:`pandas.DataFrame` with deleted and transferred entries moved to
+        `pandas.DataFrame` with deleted and transferred entries moved to
         the bottom, and their:
 
            * ``ID`` being the deleted/transferred ID,

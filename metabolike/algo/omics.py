@@ -1,5 +1,6 @@
 import logging
-from typing import Dict, Iterable, Sequence, Set
+from collections.abc import Iterable
+from typing import Any
 
 import pandas as pd
 
@@ -8,7 +9,7 @@ from metabolike.db import Neo4jClient
 logger = logging.getLogger(__name__)
 
 
-def get_all_gene_products(db: Neo4jClient) -> Set[str]:
+def get_all_gene_products(db: Neo4jClient) -> set[str]:
     ec = db.read(
         """
         MATCH (r:Reaction)-[:hasRDF {bioQualifier: 'is'}]->(rdf:RDF)
@@ -20,18 +21,20 @@ def get_all_gene_products(db: Neo4jClient) -> Set[str]:
     return {n["ec"] for n in ec}
 
 
-def get_table_of_gene_products(db: Neo4jClient, rdf_fields: Dict[str, str] = None):
+def get_table_of_gene_products(
+    db: Neo4jClient, rdf_fields: dict[str, str] = None
+) -> list[dict[str, Any]]:
     """
     Retrieves all reaction-associated gene products.
     Args:
         db: A Neo4j client connected to the graph database.
         rdf_fields: Properties of the RDF nodes, and the desired output name.
-          For example, {"ncbigene": "entrez"} would extract the ``ncbigene``
-          property from the RDF nodes and output it in the ``entrez`` column.
+            For example, {"ncbigene": "entrez"} would extract the ``ncbigene``
+            property from the RDF nodes and output it in the ``entrez`` column.
 
     Returns:
         A list of entries with the reaction ID, the metaId of the gene, the
-          gene symbol, and other fields from RDF nodes whenever available.
+        gene symbol, and other fields from RDF nodes whenever available.
     """
     query = """
         MATCH (r:Reaction)-[:hasGeneProduct|hasMember|hasComponent*]->(gp:GeneProduct)
@@ -50,8 +53,8 @@ class ReactionGeneMap:
     def __init__(
         self,
         database_connection: Neo4jClient,
-        gene_ids: Sequence[str],
-        expression_levels: Sequence[float],
+        gene_ids: Iterable[str],
+        expression_levels: Iterable[float],
         gene_groups: pd.DataFrame | None = None,
         gene_id_map: pd.DataFrame | None = None,
         gene_set_reduce_func: callable = max,
@@ -70,8 +73,7 @@ class ReactionGeneMap:
 
         self.db = database_connection
         self.gene_exp = {
-            gene_id: exp_level
-            for gene_id, exp_level in zip(gene_ids, expression_levels)
+            gene_id: exp_level for gene_id, exp_level in zip(gene_ids, expression_levels)
         }
         self.rxn_exp: dict[str, float] = {}
 
@@ -126,10 +128,7 @@ class ReactionGeneMap:
         #     logger.warning(f"Unknown gene product {gene_name}")
 
     def calc_reaction_gene_group_expression(self, gene_group_id: str):
-        """
-        Calculate the expression level of a given gene product set or
-        complex node.
-        """
+        """Calculate the expression level of a given gene product set or complex node."""
         # TODO: make use of self.get_all_genes_in_group()
         genes = self.gene_groups.loc[self.gene_groups["group_id"] == gene_group_id, :]
         gene_ids = genes["members"].values
@@ -152,9 +151,8 @@ class ReactionGeneMap:
             raise ValueError(f"Unknown gene group type: {group_type}")
 
     def get_route_expression(self, rxn_ids: Iterable[str]) -> float:
-        """
-        Sums up total expression levels of the reaction route, and divide
-        the value by the number of reactions.
+        """Sums up total expression levels of the reaction route, and divide the value by the
+        number of reactions.
 
         Args:
             rxn_ids: The metaId fields of the reactions.
@@ -170,9 +168,9 @@ class ReactionGeneMap:
         return res / len(rxn_ids)
 
     def _get_top_level_rxn_gene_mapping(self):
-        """
-        Get unique reaction -> gene product mappings. The "gene" column could
-        be GeneProduct, GeneProductSet, or GeneProductComplex nodes.
+        """Get unique reaction -> gene product mappings.
+
+        The "gene" column could be GeneProduct, GeneProductSet, or GeneProductComplex nodes.
         """
         rxn2gene = self.db.read(
             """

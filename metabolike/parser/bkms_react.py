@@ -7,12 +7,11 @@ import requests
 
 
 def get_bkms_tarball(filepath: str, extract: bool = True) -> None:
-    """
-    The file is available at: https://bkms.brenda-enzymes.org/download.php
+    """The file is available at: https://bkms.brenda-enzymes.org/download.php.
 
     The compressed file (``Reactions_BKMS.tar.gz``) includes the table in tab
     stop separated format (Excel, OpenOffice). The table contains actual data of
-    BRENDA (release 2021.2, only reactions with naturally occuring substrates),
+    BRENDA (release 2021.2, only reactions with naturally occurring substrates),
     MetaCyc (version 24.5), SABIO-RK (07/02/2021) and KEGG data, downloaded on
     the 23rd of April 2012. Downloading more recent KEGG data cannot be offered
     because a KEGG license agreement would be necessary.
@@ -32,8 +31,7 @@ def get_bkms_tarball(filepath: str, extract: bool = True) -> None:
 
 
 def _extract_bkms_tarball(filepath: str) -> None:
-    """
-    Extract the tsv file from the tarball.
+    """Extract the tsv file from the tarball.
 
     Args:
         filepath: The path to the downloaded file.
@@ -44,8 +42,7 @@ def _extract_bkms_tarball(filepath: str) -> None:
 
 
 def read_bkms(filepath: str, clean: bool = True) -> pd.DataFrame:
-    """
-    Read the BKMS-react table and prepare it for further processing.
+    """Read the BKMS-react table and prepare it for further processing.
 
     The table contains random ``^M`` characters in some rows. These characters
     won't break pandas, but they will make the parsed table unexpectedly long.
@@ -73,7 +70,7 @@ def read_bkms(filepath: str, clean: bool = True) -> pd.DataFrame:
         df = pd.read_table(fp, sep="\t")
         return df.drop_duplicates()
 
-    with open(fp, "r") as f:
+    with open(fp) as f:
         lines = f.readlines()
     lines = [line.replace(r"\r", "") for line in lines]
     df: pd.DataFrame = pd.read_table(StringIO("".join(lines)), sep="\t")

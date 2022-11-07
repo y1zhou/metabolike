@@ -1,10 +1,12 @@
 import logging
-from typing import Any, Dict, Iterable, List, Union
+from collections.abc import Iterable
+from typing import Any, Union
 
 from libsbml import FbcModelPlugin, GroupsModelPlugin, Model, Reaction
+from tqdm import tqdm
+
 from metabolike.parser import SBMLParser
 from metabolike.utils import chunk
-from tqdm import tqdm
 
 from .neo4j import Neo4jClient
 
@@ -101,13 +103,12 @@ UNWIND $batch_nodes AS n
 
 
 class SBMLClient(Neo4jClient):
-    """In addition to the Neo4j driver, this class also includes a set of
-    helper methods for creating nodes and relationships in the graph with data
-    from the SBML file.
+    """In addition to the Neo4j driver, this class also includes a set of helper methods for
+    creating nodes and relationships in the graph with data from the SBML file.
 
     Args:
         uri: URI of the Neo4j server. Defaults to ``neo4j://localhost:7687``.
-         For more details, see :class:`neo4j.driver.Driver`.
+            For more details, see :class:`neo4j.driver.Driver`.
         neo4j_user: Neo4j user. Defaults to ``neo4j``.
         neo4j_password: Neo4j password. Defaults to ``neo4j``.
         database: Name of the database. Defaults to ``neo4j``.
@@ -118,7 +119,7 @@ class SBMLClient(Neo4jClient):
         driver: :class:`neo4j.Neo4jDriver` or :class:`neo4j.BoltDriver`.
         database: str, name of the database to use.
         available_node_labels: tuple of strings indicating the possible node
-         labels in the graph.
+            labels in the graph.
     """
 
     default_cyphers = {
@@ -132,7 +133,7 @@ class SBMLClient(Neo4jClient):
         "Reaction-GeneProduct": _reaction_gene_product_cypher,
     }
 
-    def __init__(
+    def __init__(  # nosec B107 - default password is okay here
         self,
         uri: str = "neo4j://localhost:7687",
         neo4j_user: str = "neo4j",
@@ -142,12 +143,11 @@ class SBMLClient(Neo4jClient):
         drop_if_exists: bool = False,
         reaction_groups: bool = True,
     ):
-        """
-        Create Neo4j database.
+        """Create Neo4j database.
 
         Args:
             create_db: If False, does not create the database. This is useful
-             for running on neo4j AuraDB when database creation is not allowed.
+                for running on neo4j AuraDB when database creation is not allowed.
             drop_if_exists: See :meth:`.create`.
             reaction_groups: Assume all ``group`` nodes are groups of ``Reaction``
                 nodes. This assumption greatly speeds up the creation of the
@@ -163,8 +163,7 @@ class SBMLClient(Neo4jClient):
         self.reaction_groups = reaction_groups
 
     def sbml_to_graph(self, parser: SBMLParser):
-        """
-        Populate Neo4j database with SBML data. The process is as follows:
+        """Populate Neo4j database with SBML data. The process is as follows:
 
         #. Parse the SBML file. All parsing errors are logged as warnings.
         #. Create the database and constraints.
@@ -196,13 +195,16 @@ class SBMLClient(Neo4jClient):
             # Gene products
             self._gene_products_to_graph(model, parser, rxns)
 
+            # Dummy reverse reactions for easier queries
+            self._add_reverse_reactions_to_graph(reactions)
+
         # Groups, i.e. related reactions in SBML
         self._groups_to_graph(model, parser)
 
     def create_nodes(
         self,
         desc: str,
-        nodes: List[Dict[str, Any]],
+        nodes: list[dict[str, Any]],
         query: str,
         batch_size: int = 1000,
         progress_bar: bool = False,
@@ -241,24 +243,16 @@ class SBMLClient(Neo4jClient):
 
         logger.info(f"Created {len(nodes)} {desc} nodes")
 
-    def _compartments_to_graph(
-        self, compartments: List[Dict[str, Union[str, Dict[str, str]]]]
-    ):
+    def _compartments_to_graph(self, compartments: list[dict[str, Union[str, dict[str, str]]]]):
         self._set_metaid_constraints("Compartment")
-        self.create_nodes(
-            "Compartment", compartments, self.default_cyphers["Compartment"]
-        )
+        self.create_nodes("Compartment", compartments, self.default_cyphers["Compartment"])
 
-    def _compounds_to_graph(
-        self, compounds: List[Dict[str, Union[str, Dict[str, str]]]]
-    ):
+    def _compounds_to_graph(self, compounds: list[dict[str, Union[str, dict[str, str]]]]):
         self._set_metaid_constraints("Compound")
         self._check_rdf_nodes(compounds)
         self.create_nodes("Compound", compounds, self.default_cyphers["Compound"])
 
-    def _reactions_to_graph(
-        self, reactions: List[Dict[str, Union[str, Dict[str, str]]]]
-    ):
+    def _reactions_to_graph(self, reactions: list[dict[str, Union[str, dict[str, str]]]]):
         self._set_metaid_constraints("Reaction")
         self._check_rdf_nodes(reactions)
         self.create_nodes(
@@ -267,6 +261,9 @@ class SBMLClient(Neo4jClient):
             self.default_cyphers["Reaction"],
             progress_bar=True,
         )
+
+    def _add_reverse_reactions_to_graph(self):
+        pass
 
     def _gene_products_to_graph(
         self, model: Model, parser: SBMLParser, reactions: Iterable[Reaction]
@@ -278,15 +275,11 @@ class SBMLClient(Neo4jClient):
 
         self._set_metaid_constraints("GeneProduct")
         gene_prods = parser.collect_gene_products(fbc.getListOfGeneProducts())
-        self.create_nodes(
-            "GeneProduct", gene_prods, self.default_cyphers["GeneProduct"]
-        )
+        self.create_nodes("GeneProduct", gene_prods, self.default_cyphers["GeneProduct"])
         self._check_rdf_nodes(gene_prods)
         self._link_reaction_to_gene_prods(parser, reactions)
 
-    def _link_reaction_to_gene_prods(
-        self, parser: SBMLParser, reactions: Iterable[Reaction]
-    ):
+    def _link_reaction_to_gene_prods(self, parser: SBMLParser, reactions: Iterable[Reaction]):
         (
             reaction_links,
             gene_sets,
@@ -304,18 +297,12 @@ class SBMLClient(Neo4jClient):
                 self.default_cyphers["GeneProductComplex"],
             )
 
-        if set_nodes := (
-            [{"metaId": k, "members": list(v)} for k, v in gene_sets.items()]
-        ):
+        if set_nodes := ([{"metaId": k, "members": list(v)} for k, v in gene_sets.items()]):
             self._set_metaid_constraints("GeneProductSet")
-            self.create_nodes(
-                "GeneProductSet", set_nodes, self.default_cyphers["GeneProductSet"]
-            )
+            self.create_nodes("GeneProductSet", set_nodes, self.default_cyphers["GeneProductSet"])
 
         # Link reactions to these nodes
-        reaction_rels = [
-            {"reaction": k, "target": v} for k, v in reaction_links.items()
-        ]
+        reaction_rels = [{"reaction": k, "target": v} for k, v in reaction_links.items()]
         self.create_nodes(
             "Reaction-GeneProduct",
             reaction_rels,
@@ -344,10 +331,7 @@ class SBMLClient(Neo4jClient):
             )
 
     def _set_metaid_constraints(self, label: str):
-        """
-        Constraints automatically create indexes, so we don't need to
-        create them manually.
-        """
+        """Constraints automatically create indexes, so we don't need to create them manually."""
         if not label:
             raise ValueError("Label must be specified.")
 

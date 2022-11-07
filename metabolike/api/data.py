@@ -66,13 +66,11 @@ def download_df(df):
     return df.to_csv().encode("utf-8")
 
 
-def routes_to_graph(
-    routes, rgm: ReactionGeneMap, pos_color="#FF4B4B", neg_color="#002941"
-):
-    """
-    Generates a graph object used by streamlit for visualizing the routes.
-    Duplicated reaction nodes are dropped but edges are preserved.
-    Edge widths are proportional to the highest-scoring route they belong to.
+def routes_to_graph(routes, rgm: ReactionGeneMap, pos_color="#FF4B4B", neg_color="#002941"):
+    """Generates a graph object used by streamlit for visualizing the routes.
+
+    Duplicated reaction nodes are dropped but edges are preserved. Edge widths are proportional to
+    the highest-scoring route they belong to.
     """
     nodes, edges = {}, {}
     max_score, min_score = -float("inf"), float("inf")
