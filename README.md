@@ -17,4 +17,4 @@ code](https://github.com/y1zhou/metabolike/blob/main/metabolike/api/main.py)
 for easy route search with both example TCGA datasets and custom CSV
 files.
 
-For more details, please visit the [documentation site](https://metabolike.readthedocs.io/en/stable/).
+For more details, please visit the [documentation site](https://metabolike.rtfd.io/).

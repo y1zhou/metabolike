@@ -28,6 +28,6 @@ metabolike: # (1)
 
 A schema of the final built graph is:
 
-![Schema of the MetaCyc database](_static/metabolike_schema.svg){ align=center }
+![Schema of the MetaCyc database](../_static/metabolike_schema.svg)
 
 <figcaption>Schema of the MetaCyc database</figcaption>
