@@ -1,7 +1,9 @@
 # Installation
 
 !!! note
-This package is still under very active development, and **anything** may change at **any moment**. [Semantic versioning](https://semver.org/) will be followed starting from release v1.0.0.
+
+    This package is still under very active development, and **anything** may change at **any moment**.
+    [Semantic versioning](https://semver.org/) will be followed starting from release v1.0.0.
 
 ## Releases from PyPI
 
@@ -35,7 +37,10 @@ pip install . # (1)
 
 ### Contributing
 
-If you would like to contribute to `metabolike`, some extra dependencies including [pytest](https://docs.pytest.org/), [MkDocs](https://www.mkdocs.org/), [black](https://github.com/psf/black), and [pre-commit](https://pre-commit.com/) are needed:
+If you would like to contribute to `metabolike`, some extra dependencies including [pytest](https://docs.pytest.org/),
+[MkDocs](https://www.mkdocs.org/),
+[black](https://github.com/psf/black),
+and [pre-commit](https://pre-commit.com/) are needed:
 
 ```bash
 pip install -e .[dev]

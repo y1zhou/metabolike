@@ -90,17 +90,22 @@ repos:
       - id: shellcheck
 
   # md formatting
-  - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.14
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: "v2.7.1" # Use the sha or tag you want to point at
     hooks:
-      - id: mdformat
-        args: ["--number"]
-        additional_dependencies:
-          - mdformat-gfm
-          - mdformat-tables
-          - mdformat_frontmatter
-          # - mdformat-toc
-          # - mdformat-black
+      - id: prettier
+        types_or: [markdown]
+  #  - repo: https://github.com/executablebooks/mdformat
+  #    rev: 0.7.14
+  #    hooks:
+  #      - id: mdformat
+  #        args: ["--number"]
+  #        additional_dependencies:
+  #          - mdformat-gfm
+  #          - mdformat-tables
+  #          - mdformat_frontmatter
+  # - mdformat-toc
+  # - mdformat-black
 
   # word spelling linter
   - repo: https://github.com/codespell-project/codespell
