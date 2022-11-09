@@ -2,8 +2,8 @@
 
 ## Prerequisites
 
-In this section, you will make use of the parser module of `metabolike`.
-More specifically, you will use the \[`SBML parser module`\]\[parser.sbml\] to extract information from an SBML model file and populate the graph database.
+In this section, you will make use of the parser module of metabolike.
+More specifically, you will use the [`SBML parser module`][parser.sbml] to extract information from an SBML model file and populate the graph database.
 But before that, you will need to set up Neo4j and download a sample SBML file.
 
 ### Neo4j database
@@ -60,7 +60,7 @@ docker run \
 1. The mounted directories `/path/to/[data|logs]` should exist **before** running Docker, otherwise you'll either run
    into permission errors or have files created instead of directories.
 
-The `metabolike` package requires the [APOC library](https://neo4j.com/labs/apoc/4.3/installation/) for complex queries.
+The metabolike package requires the [APOC library](https://neo4j.com/labs/apoc/4.3/installation/) for complex queries.
 You will have to download the binary `jar` file from [their release page](http://github.com/neo4j-contrib/neo4j-apoc-procedures/releases/) and place it in a directory (say `plugins/`).
 For Neo4j 4.4.9, the APOC file you need is `apoc-4.3.0.9-all.jar`.
 When this directory is mounted, the Neo4j image automatically recognizes and loads the plugin:
@@ -133,24 +133,95 @@ You may be prompted to change the password after the first successful connection
 
 ### SBML model files
 
-### Optional files
+Here are two metabolic models of drastically different sizes for you to test out the capabilities of `metabolike`:
 
-#### MetaCyc
+- A [small model](https://github.com/y1zhou/metabolike/blob/main/tests/data/metabolic-reactions.sbml?raw=true) containing the glycolysis pathway. This is also the model metabolike uses for internal tests.
+- The [Human-GEM](https://github.com/SysBioChalmers/Human-GEM/blob/main/model/Human-GEM.xml?raw=true) model, where `GEM` stands for genome-scale metabolic model.
 
-#### BRENDA
+You may download either file (or bring your own SBML model of interest) and save it to a local directory. In later sections, we will be using the small model for demonstration purposes.
 
-To populate the database, you will also need to acquire the [BioCyc data files](https://biocyc.org/download.shtml) and
-the [BRENDA text file](https://www.brenda-enzymes.org/download_brenda_without_registration.php).
-The `metabolike` package doesn't include the data sources since they are large and require license agreements. Please
-download the data files and extract them for later use.
+## Metabolic graph setup
 
-The MetaCyc (BioCyc) database is imported to the graph database using the provided SBML file and various `.dat` files.
-The BRENDA text file is then mapped onto the graph using common EC numbers and KEGG reaction IDs.
+To let metabolike parse the SBML model and transform it to a graph, the easiest way is to use the provided CLI tool.
+If you have followed [installation instructions](./installation.md), try running the following command and see if you get the same help message:
 
-## SBML model parsing
+```shell-session
+$ metabolike setup --help
+Usage: metabolike setup [OPTIONS]
 
-A schema of the final built graph is:
+Options:
+  -c, --config TEXT             Path to the configuration file.  [required]
+  --create-db / --no-create-db  When database creation is not allowed, set
+                                this to False.  [default: create-db]
+  -f, --drop-if-exists          Drop the database if it already exists.
+  --help                        Show this message and exit.
+```
 
-![Schema of the MetaCyc database](../_static/metabolike_schema.svg)
+??? info "What are these options?"
+In some restricted environments (e.g. Neo4j AuraDB), the user may not have database creation privileges.
+The `--no-create-db` option is provided so that you can manually create the database and skip the metabolike procedure.
+The `-f` flag is for overriding existing databases. Handy for debugging, but be _very careful_ with it in production environments.
 
-<figcaption>Schema of the MetaCyc database</figcaption>
+As the `-c` option suggests, a config file needs to be created. Use your favorite text editor and edit the following template:
+
+```yaml title="metabolike-setup.yaml"
+neo4j:
+  uri: "neo4j://localhost:7687"
+  user: neo4j
+  password: <my-fancy-long-password>
+  database: neo4j
+
+metacyc:
+  sbml: /path/to/model.sbml
+```
+
+> TODO: explain the `uri` field.
+
+Change the password to your actual password, and the file path to wherever you've stored the SBML model downloaded earlier.
+The following command will then parse the SBML model and feed it into the Neo4j graph database (it should take no more than a few seconds):
+
+```shell-session
+$ metabolike setup -c metabolike-setup.yaml
+[INFO] 2022-11-10 00:26:48,858 - metabolike.config:58:load_config - Parsing config file metabolike-setup.yaml
+[INFO] 2022-11-10 00:26:48,860 - metabolike.main:32:setup - Connecting to neo4j database
+[INFO] 2022-11-10 00:26:49,259 - metabolike.parser.metacyc:77:__init__ - Input files: {'reactions': None, 'atom_mapping': None, 'pathways': None, 'compounds': None, 'publications': None, 'classes': None}
+[INFO] 2022-11-10 00:26:49,259 - metabolike.main:42:setup - Setting up database using <class 'metabolike.parser.metacyc.MetacycParser'>
+[INFO] 2022-11-10 00:26:49,281 - metabolike.parser.sbml:58:read_sbml - Finished reading SBML file
+[INFO] 2022-11-10 00:26:49,325 - metabolike.db.sbml:229:create_nodes - Creating Compartment nodes
+[INFO] 2022-11-10 00:26:49,358 - metabolike.db.sbml:243:create_nodes - Created 33 Compartment nodes
+Compounds: 100%|█████████████████████████████████████████████████| 45/45 [00:00<00:00, 22026.34it/s]
+[INFO] 2022-11-10 00:26:49,426 - metabolike.db.sbml:229:create_nodes - Creating Compound nodes
+[INFO] 2022-11-10 00:26:49,523 - metabolike.db.sbml:243:create_nodes - Created 45 Compound nodes
+Reactions: 100%|██████████████████████████████████████████████████| 12/12 [00:00<00:00, 4906.10it/s]
+[INFO] 2022-11-10 00:26:49,572 - metabolike.db.sbml:229:create_nodes - Creating Reaction nodes
+Reaction: 1it [00:00,  9.73it/s]
+[INFO] 2022-11-10 00:26:49,675 - metabolike.db.sbml:243:create_nodes - Created 12 Reaction nodes
+GeneProducts: 100%|████████████████████████████████████████████| 118/118 [00:00<00:00, 22386.82it/s]
+[INFO] 2022-11-10 00:26:49,718 - metabolike.db.sbml:229:create_nodes - Creating GeneProduct nodes
+[INFO] 2022-11-10 00:26:49,777 - metabolike.db.sbml:243:create_nodes - Created 118 GeneProduct nodes
+Associated GeneProduct: 100%|█████████████████████████████████████| 12/12 [00:00<00:00, 9907.80it/s]
+[INFO] 2022-11-10 00:26:49,812 - metabolike.db.sbml:229:create_nodes - Creating GeneProductComplex nodes
+[INFO] 2022-11-10 00:26:49,851 - metabolike.db.sbml:243:create_nodes - Created 1 GeneProductComplex nodes
+[INFO] 2022-11-10 00:26:49,883 - metabolike.db.sbml:229:create_nodes - Creating GeneProductSet nodes
+[INFO] 2022-11-10 00:26:49,933 - metabolike.db.sbml:243:create_nodes - Created 12 GeneProductSet nodes
+[INFO] 2022-11-10 00:26:49,933 - metabolike.db.sbml:229:create_nodes - Creating Reaction-GeneProduct nodes
+[INFO] 2022-11-10 00:26:49,998 - metabolike.db.sbml:243:create_nodes - Created 12 Reaction-GeneProduct nodes
+[WARNING] 2022-11-10 00:26:49,998 - metabolike.db.sbml:332:_groups_to_graph - No groups plugin found in SBML file.
+[WARNING] 2022-11-10 00:26:50,001 - metabolike.db.metacyc:177:_reactions_dat_to_graph - No reactions.dat file given
+[WARNING] 2022-11-10 00:26:50,002 - metabolike.db.metacyc:274:_smiles_dat_to_graph - No atom-mappings-smiles.dat file given
+[WARNING] 2022-11-10 00:26:50,002 - metabolike.db.metacyc:291:_compounds_dat_to_graph - No compounds.dat file given
+[WARNING] 2022-11-10 00:26:50,002 - metabolike.db.metacyc:311:_citations_dat_to_graph - No pubs.dat file given
+[WARNING] 2022-11-10 00:26:50,002 - metabolike.db.metacyc:327:_classes_dat_to_graph - No classes.dat file given
+```
+
+Congratulations! You've successfully imported your first SBML model into the graph database.
+If you'd like a visual check, head to [localhost:7474](http://localhost:7474) and type in the following query:
+
+```cypher
+MATCH (n) WHERE (n:Reaction OR n:Compound OR n:GeneProduct) RETURN n;
+```
+
+If you were also using the sample glycolysis model, the returned graph should look somewhat like the one presented below.
+Here the orange nodes are metabolites/compounds, purple nodes are reactions, red nodes are gene products (enzymes), and the other nodes are sets/complexes of gene products.
+
+![Glycolysis graph](../_static/glycolysis.svg)
