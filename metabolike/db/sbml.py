@@ -25,7 +25,7 @@ UNWIND $batch_nodes AS n
     ON CREATE SET c += n.props
   FOREACH (rdf IN n.rdf |
     CREATE (r:RDF)
-    SET r = rdf.rdf
+      SET r = rdf.rdf
     MERGE (r)<-[rel:hasRDF]-(c)
       ON CREATE SET rel.bioQualifier = rdf.bioQual
   );
@@ -37,7 +37,7 @@ UNWIND $batch_nodes AS n
     ON CREATE SET gp += n.props
   FOREACH (rdf IN n.rdf |
     CREATE (r:RDF)
-    SET r = rdf.rdf
+      SET r = rdf.rdf
     MERGE (r)<-[rel:hasRDF]-(gp)
       ON CREATE SET rel.bioQualifier = rdf.bioQual
   );
@@ -45,7 +45,8 @@ UNWIND $batch_nodes AS n
 
 _gene_product_complex_cypher = """
 UNWIND $batch_nodes AS n
-  CREATE (gpc:GeneProductComplex:GeneProduct {metaId: n.metaId})
+  MERGE (gpc:GeneProduct {metaId: n.metaId})
+    SET gpc:GeneProductComplex:GeneProduct
   FOREACH (g IN n.components |
     MERGE (gp:GeneProduct {metaId: g})
     MERGE (gpc)-[:hasComponent]->(gp)
@@ -68,7 +69,7 @@ UNWIND $batch_nodes AS n
     ON CREATE SET r += n.props
   FOREACH (rdf IN n.rdf |
     CREATE (x:RDF)
-    SET x = rdf.rdf
+      SET x = rdf.rdf
     MERGE (x)<-[rel:hasRDF]-(r)
       ON CREATE SET rel.bioQualifier = rdf.bioQual
   )
@@ -262,7 +263,7 @@ class SBMLClient(Neo4jClient):
             progress_bar=True,
         )
 
-    def _add_reverse_reactions_to_graph(self):
+    def _add_reverse_reactions_to_graph(self, reactions: Iterable[Reaction]):
         pass
 
     def _gene_products_to_graph(

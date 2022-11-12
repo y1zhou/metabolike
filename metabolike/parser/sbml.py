@@ -79,10 +79,12 @@ class SBMLParser:
         self,
         compounds: Iterable[libsbml.Species],
     ) -> list[dict[str, Union[str, dict[str, str]]]]:
-        nodes = []
+        nodes = {}
         for c in tqdm(compounds, desc="Compounds"):
+            if (metaId := c.getId()) in nodes:
+                continue
             node = {
-                "metaId": c.getId(),
+                "metaId": metaId,
                 "props": {
                     "name": c.getName(),
                     "boundaryCondition": c.getBoundaryCondition(),
@@ -97,17 +99,19 @@ class SBMLParser:
             cvterms: list[libsbml.CVTerm] = c.getCVTerms()
             node["rdf"] = [self._cvterm_to_rdf(cvterm) for cvterm in cvterms]
 
-            nodes.append(node)
+            nodes[metaId] = node
 
-        return nodes
+        return list(nodes.values())
 
     def collect_gene_products(
         self, gene_prods: Iterable[libsbml.GeneProduct]
     ) -> list[dict[str, Union[str, dict[str, str]]]]:
-        nodes = []
+        nodes = {}
         for gp in tqdm(gene_prods, desc="GeneProducts"):
+            if (metaId := gp.getId()) in nodes:
+                continue
             node = {
-                "metaId": gp.getId(),
+                "metaId": metaId,
                 "props": {
                     "name": gp.getName(),
                     "label": gp.getLabel(),
@@ -116,18 +120,20 @@ class SBMLParser:
             cvterms: list[libsbml.CVTerm] = gp.getCVTerms()
             node["rdf"] = [self._cvterm_to_rdf(cvterm) for cvterm in cvterms]
 
-            nodes.append(node)
+            nodes[metaId] = node
 
-        return nodes
+        return list(nodes.values())
 
     def collect_reactions(
         self, reactions: Iterable[libsbml.Reaction]
     ) -> list[dict[str, Union[str, dict[str, str]]]]:
-        nodes = []
+        nodes = {}
         for r in tqdm(reactions, desc="Reactions"):
             r: libsbml.Reaction
+            if (metaId := r.getId()) in nodes:
+                continue
             node = {
-                "metaId": r.getId(),
+                "metaId": metaId,
                 "props": {
                     "name": r.getName(),
                     "fast": r.getFast(),
@@ -143,9 +149,9 @@ class SBMLParser:
             products = r.getListOfProducts()
             node["products"] = self._get_reaction_compounds(products)
 
-            nodes.append(node)
+            nodes[metaId] = node
 
-        return nodes
+        return list(nodes.values())
 
     @staticmethod
     def collect_groups(
