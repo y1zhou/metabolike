@@ -17,7 +17,7 @@ class SBMLParser:
     FAQs can be found at:
 
     * [MetaCyc data files download](https://metacyc.org/downloads.shtml)
-    * [MetaCyc file formats](http://bioinformatics.ai.sri.com/ptools/flatfile-format.html)
+    * [MetaCyc file formats](https://bioinformatics.ai.sri.com/ptools/flatfile-format.html)
     * [SBML FAQ](https://synonym.caltech.edu/documents/faq)
 
     Args:
@@ -50,6 +50,7 @@ class SBMLParser:
         self.sbml_file = validate_path(sbml)
         if not self.sbml_file:
             raise ValueError("Missing SBML file path.")
+        logger.info(f"SBML file: {self.sbml_file}")
 
     @staticmethod
     def read_sbml(sbml_file: Path) -> libsbml.SBMLDocument:
@@ -152,6 +153,26 @@ class SBMLParser:
             nodes[metaId] = node
 
         return list(nodes.values())
+
+    @staticmethod
+    def collect_reverse_reactions(
+        reactions: Iterable[libsbml.Reaction],
+    ) -> list[dict[str, Union[str, dict[str, str]]]]:
+        rev_reactions = []
+        for r in reactions:
+            if r["props"].get("reversible"):
+                node = {
+                    "metaId": f"rev-{r['metaId']}",
+                    "props": {
+                        "name": f"rev-{r['props']['name']}",
+                        "fast": r["props"]["fast"],
+                    },
+                    "reactants": r["products"],
+                    "products": r["reactants"],
+                }
+                rev_reactions.append(node)
+
+        return rev_reactions
 
     @staticmethod
     def collect_groups(

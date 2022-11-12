@@ -85,6 +85,22 @@ UNWIND $batch_nodes AS n
   );
 """
 
+_reverse_reaction_cypher = """
+UNWIND $batch_nodes AS n
+  MERGE (r:ReverseReaction {metaId: n.metaId})
+    ON CREATE SET r += n.props, r:ReverseReaction:Reaction
+  FOREACH (reactant IN n.reactants |
+    MERGE (c:Compound {metaId: reactant.cpdId})
+    MERGE (r)-[rel:hasLeft]->(c)
+      ON CREATE SET rel = reactant.props
+  )
+  FOREACH (product IN n.products |
+    MERGE (c:Compound {metaId: product.cpdId})
+    MERGE (r)-[rel:hasRight]->(c)
+      ON CREATE SET rel = product.props
+  );
+"""
+
 _reaction_gene_product_cypher = """
 UNWIND $batch_nodes AS n
   MERGE (r:Reaction {metaId: n.reaction})
@@ -128,6 +144,7 @@ class SBMLClient(Neo4jClient):
         "Compound": _compound_cypher,
         "GeneProduct": _gene_product_cypher,
         "Reaction": _reaction_cypher,
+        "ReverseReaction": _reverse_reaction_cypher,
         "Group": _group_cypher,
         "GeneProductComplex": _gene_product_complex_cypher,
         "GeneProductSet": _gene_product_set_cypher,
@@ -197,7 +214,8 @@ class SBMLClient(Neo4jClient):
             self._gene_products_to_graph(model, parser, rxns)
 
             # Dummy reverse reactions for easier queries
-            self._add_reverse_reactions_to_graph(reactions)
+            rev_reactions = parser.collect_reverse_reactions(reactions)
+            self._reverse_reactions_to_graph(rev_reactions)
 
         # Groups, i.e. related reactions in SBML
         self._groups_to_graph(model, parser)
@@ -263,8 +281,14 @@ class SBMLClient(Neo4jClient):
             progress_bar=True,
         )
 
-    def _add_reverse_reactions_to_graph(self, reactions: Iterable[Reaction]):
-        pass
+    def _reverse_reactions_to_graph(self, reactions: list[dict[str, Union[str, dict[str, str]]]]):
+        self._set_metaid_constraints("ReverseReaction")
+        self.create_nodes(
+            "ReverseReaction",
+            reactions,
+            self.default_cyphers["ReverseReaction"],
+            progress_bar=True,
+        )
 
     def _gene_products_to_graph(
         self, model: Model, parser: SBMLParser, reactions: Iterable[Reaction]

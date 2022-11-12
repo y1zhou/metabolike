@@ -20,7 +20,7 @@ class MetacycParser(SBMLParser):
     FAQs can be found at:
 
     * MetaCyc data files download: https://metacyc.org/downloads.shtml
-    * MetaCyc file formats: http://bioinformatics.ai.sri.com/ptools/flatfile-format.html
+    * MetaCyc file formats: https://bioinformatics.ai.sri.com/ptools/flatfile-format.html
     * SBML FAQ: https://synonym.caltech.edu/documents/faq
 
     See :class:`.sbml.SBMLParser` for more information on SBML parsing.
