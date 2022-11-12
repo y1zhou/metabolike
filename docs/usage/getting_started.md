@@ -182,43 +182,47 @@ The following command will then parse the SBML model and feed it into the Neo4j 
 
 ```shell-session
 $ metabolike setup -c metabolike-setup.yaml
-[INFO] 2022-11-10 00:26:48,858 - metabolike.config:58:load_config - Parsing config file metabolike-setup.yaml
-[INFO] 2022-11-10 00:26:48,860 - metabolike.main:32:setup - Connecting to neo4j database
-[INFO] 2022-11-10 00:26:49,259 - metabolike.parser.metacyc:77:__init__ - Input files: {'reactions': None, 'atom_mapping': None, 'pathways': None, 'compounds': None, 'publications': None, 'classes': None}
-[INFO] 2022-11-10 00:26:49,259 - metabolike.main:42:setup - Setting up database using <class 'metabolike.parser.metacyc.MetacycParser'>
-[INFO] 2022-11-10 00:26:49,281 - metabolike.parser.sbml:58:read_sbml - Finished reading SBML file
-[INFO] 2022-11-10 00:26:49,325 - metabolike.db.sbml:229:create_nodes - Creating Compartment nodes
-[INFO] 2022-11-10 00:26:49,358 - metabolike.db.sbml:243:create_nodes - Created 33 Compartment nodes
-Compounds: 100%|█████████████████████████████████████████████████| 45/45 [00:00<00:00, 22026.34it/s]
-[INFO] 2022-11-10 00:26:49,426 - metabolike.db.sbml:229:create_nodes - Creating Compound nodes
-[INFO] 2022-11-10 00:26:49,523 - metabolike.db.sbml:243:create_nodes - Created 45 Compound nodes
-Reactions: 100%|██████████████████████████████████████████████████| 12/12 [00:00<00:00, 4906.10it/s]
-[INFO] 2022-11-10 00:26:49,572 - metabolike.db.sbml:229:create_nodes - Creating Reaction nodes
-Reaction: 1it [00:00,  9.73it/s]
-[INFO] 2022-11-10 00:26:49,675 - metabolike.db.sbml:243:create_nodes - Created 12 Reaction nodes
-GeneProducts: 100%|████████████████████████████████████████████| 118/118 [00:00<00:00, 22386.82it/s]
-[INFO] 2022-11-10 00:26:49,718 - metabolike.db.sbml:229:create_nodes - Creating GeneProduct nodes
-[INFO] 2022-11-10 00:26:49,777 - metabolike.db.sbml:243:create_nodes - Created 118 GeneProduct nodes
-Associated GeneProduct: 100%|█████████████████████████████████████| 12/12 [00:00<00:00, 9907.80it/s]
-[INFO] 2022-11-10 00:26:49,812 - metabolike.db.sbml:229:create_nodes - Creating GeneProductComplex nodes
-[INFO] 2022-11-10 00:26:49,851 - metabolike.db.sbml:243:create_nodes - Created 1 GeneProductComplex nodes
-[INFO] 2022-11-10 00:26:49,883 - metabolike.db.sbml:229:create_nodes - Creating GeneProductSet nodes
-[INFO] 2022-11-10 00:26:49,933 - metabolike.db.sbml:243:create_nodes - Created 12 GeneProductSet nodes
-[INFO] 2022-11-10 00:26:49,933 - metabolike.db.sbml:229:create_nodes - Creating Reaction-GeneProduct nodes
-[INFO] 2022-11-10 00:26:49,998 - metabolike.db.sbml:243:create_nodes - Created 12 Reaction-GeneProduct nodes
-[WARNING] 2022-11-10 00:26:49,998 - metabolike.db.sbml:332:_groups_to_graph - No groups plugin found in SBML file.
-[WARNING] 2022-11-10 00:26:50,001 - metabolike.db.metacyc:177:_reactions_dat_to_graph - No reactions.dat file given
-[WARNING] 2022-11-10 00:26:50,002 - metabolike.db.metacyc:274:_smiles_dat_to_graph - No atom-mappings-smiles.dat file given
-[WARNING] 2022-11-10 00:26:50,002 - metabolike.db.metacyc:291:_compounds_dat_to_graph - No compounds.dat file given
-[WARNING] 2022-11-10 00:26:50,002 - metabolike.db.metacyc:311:_citations_dat_to_graph - No pubs.dat file given
-[WARNING] 2022-11-10 00:26:50,002 - metabolike.db.metacyc:327:_classes_dat_to_graph - No classes.dat file given
+[INFO] 2022-11-12 21:32:55,371 - metabolike.config:57:load_config - Parsing config file metabolike-setup.yaml
+[INFO] 2022-11-12 21:32:55,372 - metabolike.main:34:setup - Connecting to neo4j database
+[INFO] 2022-11-12 21:32:55,766 - metabolike.parser.sbml:53:__init__ - SBML file: /y1zhou/metabolike/tests/data/metabolic-reactions.sbml
+[INFO] 2022-11-12 21:32:55,767 - metabolike.parser.metacyc:77:__init__ - Input files: {'reactions': None, 'atom_mapping': None, 'pathways': None, 'compounds': None, 'publications': None, 'classes': None}
+[INFO] 2022-11-12 21:32:55,767 - metabolike.main:44:setup - Setting up database using <class 'metabolike.parser.metacyc.MetacycParser'>
+[INFO] 2022-11-12 21:32:55,791 - metabolike.parser.sbml:59:read_sbml - Finished reading SBML file
+[INFO] 2022-11-12 21:32:55,833 - metabolike.db.sbml:249:create_nodes - Creating Compartment nodes
+[INFO] 2022-11-12 21:32:55,861 - metabolike.db.sbml:263:create_nodes - Created 33 Compartment nodes
+Compounds: 100%|█████████████████████████████████████████████████| 45/45 [00:00<00:00, 29390.17it/s]
+[INFO] 2022-11-12 21:32:55,947 - metabolike.db.sbml:249:create_nodes - Creating Compound nodes
+[INFO] 2022-11-12 21:32:56,005 - metabolike.db.sbml:263:create_nodes - Created 18 Compound nodes
+Reactions: 100%|█████████████████████████████████████████████████| 12/12 [00:00<00:00, 26958.57it/s]
+[INFO] 2022-11-12 21:32:56,039 - metabolike.db.sbml:249:create_nodes - Creating Reaction nodes
+Reaction: 1it [00:00, 10.62it/s]
+[INFO] 2022-11-12 21:32:56,134 - metabolike.db.sbml:263:create_nodes - Created 12 Reaction nodes
+GeneProducts: 100%|████████████████████████████████████████████| 118/118 [00:00<00:00, 29507.42it/s]
+[INFO] 2022-11-12 21:32:56,160 - metabolike.db.sbml:249:create_nodes - Creating GeneProduct nodes
+[INFO] 2022-11-12 21:32:56,202 - metabolike.db.sbml:263:create_nodes - Created 117 GeneProduct nodes
+Associated GeneProduct: 100%|█████████████████████████████████████| 12/12 [00:00<00:00, 9599.78it/s]
+[INFO] 2022-11-12 21:32:56,240 - metabolike.db.sbml:249:create_nodes - Creating GeneProductComplex nodes
+[INFO] 2022-11-12 21:32:56,284 - metabolike.db.sbml:263:create_nodes - Created 1 GeneProductComplex nodes
+[INFO] 2022-11-12 21:32:56,317 - metabolike.db.sbml:249:create_nodes - Creating GeneProductSet nodes
+[INFO] 2022-11-12 21:32:56,350 - metabolike.db.sbml:263:create_nodes - Created 12 GeneProductSet nodes
+[INFO] 2022-11-12 21:32:56,350 - metabolike.db.sbml:249:create_nodes - Creating Reaction-GeneProduct nodes
+[INFO] 2022-11-12 21:32:56,382 - metabolike.db.sbml:263:create_nodes - Created 12 Reaction-GeneProduct nodes
+[INFO] 2022-11-12 21:32:56,415 - metabolike.db.sbml:249:create_nodes - Creating ReverseReaction nodes
+ReverseReaction: 1it [00:00, 20.91it/s]
+[INFO] 2022-11-12 21:32:56,463 - metabolike.db.sbml:263:create_nodes - Created 9 ReverseReaction nodes
+[WARNING] 2022-11-12 21:32:56,464 - metabolike.db.sbml:340:_groups_to_graph - No groups plugin found in SBML file.
+[WARNING] 2022-11-12 21:32:56,468 - metabolike.db.metacyc:177:_reactions_dat_to_graph - No reactions.dat file given
+[WARNING] 2022-11-12 21:32:56,468 - metabolike.db.metacyc:274:_smiles_dat_to_graph - No atom-mappings-smiles.dat file given
+[WARNING] 2022-11-12 21:32:56,468 - metabolike.db.metacyc:291:_compounds_dat_to_graph - No compounds.dat file given
+[WARNING] 2022-11-12 21:32:56,468 - metabolike.db.metacyc:311:_citations_dat_to_graph - No pubs.dat file given
+[WARNING] 2022-11-12 21:32:56,468 - metabolike.db.metacyc:327:_classes_dat_to_graph - No classes.dat file given
 ```
 
 Congratulations! You've successfully imported your first SBML model into the graph database.
 If you'd like a visual check, head to [localhost:7474](http://localhost:7474) and type in the following query:
 
 ```cypher
-MATCH (n) WHERE (n:Reaction OR n:Compound OR n:GeneProduct) RETURN n;
+MATCH (n) WHERE NOT (n:Compartment OR n:RDF) RETURN n LIMIT 500;
 ```
 
 If you were also using the sample glycolysis model, the returned graph should look somewhat like the one presented below.
