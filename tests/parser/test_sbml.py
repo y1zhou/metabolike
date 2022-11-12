@@ -129,6 +129,26 @@ def test_collect_reactions(sbml_parser: SBMLParser, sbml_model: Model):
     }
 
 
+def test_collect_reverse_reactions(sbml_parser: SBMLParser, sbml_model: Model):
+    reactions = sbml_model.getListOfReactions()
+    reaction_nodes = sbml_parser.collect_reactions(reactions)
+    nodes = sbml_parser.collect_reverse_reactions(reaction_nodes)
+
+    assert isinstance(nodes, list)
+    assert len(nodes) == 9
+    assert all("metaId" in n for n in nodes)
+    assert all("props" in n for n in nodes)
+    assert all("reactants" in n for n in nodes)
+    assert all("products" in n for n in nodes)
+
+    assert nodes[0] == {
+        "metaId": "rev-RXN__45__15513",
+        "props": {"name": "rev-RXN-15513", "fast": False},
+        "products": [{"cpdId": "_2__45__PG_c", "props": {"stoichiometry": 1.0, "constant": True}}],
+        "reactants": [{"cpdId": "G3P_c", "props": {"stoichiometry": 1.0, "constant": True}}],
+    }
+
+
 @pytest.fixture
 def complex_node():
     n = libsbml.FbcAnd()
