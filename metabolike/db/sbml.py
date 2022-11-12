@@ -88,7 +88,7 @@ UNWIND $batch_nodes AS n
 _reverse_reaction_cypher = """
 UNWIND $batch_nodes AS n
   MERGE (r:ReverseReaction {metaId: n.metaId})
-    ON CREATE SET r += n.props, r:ReverseReaction:Reaction
+    ON CREATE SET r += n.props
   FOREACH (reactant IN n.reactants |
     MERGE (c:Compound {metaId: reactant.cpdId})
     MERGE (r)-[rel:hasLeft]->(c)

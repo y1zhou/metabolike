@@ -162,6 +162,8 @@ class ReactionGeneMap:
         """
         res = 0.0
         for rxn_id in rxn_ids:
+            if rxn_id.startswith("rev-"):
+                rxn_id = rxn_id[4:]
             if (gene_exp := self.rxn_exp.get(rxn_id)) is not None:
                 res += gene_exp
 

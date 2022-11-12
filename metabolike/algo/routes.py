@@ -375,7 +375,9 @@ def find_compound_outflux_routes(
         valid_genes = set(expressed_genes)
         all_genes = get_table_of_gene_products(db)
         bad_rxns = [x["rxn_id"] for x in all_genes if x["gene"] not in valid_genes]
+        bad_rev_rxns = [f"rev-{x}" for x in bad_rxns]
         ignore_nodes += bad_rxns
+        ignore_nodes += bad_rev_rxns
 
     if drop_nodes is not None:
         ignore_nodes += drop_nodes
@@ -400,7 +402,7 @@ def find_compound_outflux_routes(
         MATCH (c:Compound {metaId: $cpd_id})
         CALL apoc.path.expandConfig(c, {
             beginSequenceAtStart: false,
-            sequence: "<hasLeft,Reaction,hasRight>,Compound,<hasLeft",
+            sequence: "<hasLeft,Reaction|ReverseReaction,hasRight>,Compound,<hasLeft",
             blacklistNodes: ns,
             uniqueness: "NODE_PATH",
             bfs: true,
@@ -442,11 +444,13 @@ def find_compound_outflux_routes(
 
     # Another case is when the end metabolite is in `ignore_nodes`.
     # These end reactions are dropped.
-    routes = [r for r in routes if r["route"][-1]["nodeType"] != "Reaction"]
+    routes = [
+        r for r in routes if r["route"][-1]["nodeType"] not in {"Reaction", "ReverseReaction"}
+    ]
 
     # Get genes associated with each route
     rxns_in_route = {
-        str(i): {x["id"] for x in r["route"] if x["nodeType"] == "Reaction"}
+        str(i): {x["id"] for x in r["route"] if x["nodeType"] in {"Reaction", "ReverseReaction"}}
         for i, r in enumerate(routes)
     }
     route_expression_levels = [
