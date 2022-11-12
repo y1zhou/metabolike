@@ -64,7 +64,7 @@ class Neo4jClient:
             **kwargs: Keyword arguments to pass to :meth:`BaseDB.run`.
         """
         with self.driver.session(database=self.database) as ss:
-            ss.write_transaction(lambda tx: tx.run(cypher, **kwargs))
+            ss.execute_write(lambda tx: tx.run(cypher, **kwargs))
 
     def read(self, cypher: str, **kwargs) -> list[dict[str, Any]]:
         """Helper function to read from the database. Streams all records in the query into a list
@@ -75,7 +75,7 @@ class Neo4jClient:
             **kwargs: Parameters to pass to the Cypher query.
         """
         with self.driver.session(database=self.database) as ss:
-            return ss.read_transaction(lambda tx: tx.run(cypher, **kwargs).data())
+            return ss.execute_read(lambda tx: tx.run(cypher, **kwargs).data())
 
     def read_tx(self, tx_func: Callable, **kwargs) -> list[Any]:
         """Helper function to read from the database.
@@ -86,4 +86,4 @@ class Neo4jClient:
                 the Cypher query.
         """
         with self.driver.session(database=self.database) as ss:
-            return ss.read_transaction(tx_func, **kwargs)
+            return ss.execute_read(tx_func, **kwargs)

@@ -38,7 +38,7 @@ def test_read_tx(db: Neo4jClient):
 
 def test_write(mocker: MockerFixture, db: Neo4jClient):
     q = "CREATE (n:Movie) SET n.title = $title"
-    mocked_session = mocker.patch("neo4j.Session.write_transaction")
+    mocked_session = mocker.patch("neo4j.Session.execute_write")
     db.write(q, title="The Matrix")
 
     args, _ = mocked_session.call_args
