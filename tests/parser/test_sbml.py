@@ -42,7 +42,7 @@ def test_collect_compounds(sbml_parser: SBMLParser, sbml_model: Model):
     nodes = sbml_parser.collect_compounds(species)
 
     assert isinstance(nodes, list)
-    assert len(nodes) == 45
+    assert len(nodes) == 18  # Duplicated nodes
     assert all("metaId" in n for n in nodes)
     assert all("props" in n for n in nodes)
     assert all("compartment" in n for n in nodes)
@@ -82,7 +82,7 @@ def test_collect_gene_products(sbml_parser: SBMLParser, sbml_model: Model):
     nodes = sbml_parser.collect_gene_products(gene_products)
 
     assert isinstance(nodes, list)
-    assert len(nodes) == 118
+    assert len(nodes) == 117
     assert all("metaId" in n for n in nodes)
     assert all("props" in n for n in nodes)
     assert all("rdf" in n for n in nodes)
