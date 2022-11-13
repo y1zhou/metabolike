@@ -15,11 +15,10 @@ for path in sorted(Path(src_dir).glob("**/*.py")):
 
     # Focus on module-level files
     if parts[-1] == "__init__":
-        parts = parts[:-1]
+        if len(parts) > 1:
+            parts = parts[:-1]
         doc_path = doc_path.with_name("index.md")
         full_doc_path = full_doc_path.with_name("index.md")
-    if len(parts) < 1 or parts[-1] == "__main__":
-        continue
 
     nav[parts] = doc_path
 
