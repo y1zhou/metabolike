@@ -14,7 +14,7 @@ from metabolike.api.data import (
     routes_to_graph,
 )
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="Metabolike")
 st.title("Route search with metabolike")
 
 # Connect to Neo4j database
