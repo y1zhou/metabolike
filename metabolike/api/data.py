@@ -37,6 +37,7 @@ def neo4j_db():
         neo4j_password=neo4j_password,
         database=neo4j_database,
     )
+    _con.driver.verify_connectivity()
     return _con
 
 
@@ -98,7 +99,7 @@ def routes_to_graph(routes, rgm: ReactionGeneMap, pos_color="#FF4B4B", neg_color
                     nodes[step["id"]] = n
                 # TODO: color nodes based on structural similarity?
 
-            elif step["nodeType"] == "Reaction":
+            elif step["nodeType"] in {"Reaction", "ReverseReaction"}:
                 n_src = r[i - 1]["id"]
                 _ = edges.setdefault(n_src, {})
 
