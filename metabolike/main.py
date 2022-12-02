@@ -52,7 +52,7 @@ def setup(
 
 @app.command()
 def serve():
-    """Serves an API to the graph database.
+    """Serves a Streamlit app for  graph database.
 
     The command uses the following environment variables to configure the
     database connection: METABOLIKE_DB_URI, METABOLIKE_DB_USER,

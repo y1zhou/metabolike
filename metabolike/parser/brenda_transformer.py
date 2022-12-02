@@ -31,7 +31,7 @@ class BaseTransformer(Transformer):
 class GenericTreeTransformer(BaseTransformer):
     """Transform extracted values from bottom-up.
 
-    Formats the tree into a dictionary, as described in [entry()][parser.brenda_transformer.GenericTreeTransformer.entry].
+    Formats the tree into a dictionary with child token types as keys.
     """
 
     def description(self, children: list[Token]) -> Token:
